@@ -6,6 +6,7 @@ public enum NikoCLI {
     /// when the process should carry on and launch the menu-bar app.
     public static func run(arguments: [String]) -> Int32? {
         guard let command = arguments.first else { return nil }
+        var args = Arguments(Array(arguments.dropFirst()))
         switch command {
         case "--version", "-v", "version":
             print("niko-island \(NikoVersion.current)")
@@ -13,10 +14,18 @@ public enum NikoCLI {
         case "--help", "-h", "help":
             print(usage)
             return 0
+        case "install": return install(&args, action: .install)
+        case "uninstall": return install(&args, action: .uninstall)
+        case "scan": return scan(&args)
+        case "status": return status(&args)
+        case "doctor": return doctor(&args)
+        case "diagnostics": return diagnostics(&args)
+        case "pricing": return pricing(&args)
+        case "internal": return internalCommand(&args)
         default:
             // Finder/LaunchServices may pass `-psn_…`/`-NS…` style arguments: that is an app launch.
             if command.hasPrefix("-") { return nil }
-            FileHandle.standardError.write(Data("niko-island: unknown command '\(command)'\n\n\(usage)\n".utf8))
+            fail("unknown command '\(command)'\n\n\(usage)")
             return 64
         }
     }
@@ -25,8 +34,246 @@ public enum NikoCLI {
     Niko Island \(NikoVersion.current) — menu-bar companion for AI coding agents
 
     USAGE
-      niko-island                 launch the menu-bar app
-      niko-island --version       print the version
-      niko-island --help          show this help
+      niko-island                       launch the menu-bar app
+      niko-island install [options]     register hooks (scan first, back up, verify, roll back on failure)
+          --dry-run                     show what would change, change nothing
+          --agents a,b,…                choose agents (default: stable adapters only)
+          --all                         every detected agent, including experimental adapters
+          --no-statusline               do not touch the Claude Code status line
+      niko-island uninstall [options]   remove every niko-bridge entry; agents keep working
+          --dry-run                     show what would change, change nothing
+          --purge                       also delete ~/.niko-island and config backups
+      niko-island scan [--versions]     read-only report of detected agents
+      niko-island status                is the app running, which agents are wired
+      niko-island doctor                check permissions, shims and the bundle
+      niko-island diagnostics [--out F] redacted report for bug reports
+      niko-island pricing refresh       download the latest pricing table (the only network call; opt-in)
+      niko-island --version | --help
+
+    Agent ids: \(AgentRegistry.installable.map(\.id).joined(separator: ", "))
     """
+
+    static func fail(_ message: String) {
+        FileHandle.standardError.write(Data("niko-island: \(message)\n".utf8))
+    }
+
+    struct Arguments {
+        private var items: [String]
+        init(_ items: [String]) { self.items = items }
+
+        mutating func flag(_ name: String) -> Bool {
+            guard let index = items.firstIndex(of: name) else { return false }
+            items.remove(at: index)
+            return true
+        }
+
+        mutating func value(_ name: String) -> String? {
+            guard let index = items.firstIndex(of: name), index + 1 < items.count else { return nil }
+            let value = items[index + 1]
+            items.removeSubrange(index...(index + 1))
+            return value
+        }
+
+        mutating func positional() -> String? { items.isEmpty ? nil : items.removeFirst() }
+        var leftovers: [String] { items }
+    }
+
+    private static func home(_ args: inout Arguments) -> URL {
+        if let override = args.value("--home") {
+            return URL(fileURLWithPath: NikoPaths.canonicalPath(override))
+        }
+        return NikoPaths.userHome()
+    }
+
+    private static func rejectLeftovers(_ args: Arguments) -> Bool {
+        guard let extra = args.leftovers.first else { return false }
+        fail("unexpected argument '\(extra)'")
+        return true
+    }
+
+    // MARK: install / uninstall
+
+    static func install(_ args: inout Arguments, action: InstallAction) -> Int32 {
+        var options = InstallOptions(home: home(&args), paths: .resolve())
+        options.dryRun = args.flag("--dry-run")
+        options.purge = args.flag("--purge")
+        if args.flag("--no-statusline") { options.includeStatusLine = false }
+        let all = args.flag("--all")
+        if let list = args.value("--agents") {
+            let ids = list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+            let unknown = ids.filter { AgentRegistry.descriptor($0) == nil }
+            guard unknown.isEmpty else {
+                fail("unknown agent id: \(unknown.joined(separator: ", "))")
+                return 64
+            }
+            let planned = ids.filter { AgentRegistry.descriptor($0)?.stability == .planned }
+            guard planned.isEmpty else {
+                fail("no adapter yet for: \(planned.joined(separator: ", ")) (planned)")
+                return 64
+            }
+            options.agentIDs = ids
+        } else if all, action == .install {
+            options.agentIDs = AgentRegistry.installable.map(\.id)
+        }
+        if rejectLeftovers(args) { return 64 }
+        if options.purge, action == .install {
+            fail("--purge only applies to uninstall")
+            return 64
+        }
+        options.bridgeBinary = Shims.locateBridgeBinary()
+        options.appExecutable = Bundle.main.executablePath
+
+        let installer = Installer(options: options)
+        let experimental = installer.agents(for: action).filter { $0.stability == .experimental }
+        if action == .install, !experimental.isEmpty {
+            print("Experimental adapters selected: \(experimental.map(\.id).joined(separator: ", ")).")
+            print("Their wiring follows INTEGRATIONS.md and has not been validated against live agents.\n")
+        }
+        print("Scanning \(options.home.path) …")
+        let result = installer.run(action)
+        print(result.report(home: options.home.path))
+        if action == .install, result.succeeded, !options.dryRun, options.bridgeBinary == nil {
+            print("note: bridge binary not found next to this executable; hooks stay inert until the app is installed.")
+        }
+        return result.succeeded ? 0 : 1
+    }
+
+    // MARK: scan / status / doctor / diagnostics
+
+    static func scan(_ args: inout Arguments) -> Int32 {
+        let home = home(&args)
+        let versions = args.flag("--versions")
+        if rejectLeftovers(args) { return 64 }
+        print("Agents under \(home.path) (read-only scan):")
+        Diagnostics.agentSummary(home: home, includeVersions: versions).forEach { print("  " + $0) }
+        return 0
+    }
+
+    static func status(_ args: inout Arguments) -> Int32 {
+        let home = home(&args)
+        if rejectLeftovers(args) { return 64 }
+        let paths = NikoPaths.resolve()
+        print("app: \(Diagnostics.isAppRunning(paths: paths) ? "running" : "not running") (\(paths.socket.path))")
+        Diagnostics.agentSummary(home: home).forEach { print("  " + $0) }
+        return 0
+    }
+
+    static func doctor(_ args: inout Arguments) -> Int32 {
+        let home = home(&args)
+        if rejectLeftovers(args) { return 64 }
+        let paths = NikoPaths.resolve()
+        var problems = 0
+        func check(_ label: String, _ ok: Bool, _ detail: String = "") {
+            print("\(ok ? "ok  " : "FAIL") \(label)\(detail.isEmpty ? "" : " — \(detail)")")
+            if !ok { problems += 1 }
+        }
+        print("Niko Island \(NikoVersion.current)")
+        for directory in [paths.root, paths.run] where FileManager.default.fileExists(atPath: directory.path) {
+            do {
+                try SecureDirectory.validate(directory)
+                var st = stat()
+                lstat(directory.path, &st)
+                check(directory.path, st.st_mode & 0o777 == 0o700, "mode \(String(st.st_mode & 0o777, radix: 8))")
+            } catch {
+                check(directory.path, false, "\(error)")
+            }
+        }
+        if FileManager.default.fileExists(atPath: paths.ingressToken.path) {
+            var st = stat()
+            lstat(paths.ingressToken.path, &st)
+            check("ingress token is private", st.st_mode & 0o777 == 0o600)
+        }
+        print("info app \(Diagnostics.isAppRunning(paths: paths) ? "running" : "not running")")
+        let shimPresent = FileManager.default.isExecutableFile(atPath: paths.bridgeShim.path)
+        print("info bridge shim \(shimPresent ? "installed" : "not installed (run `niko-island install`)")")
+        if let bridge = Shims.locateBridgeBinary() {
+            check("bridge binary", true, bridge)
+        } else {
+            check("bridge binary", false, "not found next to this executable")
+        }
+        if Bundle.main.bundleURL.pathExtension == "app", let bridge = Shims.locateBridgeBinary() {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: bridge)
+            process.arguments = ["--integrity-check", Bundle.main.bundleURL.path]
+            process.standardOutput = FileHandle.nullDevice
+            if (try? process.run()) != nil {
+                process.waitUntilExit()
+                check("bundle integrity", process.terminationStatus == 0)
+            }
+        }
+        print("Agents:")
+        Diagnostics.agentSummary(home: home).forEach { print("  " + $0) }
+        print(problems == 0 ? "No problems found." : "\(problems) problem(s) found.")
+        return problems == 0 ? 0 : 1
+    }
+
+    static func diagnostics(_ args: inout Arguments) -> Int32 {
+        let home = home(&args)
+        let out = args.value("--out")
+        if rejectLeftovers(args) { return 64 }
+        let text = Diagnostics.export(paths: .resolve(), home: home)
+        if let out {
+            do {
+                try Data(text.utf8).write(to: URL(fileURLWithPath: out), options: .atomic)
+                print("wrote \(out)")
+            } catch {
+                fail("could not write \(out): \(error.localizedDescription)")
+                return 1
+            }
+        } else {
+            print(text, terminator: "")
+        }
+        return 0
+    }
+
+    static func pricing(_ args: inout Arguments) -> Int32 {
+        fail("pricing commands arrive with the usage engine")
+        return 64
+    }
+
+    // MARK: internal helpers (CI)
+
+    static func internalCommand(_ args: inout Arguments) -> Int32 {
+        switch args.positional() {
+        case "dump-scripts":
+            guard let directory = args.positional() else {
+                fail("usage: niko-island internal dump-scripts <dir>")
+                return 64
+            }
+            return dumpScripts(to: URL(fileURLWithPath: directory))
+        default:
+            fail("unknown internal command")
+            return 64
+        }
+    }
+
+    /// Writes every shell snippet we generate so CI can run shellcheck over them.
+    static func dumpScripts(to directory: URL) -> Int32 {
+        let defaults = NikoPaths(root: NikoPaths.userHome().appendingPathComponent(".niko-island"), isDefaultLocation: true)
+        let custom = NikoPaths(root: URL(fileURLWithPath: "/tmp/odd path's/ni"))
+        var files: [(String, String)] = []
+        for (label, paths) in [("default", defaults), ("custom", custom)] {
+            files.append(("bridge-shim.\(label).sh", Shims.bridgeShim(paths: paths)))
+            files.append(("statusline.\(label).bash", Shims.statuslineScript(paths: paths)))
+            files.append(("statusline-chained.\(label).bash",
+                          Shims.statuslineScript(paths: paths, userSection: Shims.chainedUserSection(originalCommand: "cat"))))
+            files.append(("hook-command.\(label).sh", "#!/bin/sh\n" + Shims.hookCommand(paths: paths, source: "claude") + "\n"))
+            files.append(("hook-command-deny.\(label).sh",
+                          "#!/bin/sh\n" + Shims.hookCommand(paths: paths, source: "generic", extraArguments: ["--reply", "exit-code"], propagateDeny: true) + "\n"))
+            files.append(("statusline-command.\(label).sh", "#!/bin/sh\n" + Shims.statuslineCommand(paths: paths) + "\n"))
+        }
+        files.append(("cli-shim.sh", Shims.cliShim(appExecutable: "/Applications/Niko Island.app/Contents/MacOS/niko-island")))
+        files.append(("scan-probe.sh", ScanProbe.script(agents: AgentRegistry.installable, includeVersions: true)))
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for (name, content) in files {
+                try Data(content.utf8).write(to: directory.appendingPathComponent(name))
+            }
+        } catch {
+            fail("\(error.localizedDescription)")
+            return 1
+        }
+        print("wrote \(files.count) scripts to \(directory.path)")
+        return 0
+    }
 }

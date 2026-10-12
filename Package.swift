@@ -35,7 +35,7 @@ let package = Package(
         ),
         .testTarget(
             name: "NikoAppTests",
-            dependencies: ["NikoIslandApp", "NikoCore", "niko-bridge"]
+            dependencies: ["NikoIslandApp", "NikoCore", "niko-bridge", "niko-island"]
         ),
     ]
 )

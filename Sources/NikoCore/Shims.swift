@@ -150,7 +150,7 @@ public enum Shims {
     /// Writes the shims (0755) and the bridge cache. Preserves an existing statusline user section.
     @discardableResult
     public static func install(paths: NikoPaths, bridgeBinary: String?, appExecutable: String?,
-                               statuslineUserSection: String? = nil) throws -> WriteReport {
+                               statuslineUserSection: String? = nil, overrideUserSection: Bool = false) throws -> WriteReport {
         try SecureDirectory.ensureTree(paths)
         var report = WriteReport()
         func put(_ text: String, _ url: URL, mode: mode_t) throws {
@@ -160,7 +160,8 @@ public enum Shims {
             report.written.append(url.path)
         }
         try put(bridgeShim(paths: paths), paths.bridgeShim, mode: 0o755)
-        let existing = (try? String(contentsOf: paths.statuslineScript, encoding: .utf8)).flatMap(extractUserSection)
+        let existing = overrideUserSection ? nil
+            : (try? String(contentsOf: paths.statuslineScript, encoding: .utf8)).flatMap(extractUserSection)
         try put(statuslineScript(paths: paths, userSection: existing ?? statuslineUserSection),
                 paths.statuslineScript, mode: 0o755)
         if let bridgeBinary {

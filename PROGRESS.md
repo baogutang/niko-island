@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-12T22:50:00+08:00
-milestone: M3
-done: [M0, M1, M2]
-next: "M3 — Sources/NikoCore/Installer/: ScanProbe.swift (POSIX sh probe, <<<NI:section>>> output, base64 size-capped), AgentRegistry.swift (descriptors from INTEGRATIONS.md), HookMerge.swift (settings-JSON merge/strip by marker), Installer.swift (plan/dry-run → apply atomically with .niko-backup-<ts> → verify by rescan → rollback; uninstall), NikoSettings.swift; CLI install/uninstall/scan; fixture tests"
+updated: 2026-10-12T21:58:44+0800
+milestone: M4
+done: [M0, M1, M2, M3]
+next: "M4 — NikoCore/SessionStore.swift + Questions.swift + TerminalJump.swift (pure, tested); NikoIslandApp: AppModel (ingress wiring, pending approvals, session rules), PanelView/SessionCard/PermissionCard/QuestionWizard, Notifier (UNUserNotificationCenter + click → AppleScript jump), preview renderer (ImageRenderer → docs/panel.png), docs/TESTPLAN.md, Assets/Localizable.xcstrings"
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -25,3 +25,15 @@ notes:
   - "M2 shim: sh shim maps bridge exit status {2→2, anything else→0}; NIKO_BRIDGE_BIN env override (dev/tests); miss remembered 60 min in bin/.bridge-miss; redirects grouped so a deleted runtime dir cannot make the shim fail (found by test)"
   - "M2 statusline: bash script, rate-limit capture is backgrounded; user section between '# >>> niko-island user section >>>' markers is preserved on rewrite; a pre-existing foreign statusLine command gets chained into the user section and its original JSON saved to cache/statusline-original.json for uninstall"
   - "Tests locate built products via Bundle(for:).bundleURL/.. (works for .build/<triple>/debug)"
+  - "(earlier 'updated' timestamps in git history were estimates; from here they come from `date`)"
+  - "M3 installer: default `install` wires STABLE adapters only (= Claude Code). Everything else is experimental and opt-in via --agents/--all because its hook format follows INTEGRATIONS.md and was not validated against a live agent tonight. Planned (no adapter): kimi, deepseek, droid, pi, openclaw, amp."
+  - "M3 doubt to flag in HANDOFF: INTEGRATIONS.md says Cursor/Gemini use the Claude hook shape; I believe Cursor's real hooks.json uses its own event names (beforeShellExecution…) and Gemini CLI hooks live in settings.json — hence experimental, never default."
+  - "M3 experimental settings-shape agents get status-only events (no PermissionRequest): approvals are Claude-only until each agent's decision contract is verified"
+  - "M3 Claude wiring: 11 events (canonical 10 + PostCompact), matcher '*' except Pre/PostCompact 'manual|auto', timeout 10s except PermissionRequest 86400; command = /bin/sh -c '[ -x shim ] && shim --source claude; exit 0'"
+  - "M3 statusLine: only `command` is swapped (other keys kept); original object saved to cache/statusline-original.json and its command chained in the script's user section; uninstall restores it"
+  - "M3 safety: scan (POSIX sh probe, base64, 1 MiB cap) must succeed before any write; each write re-checks bytes against the scan (changed → abort); backups <file>.niko-backup-<yyyyMMdd-HHmmss> for shared configs only (newest 3 kept); verify = rescan; any failure rolls back every file and deletes that run's backups; symlinked configs are written through the link"
+  - "M3 uninstall hands back the ORIGINAL BYTES from the newest pristine backup when nothing else changed; otherwise re-serialises in the file's detected style. Known edge: an empty \"hooks\": {} the user had is dropped if no pristine backup matches."
+  - "M3 invalid JSON / non-object / odd shapes / unreadable / >1 MiB configs are skipped with a reason, never rewritten"
+  - "M3 partial uninstall (--agents x) keeps shims; full uninstall removes shims, keeps usage data + backups unless --purge"
+  - "Tests/NikoAppTests/TestSupport.swift is a copy of the NikoCoreTests one (HookMergeTests.testSupportFilesStayInSync guards drift) — after editing one, cp to the other"
+  - "CLI: install/uninstall/scan/status/doctor/diagnostics/internal dump-scripts (pricing refresh lands in M5); `--home DIR` + NIKO_ISLAND_HOME make everything testable off the real home"
