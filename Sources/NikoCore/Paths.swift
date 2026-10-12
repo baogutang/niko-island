@@ -7,8 +7,22 @@ public struct NikoPaths: Sendable, Equatable {
     public let isDefaultLocation: Bool
 
     public init(root: URL, isDefaultLocation: Bool = false) {
-        self.root = root.standardizedFileURL
+        self.root = URL(fileURLWithPath: NikoPaths.normalize(root.path))
         self.isDefaultLocation = isDefaultLocation
+    }
+
+    /// Purely lexical clean-up (`.`/`..`/duplicate slashes). Foundation's
+    /// `standardizedFileURL` also strips `/private`, which would make a path
+    /// differ from its own realpath and trip the hardening check.
+    public static func normalize(_ path: String) -> String {
+        var parts: [Substring] = []
+        for part in path.split(separator: "/", omittingEmptySubsequences: true) {
+            if part == "." { continue }
+            if part == ".." { _ = parts.popLast(); continue }
+            parts.append(part)
+        }
+        let joined = parts.joined(separator: "/")
+        return path.hasPrefix("/") ? "/" + joined : joined
     }
 
     public static let homeOverrideVariable = "NIKO_ISLAND_HOME"
@@ -36,7 +50,8 @@ public struct NikoPaths: Sendable, Equatable {
     public static func resolve(environment: [String: String] = ProcessInfo.processInfo.environment) -> NikoPaths {
         if let override = environment[homeOverrideVariable], !override.isEmpty {
             // Canonicalise the parent only: the leaf is ours to create and must not be a symlink.
-            let url = URL(fileURLWithPath: override).standardizedFileURL
+            let absolute = override.hasPrefix("/") ? override : FileManager.default.currentDirectoryPath + "/" + override
+            let url = URL(fileURLWithPath: normalize(absolute))
             let parent = canonicalPath(url.deletingLastPathComponent().path)
             return NikoPaths(root: URL(fileURLWithPath: parent).appendingPathComponent(url.lastPathComponent))
         }
@@ -70,7 +85,7 @@ public struct NikoPaths: Sendable, Equatable {
     /// default location (portable across machines), else a single-quoted absolute path.
     public func shellPath(_ url: URL) -> String {
         let rootPath = root.path
-        let path = url.standardizedFileURL.path
+        let path = NikoPaths.normalize(url.path)
         if isDefaultLocation, path.hasPrefix(rootPath + "/") {
             let suffix = String(path.dropFirst(rootPath.count))
             return "\"$HOME/.niko-island\(ShellQuote.doubleQuotedBody(suffix))\""
@@ -120,7 +135,7 @@ public enum SecureDirectoryError: Error, CustomStringConvertible, Equatable {
 /// and resolving to exactly the path we asked for (PROTOCOLS §2.1).
 public enum SecureDirectory {
     public static func ensure(_ url: URL, mode: mode_t = 0o700) throws {
-        let path = url.standardizedFileURL.path
+        let path = NikoPaths.normalize(url.path)
         var st = stat()
         if lstat(path, &st) != 0 {
             guard errno == ENOENT else { throw SecureDirectoryError.createFailed(path, errno) }
@@ -137,7 +152,7 @@ public enum SecureDirectory {
 
     /// Read-only check; never creates or chmods.
     public static func validate(_ url: URL) throws {
-        let path = url.standardizedFileURL.path
+        let path = NikoPaths.normalize(url.path)
         var st = stat()
         guard lstat(path, &st) == 0 else { throw SecureDirectoryError.notDirectory(path) }
         try validate(path: path, st: st)
