@@ -1,0 +1,46 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: build + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-15]
+    steps:
+      - uses: actions/checkout@v5
+      - name: Toolchain
+        run: |
+          swift --version
+          sw_vers
+      - name: Build
+        run: swift build --build-tests
+      - name: Test
+        run: swift test
+      - name: Shell lint (generated scripts and repo scripts)
+        run: |
+          command -v shellcheck >/dev/null || brew install shellcheck
+          "$(swift build --show-bin-path)/niko-island" internal dump-scripts "$RUNNER_TEMP/scripts"
+          shellcheck --version | head -n 2
+          shellcheck "$RUNNER_TEMP"/scripts/*.sh
+          shellcheck --shell=bash "$RUNNER_TEMP"/scripts/*.bash scripts/*.sh
+      - name: Assemble app (host architecture)
+        run: scripts/make-app.sh
+      - name: Bundle self-check
+        run: |
+          APP="dist/Niko Island.app"
+          codesign --verify --deep --strict "$APP"
+          "$APP/Contents/Helpers/niko-bridge" --integrity-check "$APP"
+          "$APP/Contents/MacOS/niko-island" --version
+      - name: Launch smoke test
+        run: scripts/smoke-launch.sh

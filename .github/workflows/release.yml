@@ -1,0 +1,116 @@
+name: release
+
+# Tag push (vX.Y.Z)  → GitHub Release with a universal, ad-hoc signed app.
+# Manual dispatch    → refreshes the rolling "nightly" pre-release from the chosen ref.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: universal app
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - name: Toolchain
+        run: |
+          swift --version
+          sw_vers
+      - name: Test
+        run: swift test
+      - name: Version
+        id: version
+        run: |
+          SOURCE_VERSION="$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sources/NikoCore/Version.swift | head -n 1)"
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            if [ "$TAG_VERSION" != "$SOURCE_VERSION" ]; then
+              echo "::error::tag $GITHUB_REF_NAME does not match Version.swift ($SOURCE_VERSION)"
+              exit 1
+            fi
+            echo "version=$SOURCE_VERSION" >> "$GITHUB_OUTPUT"
+          else
+            echo "version=$SOURCE_VERSION-nightly.$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build universal app (arm64 + x86_64), ad-hoc signed
+        env:
+          NIKO_VERSION: ${{ steps.version.outputs.version }}
+        run: scripts/make-app.sh --universal --zip
+      - name: Verify the artifact
+        run: |
+          APP="dist/Niko Island.app"
+          test "$(lipo -archs "$APP/Contents/MacOS/niko-island")" = "x86_64 arm64"
+          test "$(lipo -archs "$APP/Contents/Helpers/niko-bridge")" = "x86_64 arm64"
+          codesign --verify --deep --strict "$APP"
+          codesign -dv "$APP" 2>&1 | grep -q "Signature=adhoc"
+          "$APP/Contents/Helpers/niko-bridge" --integrity-check "$APP"
+          # Native slice.
+          "$APP/Contents/MacOS/niko-island" --version
+          "$APP/Contents/Helpers/niko-bridge" --version
+          # Intel slice, under Rosetta.
+          /usr/sbin/softwareupdate --install-rosetta --agree-to-license >/dev/null 2>&1 || true
+          arch -x86_64 "$APP/Contents/MacOS/niko-island" --version
+          arch -x86_64 "$APP/Contents/Helpers/niko-bridge" --version
+          # The zip unpacks to the same, still-valid bundle.
+          mkdir -p "$RUNNER_TEMP/unzipped"
+          ditto -x -k dist/*.zip "$RUNNER_TEMP/unzipped"
+          codesign --verify --deep --strict "$RUNNER_TEMP/unzipped/Niko Island.app"
+          (cd dist && shasum -a 256 -c SHA256SUMS)
+      - name: Launch smoke test
+        run: scripts/smoke-launch.sh
+      - uses: actions/upload-artifact@v4
+        with:
+          name: niko-island-${{ steps.version.outputs.version }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS
+          if-no-files-found: error
+      - name: Release notes
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          {
+            awk -v v="${VERSION%%-nightly*}" '
+              $0 ~ "^## \\[" v "\\]" { printing = 1; next }
+              printing && /^## \[/ { exit }
+              printing { print }
+            ' CHANGELOG.md
+            echo
+            echo "### Install"
+            echo
+            echo "Download the zip, unzip it, move **Niko Island.app** to Applications."
+            echo "The app is ad-hoc signed (no Apple Developer account), so the first launch needs one extra step:"
+            echo "right-click the app → **Open** → **Open**, or run \`xattr -cr \"/Applications/Niko Island.app\"\`."
+            echo
+            echo "Verify the download with \`shasum -a 256 -c SHA256SUMS\`."
+          } > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md"
+      - name: Publish tagged release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
+            --title "Niko Island ${{ steps.version.outputs.version }}" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag
+      - name: Publish nightly pre-release
+        if: github.ref_type != 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
+          gh release create nightly dist/*.zip dist/SHA256SUMS \
+            --prerelease \
+            --target "$GITHUB_SHA" \
+            --title "Niko Island nightly (${{ steps.version.outputs.version }})" \
+            --notes-file "$RUNNER_TEMP/notes.md"

@@ -76,3 +76,53 @@ enum PreviewRenderer {
         }
     }
 }
+
+/// The app icon, drawn in code: the same pill-with-a-dot as the menu-bar
+/// glyph on a dark tile. Original artwork, no third-party assets.
+@MainActor
+enum IconRenderer {
+    private struct IconView: View {
+        var body: some View {
+            ZStack {
+                RoundedRectangle(cornerRadius: 186, style: .continuous)
+                    .fill(LinearGradient(colors: [Color(red: 0.13, green: 0.15, blue: 0.20), Color(red: 0.04, green: 0.05, blue: 0.07)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .overlay(RoundedRectangle(cornerRadius: 186, style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 6))
+                    .frame(width: 824, height: 824)
+                Capsule()
+                    .fill(LinearGradient(colors: [Color(red: 0.47, green: 0.92, blue: 0.80), Color(red: 0.25, green: 0.74, blue: 0.64)],
+                                         startPoint: .top, endPoint: .bottom))
+                    .frame(width: 560, height: 204)
+                    .shadow(color: Theme.working.opacity(0.45), radius: 70, y: 18)
+                Circle()
+                    .fill(Color(red: 0.05, green: 0.06, blue: 0.08))
+                    .frame(width: 104, height: 104)
+                    .offset(x: 170)
+            }
+            .frame(width: 1024, height: 1024)
+        }
+    }
+
+    /// Writes a complete `.iconset` directory (for `iconutil -c icns`).
+    static func writeIconset(to directory: URL) -> Bool {
+        let variants: [(name: String, pixels: CGFloat)] = [
+            ("icon_16x16", 16), ("icon_16x16@2x", 32), ("icon_32x32", 32), ("icon_32x32@2x", 64),
+            ("icon_128x128", 128), ("icon_128x128@2x", 256), ("icon_256x256", 256), ("icon_256x256@2x", 512),
+            ("icon_512x512", 512), ("icon_512x512@2x", 1024),
+        ]
+        do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            for variant in variants {
+                let renderer = ImageRenderer(content: IconView())
+                renderer.scale = variant.pixels / 1024
+                guard let cgImage = renderer.cgImage else { return false }
+                let bitmap = NSBitmapImageRep(cgImage: cgImage)
+                guard let png = bitmap.representation(using: .png, properties: [:]) else { return false }
+                try png.write(to: directory.appendingPathComponent(variant.name + ".png"))
+            }
+            return true
+        } catch {
+            return false
+        }
+    }
+}

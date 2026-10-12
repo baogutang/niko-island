@@ -276,6 +276,14 @@ public enum NikoCLI {
                 return 64
             }
             return dumpScripts(to: URL(fileURLWithPath: directory))
+        case "render-icon":
+            guard let directory = args.positional() else {
+                fail("usage: niko-island internal render-icon <AppIcon.iconset>")
+                return 64
+            }
+            return MainActor.assumeIsolated {
+                IconRenderer.writeIconset(to: URL(fileURLWithPath: directory)) ? 0 : 1
+            }
         case "render-preview":
             guard let directory = args.positional() else {
                 fail("usage: niko-island internal render-preview <dir>")

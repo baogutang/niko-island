@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-12T22:32:04+0800
-milestone: M6
-done: [M0, M1, M2, M3, M4, M5]
-next: "M6 — LICENSE (MIT); app icon (drawn in code → Assets/AppIcon.icns); scripts/make-app.sh --universal --zip verified locally (lipo + Rosetta run); .github/workflows/{ci,release,pages}.yml; docs/panel.png from render-preview; README.md + README.zh-CN.md (BUILD-PLAN quality bar); website/index.html; docs/ROADMAP.md; local tag v0.1.0 comes AFTER M7 review"
+updated: 2026-10-12T22:40:45+0800
+milestone: M7
+done: [M0, M1, M2, M3, M4, M5, M6]
+next: "M7 — walk REVIEW.md item by item, record evidence in docs/REVIEW-RESULTS.md, fix blockers (known: PROTOCOLS.md mentions a third-party probe name), then: scripts/check.sh → commit → tag v0.1.0 → gh repo create niko-island --public --source=. --push → push tag → watch release.yml + ci.yml (shellcheck runs only there) → gh api enable Pages (build_type=workflow) → run pages.yml → verify site + release assets → file issues for non-blockers → HANDOFF.md"
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -58,3 +58,10 @@ notes:
   - "M5 rate limits: bridge --task statusline-cache writes cache/rl.json; RateLimits.parse is lenient and drops windows whose reset time has passed"
   - "ENV: raw.githubusercontent.com is flaky here (timeouts); api.github.com via gh works. Expect the same for git push / release verification → retry, use gh api."
   - "Swift type-checker: avoid long mixed int/float literal sums in one expression (tests timed out compiling)"
+  - "M6 release: scripts/make-app.sh --universal --zip verified locally: lipo = x86_64 arm64 for both binaries, ad-hoc signature verifies, x86_64 slice runs under Rosetta, zip 3.2 MB, SHA256SUMS checks. Release-build cold start → first accepted event: 536–729 ms."
+  - "M6 workflows: ci.yml (macos-15: build, test, shellcheck of generated + repo scripts, make-app, integrity check, smoke launch), release.yml (tag v* → tests → universal zip → verify incl. Rosetta → gh release create; workflow_dispatch → rolling `nightly` pre-release), pages.yml (uploads website/ as a Pages artifact; Pages must be enabled with build_type=workflow). Tag must equal Version.swift or the release job fails."
+  - "M6 decision: the local tag v0.1.0 is created AFTER the M7 fixes, not at the end of M6, so the tag points at the reviewed commit"
+  - "M6 artwork is generated from code: scripts/make-assets.sh → Assets/AppIcon.icns (IconRenderer), docs/images/panel-*.png and website/*.png (PreviewRenderer with sample sessions). README says these are rendered images, not desktop screenshots."
+  - "M6 docs: README.md + README.zh-CN.md (full translation), website/index.html (single file, inline CSS, EN/中文 toggle by ?lang= or browser language, no external requests, no storage), docs/ROADMAP.md, CHANGELOG.md (release notes are cut from the [version] section), LICENSE (MIT). DocsTests keeps README agent table, links and CLI flags in step with the code."
+  - "M6 website verified in the built-in browser at 375 px: scrollWidth == innerWidth (a hero image overflow was found and fixed), all images load, zero external requests"
+  - "Local preview: .claude/launch.json (git-ignored) serves website/ on 127.0.0.1:8731"
