@@ -12,7 +12,7 @@ First public release.
   requests and questions answered from the panel.
 - Approvals: allow once, always allow a tool for the session, allow all for
   the session, deny, or hand the decision back to the terminal. A pending
-  request never resolves on its own.
+  request stays until you decide or the agent withdraws it.
 - Local notifications with click-to-jump back to the terminal tab
   (Terminal.app, iTerm2, tmux aware).
 - Installer that scans first, backs up, verifies and rolls back; `uninstall`

@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-13T01:11:49+0800
-milestone: M7
-done: [M0, M1, M2, M3, M4, M5, M6]
-next: "M7 step 4c — CI is green on main at 332dcc4 (run 38282312709). Pages is live at https://baogutang.github.io/niko-island/. Now: git tag -a v0.1.0 && git push origin v0.1.0 → watch release.yml → verify assets (zip + SHA256SUMS) by downloading; then 4e issues, 4f HANDOFF.md + final PROGRESS"
+updated: 2026-10-13T01:19:42+0800
+milestone: DONE
+done: [M0, M1, M2, M3, M4, M5, M6, M7]
+next: "Nothing left from the overnight plan. v0.1.0 is published. Follow-ups are the open issues #1–#6 (start with #1: confirm against a live Claude Code session) and the four owner decisions listed in HANDOFF.md."
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -76,3 +76,6 @@ notes:
   - "M7 CI risk: runners are macos-15 (default Xcode 16.x = Swift 6.1, older SDK) while local is Xcode 26.3 / Swift 6.2 → Sendable annotations in the SDK may differ; expect to fix forward from the first CI log. Soak bound is 1.5 s when CI is set."
   - "New CLI in M7: `niko-island usage` (totals from local transcripts) and `niko-island internal listen <s>` (headless ingress printing event names/keys, never values; replies no-decision to blocking requests)"
   - "PUBLISH LOG: repo created + pushed 2026-10-13 01:03 CST; Pages enabled via gh api (build_type=workflow), pages.yml run 38281725163 green, site + 4 images return 200; ci.yml needed two follow-ups (SC1003 documented exception on sample wrappers, SC2164 in scripts/check.sh) and is green at 332dcc4 on macos-15 — the runner's Swift 6.1 toolchain built the code unchanged"
+  - "RELEASE LOG: tag v0.1.0 → ee192f2; release.yml run 38282638652 green (tests, universal build, lipo + codesign + Rosetta checks, smoke launch, gh release create). Release assets re-downloaded and verified: Niko-Island-0.1.0-universal.zip (3,418,350 bytes, sha256 d1d79e79…bda20), SHA256SUMS; releases/latest → v0.1.0; every external README link returns 200."
+  - "Issues filed for open items: #1 live Claude Code session, #2 notification click-through, #3 notch layout, #4 experimental adapters (Cursor/Gemini format doubts), #5 Intel + fresh account, #6 usage engine follow-ups"
+  - "After the tag: CHANGELOG wording aligned with the README ('stays until you decide or the agent withdraws it') and the release notes on GitHub refreshed to match; HANDOFF.md written; these commits are on main after v0.1.0"
