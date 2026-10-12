@@ -1,0 +1,429 @@
+import Darwin
+import Foundation
+
+/// Parsed `niko-bridge` command line (PROTOCOLS §3).
+public struct BridgeInvocation: Sendable, Equatable {
+    public enum ReplyMode: String, Sendable { case json, exitCode = "exit-code" }
+
+    public var source = "unknown"
+    public var task: String?
+    public var cacheFile: String?
+    public var integrityCheck: String?
+    public var showVersion = false
+    /// Adapter says this event blocks for a decision even though it is not a PermissionRequest.
+    public var forceBlocking = false
+    public var replyMode: ReplyMode = .json
+
+    public init() {}
+
+    /// Lenient by design: unknown flags are ignored, never fatal.
+    public static func parse(_ arguments: [String]) -> BridgeInvocation {
+        var invocation = BridgeInvocation()
+        var index = 0
+        func value() -> String? {
+            guard index + 1 < arguments.count else { return nil }
+            index += 1
+            return arguments[index]
+        }
+        while index < arguments.count {
+            switch arguments[index] {
+            case "--source": if let v = value() { invocation.source = v }
+            case "--task": invocation.task = value()
+            case "--cache-file": invocation.cacheFile = value()
+            case "--integrity-check": invocation.integrityCheck = value()
+            case "--reply": if let v = value(), let mode = ReplyMode(rawValue: v) { invocation.replyMode = mode }
+            case "--blocking": invocation.forceBlocking = true
+            case "--version": invocation.showVersion = true
+            default: break
+            }
+            index += 1
+        }
+        return invocation
+    }
+}
+
+public struct BridgeResult: Sendable, Equatable {
+    public var exitCode: Int32 = 0
+    public var stdout = Data()
+    public var stderr = Data()
+
+    public static let silentSuccess = BridgeResult()
+    public var stdoutText: String { String(decoding: stdout, as: UTF8.self) }
+    public var stderrText: String { String(decoding: stderr, as: UTF8.self) }
+}
+
+public struct BridgeConfiguration: Sendable {
+    public var paths: NikoPaths
+    public var environment: [String: String]
+    public var connectTimeoutMS: Int32 = 250
+    public var sendTimeoutMS: Int32 = 1000
+    /// How long a fire-and-forget event waits for the app to take the bytes.
+    public var ackTimeoutMS: Int32 = 400
+    /// PROTOCOLS §2.2: hooks are registered with an 86400 s timeout; we give up a little earlier.
+    public var replyTimeout: TimeInterval = 23 * 3600
+    /// Called right before the long wait for a decision, so the caller can disarm its watchdog.
+    public var willAwaitReply: @Sendable () -> Void = {}
+
+    public init(paths: NikoPaths = .resolve(), environment: [String: String] = ProcessInfo.processInfo.environment) {
+        self.paths = paths
+        self.environment = environment
+    }
+}
+
+/// A user decision as the agent should see it.
+public struct BridgeDecision: Sendable, Equatable {
+    public enum Behavior: String, Sendable { case allow, deny }
+
+    public var behavior: Behavior
+    /// `block`: deny and stop the agent's current turn.
+    public var interrupt: Bool
+    public var reason: String?
+    public var updatedInput: JSONObject?
+
+    public init(behavior: Behavior, interrupt: Bool = false, reason: String? = nil, updatedInput: JSONObject? = nil) {
+        self.behavior = behavior
+        self.interrupt = interrupt
+        self.reason = reason
+        self.updatedInput = updatedInput
+    }
+
+    /// Parses the app's reply line (PROTOCOLS §2.2). `nil` means "no decision":
+    /// the bridge then stays silent and the agent falls back to its own prompt.
+    public init?(replyLine: JSONValue) {
+        guard replyLine["ok"]?.boolValue != false, let reply = replyLine["reply"], !reply.isNull else { return nil }
+        let decision = reply.at("hookSpecificOutput", "decision") ?? reply["decision"] ?? reply
+        guard let raw = (decision["behavior"] ?? decision["decision"])?.stringValue?.lowercased() else { return nil }
+        switch raw {
+        case "approve", "allow": behavior = .allow; interrupt = false
+        case "deny": behavior = .deny; interrupt = false
+        case "block": behavior = .deny; interrupt = true
+        default: return nil
+        }
+        reason = (decision["reason"] ?? decision["message"])?.stringValue
+        updatedInput = decision["updatedInput"]?.objectValue
+    }
+}
+
+public enum BridgeRunner {
+    public static let maxFrameBytes = LineFramer.defaultMaxLineBytes
+    static let slimStringLimit = 4096
+    static let promptLimit = 512
+
+    /// Entry point. Whatever goes wrong in here, the result is exit 0 with no
+    /// output — the agent must never fail because we do. The only non-zero
+    /// exits are a user's explicit deny in exit-code mode (2) and the
+    /// integrity self-check (1), which no hook ever calls.
+    public static func run(_ invocation: BridgeInvocation, stdin: Data, configuration: BridgeConfiguration) -> BridgeResult {
+        if invocation.showVersion {
+            return BridgeResult(stdout: Data("niko-bridge \(NikoVersion.current)\n".utf8))
+        }
+        if let bundle = invocation.integrityCheck {
+            return integrityCheck(bundlePath: bundle)
+        }
+        if invocation.task == "statusline-cache" {
+            cacheStatusline(stdin, to: invocation.cacheFile ?? configuration.paths.rateLimitCache.path)
+            return .silentSuccess
+        }
+        guard invocation.task == nil else { return .silentSuccess }
+        return forward(invocation, stdin: stdin, configuration: configuration)
+    }
+
+    // MARK: Event forwarding
+
+    static func forward(_ invocation: BridgeInvocation, stdin: Data, configuration: BridgeConfiguration) -> BridgeResult {
+        guard let parsed = try? JSONValue.parse(stdin), var object = parsed.objectValue else { return .silentSuccess }
+        guard let name = object["hook_event_name"]?.stringValue, !name.isEmpty else { return .silentSuccess }
+
+        if object["source"]?.stringValue?.isEmpty ?? true { object["source"] = .string(invocation.source) }
+        object["ts"] = .number(String(Int64(Date().timeIntervalSince1970 * 1000)))
+        if invocation.forceBlocking { object[AgentEvent.blockingKey] = .bool(true) }
+        let blocking = name == HookEvent.permissionRequest || invocation.forceBlocking
+
+        var meta = terminalContext(environment: configuration.environment).json.objectValue ?? JSONObject()
+        object = slim(object, blocking: blocking)
+        object[AgentEvent.metaKey] = .object(meta)
+
+        var line = JSONValue.object(object).serializedData(.compact)
+        if line.count > maxFrameBytes {
+            // Too big for one frame: send a cut-down copy so the session still
+            // shows up. The flag tells the app never to echo this input back.
+            meta["truncated"] = .bool(true)
+            object = truncateStrings(in: object, limit: 2048)
+            object[AgentEvent.metaKey] = .object(meta)
+            line = JSONValue.object(object).serializedData(.compact)
+            guard line.count <= maxFrameBytes else { return .silentSuccess }
+        }
+        line.append(0x0A)
+
+        let socketPath = configuration.paths.socket.path
+        var st = stat()
+        guard lstat(socketPath, &st) == 0, st.st_mode & S_IFMT == S_IFSOCK, st.st_uid == getuid() else {
+            return .silentSuccess   // app not running (or not ours): nothing to do
+        }
+        let fd = SocketIO.connectUnix(socketPath, timeoutMS: configuration.connectTimeoutMS)
+        guard fd >= 0 else { return .silentSuccess }
+        defer { close(fd) }
+        guard SocketIO.writeAll(fd, line, timeoutMS: configuration.sendTimeoutMS) else { return .silentSuccess }
+
+        guard blocking else {
+            // Half-close and wait briefly for the app's EOF. Without this, macOS
+            // can discard a connection that is closed before it was accepted.
+            shutdown(fd, SHUT_WR)
+            var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            _ = poll(&pfd, 1, configuration.ackTimeoutMS)
+            return .silentSuccess
+        }
+
+        configuration.willAwaitReply()
+        guard let replyData = readLine(fd, timeout: configuration.replyTimeout),
+              let replyLine = try? JSONValue.parse(replyData),
+              let decision = BridgeDecision(replyLine: replyLine) else {
+            return .silentSuccess   // app quit, timed out, or declined to decide
+        }
+        return render(decision, eventName: name, event: object, mode: invocation.replyMode)
+    }
+
+    /// Reads one `\n`-terminated line, or nil on EOF/timeout/oversize.
+    static func readLine(_ fd: Int32, timeout: TimeInterval) -> Data? {
+        let deadline = Date().addingTimeInterval(timeout)
+        var out = Data()
+        var buffer = [UInt8](repeating: 0, count: 16 * 1024)
+        while true {
+            let remaining = deadline.timeIntervalSinceNow
+            guard remaining > 0 else { return nil }
+            var pfd = pollfd(fd: fd, events: Int16(POLLIN), revents: 0)
+            let ready = poll(&pfd, 1, Int32(min(remaining, 3600) * 1000))
+            if ready < 0, errno == EINTR { continue }
+            if ready == 0 { continue }
+            guard ready > 0 else { return nil }
+            let n = buffer.withUnsafeMutableBytes { read(fd, $0.baseAddress, $0.count) }
+            if n < 0, errno == EINTR || errno == EAGAIN { continue }
+            guard n > 0 else { return nil }
+            if let newline = buffer[0..<n].firstIndex(of: 0x0A) {
+                out.append(contentsOf: buffer[0..<newline])
+                return out
+            }
+            out.append(contentsOf: buffer[0..<n])
+            guard out.count <= maxFrameBytes else { return nil }
+        }
+    }
+
+    // MARK: Payload shaping
+
+    /// The app needs names and short hints, not file contents. Drop what it
+    /// never reads and cap long strings — except for blocking requests, whose
+    /// `tool_input` must stay intact so an answer can be merged into it.
+    static func slim(_ object: JSONObject, blocking: Bool) -> JSONObject {
+        var out = object
+        out["tool_response"] = nil
+        out["tool_result"] = nil
+        if let prompt = out["prompt"]?.stringValue, prompt.count > promptLimit {
+            out["prompt"] = .string(String(prompt.prefix(promptLimit)))
+        }
+        guard !blocking else { return out }
+        return truncateStrings(in: out, limit: slimStringLimit)
+    }
+
+    static func truncateStrings(in object: JSONObject, limit: Int) -> JSONObject {
+        JSONObject(object.members.map { .init($0.key, truncateStrings(in: $0.value, limit: limit)) })
+    }
+
+    static func truncateStrings(in value: JSONValue, limit: Int) -> JSONValue {
+        switch value {
+        case .string(let s) where s.utf8.count > limit:
+            return .string(String(s.prefix(limit)) + "…")
+        case .array(let items):
+            return .array(items.map { truncateStrings(in: $0, limit: limit) })
+        case .object(let object):
+            return .object(truncateStrings(in: object, limit: limit))
+        default:
+            return value
+        }
+    }
+
+    /// Terminal coordinates for click-to-jump, read from our own inherited
+    /// environment (we are a child of the agent, inside its terminal).
+    static func terminalContext(environment: [String: String]) -> TerminalContext {
+        var context = TerminalContext()
+        func value(_ key: String) -> String? { environment[key].flatMap { $0.isEmpty ? nil : $0 } }
+        context.termProgram = value("TERM_PROGRAM")
+        context.itermSessionID = value("ITERM_SESSION_ID")
+        context.tmux = value("TMUX")
+        context.tmuxPane = value("TMUX_PANE")
+        context.bundleID = value("__CFBundleIdentifier")
+        context.tty = ProcessInspector.controllingTTY(of: getpid())
+        context.pid = getppid()
+        var ancestors: [String] = []
+        var current = getppid()
+        var seen: Set<pid_t> = []
+        while current > 1, ancestors.count < 12, seen.insert(current).inserted,
+              let path = ProcessInspector.path(of: current) {
+            ancestors.append(path)
+            guard let parent = ProcessInspector.parent(of: current) else { break }
+            current = parent
+        }
+        context.ancestors = ancestors
+        return context
+    }
+
+    // MARK: Reply translation
+
+    /// Translates a decision into what a Claude-dialect hook runner expects.
+    static func render(_ decision: BridgeDecision, eventName: String, event: JSONObject,
+                       mode: BridgeInvocation.ReplyMode) -> BridgeResult {
+        let denyMessage = decision.reason ?? "Denied in Niko Island"
+        if mode == .exitCode {
+            switch decision.behavior {
+            case .allow: return .silentSuccess
+            case .deny: return BridgeResult(exitCode: 2, stderr: Data((denyMessage + "\n").utf8))
+            }
+        }
+
+        var updatedInput = decision.updatedInput
+        if let input = updatedInput, event["tool_name"]?.stringValue == "AskUserQuestion" {
+            updatedInput = claudeQuestionAnswers(input)
+        }
+
+        let output: JSONValue
+        switch eventName {
+        case HookEvent.permissionRequest:
+            var body = JSONObject()
+            switch decision.behavior {
+            case .allow:
+                body["behavior"] = .string("allow")
+                if let updatedInput { body["updatedInput"] = .object(updatedInput) }
+            case .deny:
+                body["behavior"] = .string("deny")
+                body["message"] = .string(denyMessage)
+                if decision.interrupt { body["interrupt"] = .bool(true) }
+            }
+            output = .object(["hookSpecificOutput": .object([
+                "hookEventName": .string(HookEvent.permissionRequest),
+                "decision": .object(body),
+            ])])
+        case HookEvent.preToolUse:
+            var body = JSONObject(["hookEventName": .string(HookEvent.preToolUse)])
+            body["permissionDecision"] = .string(decision.behavior == .allow ? "allow" : "deny")
+            if let reason = decision.reason ?? (decision.behavior == .deny ? denyMessage : nil) {
+                body["permissionDecisionReason"] = .string(reason)
+            }
+            if decision.behavior == .allow, let updatedInput { body["updatedInput"] = .object(updatedInput) }
+            output = .object(["hookSpecificOutput": .object(body)])
+        default:
+            // No JSON form for this event: fall back to the universal convention.
+            switch decision.behavior {
+            case .allow: return .silentSuccess
+            case .deny: return BridgeResult(exitCode: 2, stderr: Data((denyMessage + "\n").utf8))
+            }
+        }
+        return BridgeResult(stdout: Data((output.serialized(.compact) + "\n").utf8))
+    }
+
+    /// Canonical answers are `answers[i] = [labels…]` (PROTOCOLS / INTEGRATIONS).
+    /// Claude Code's question tool wants `answers = {"<question text>": "label, label"}`.
+    static func claudeQuestionAnswers(_ input: JSONObject) -> JSONObject {
+        guard let answers = input["answers"]?.arrayValue, let questions = input["questions"]?.arrayValue else {
+            return input
+        }
+        var map = JSONObject()
+        for (index, question) in questions.enumerated() where index < answers.count {
+            guard let text = (question["question"] ?? question["text"])?.stringValue else { continue }
+            let labels: [String]
+            switch answers[index] {
+            case .array(let items): labels = items.compactMap(\.stringValue)
+            case .string(let single): labels = [single]
+            default: labels = []
+            }
+            map[text] = .string(labels.joined(separator: ", "))
+        }
+        var out = input
+        out["answers"] = .object(map)
+        return out
+    }
+
+    // MARK: Statusline cache
+
+    /// Extracts `rate_limits` from a statusline payload into the cache file
+    /// (PROTOCOLS §4). A payload without rate limits leaves the cache alone.
+    static func cacheStatusline(_ stdin: Data, to path: String) {
+        guard let payload = try? JSONValue.parse(stdin), let limits = payload["rate_limits"], limits.objectValue != nil else {
+            return
+        }
+        var cache = JSONObject()
+        cache["captured_at"] = .number(String(Int64(Date().timeIntervalSince1970 * 1000)))
+        cache["rate_limits"] = limits
+        if let model = payload.at("model", "display_name") ?? payload.at("model", "id") { cache["model"] = model }
+        let url = URL(fileURLWithPath: path)
+        let directory = url.deletingLastPathComponent().path
+        if !FileManager.default.fileExists(atPath: directory) {
+            try? FileManager.default.createDirectory(atPath: directory, withIntermediateDirectories: true,
+                                                     attributes: [.posixPermissions: 0o700])
+        }
+        AtomicFile.write(JSONValue.object(cache).serializedData(.compact), to: path, mode: 0o600)
+    }
+
+    // MARK: Integrity self-check
+
+    static func integrityCheck(bundlePath: String) -> BridgeResult {
+        var problems: [String] = []
+        var notes: [String] = []
+        let bundle = URL(fileURLWithPath: bundlePath)
+        let plistURL = bundle.appendingPathComponent("Contents/Info.plist")
+        if let data = try? Data(contentsOf: plistURL),
+           let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+            let identifier = plist["CFBundleIdentifier"] as? String ?? "?"
+            if identifier == NikoVersion.bundleIdentifier {
+                notes.append("bundle id \(identifier)")
+            } else {
+                problems.append("unexpected bundle id \(identifier)")
+            }
+            notes.append("version \(plist["CFBundleShortVersionString"] as? String ?? "?")")
+        } else {
+            problems.append("Info.plist missing or unreadable")
+        }
+        for relative in ["Contents/MacOS/niko-island", "Contents/Helpers/niko-bridge"] {
+            let path = bundle.appendingPathComponent(relative).path
+            if FileManager.default.isExecutableFile(atPath: path) {
+                notes.append("\(relative) present")
+            } else {
+                problems.append("\(relative) missing or not executable")
+            }
+        }
+        if FileManager.default.isExecutableFile(atPath: "/usr/bin/codesign") {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+            process.arguments = ["--verify", "--deep", "--strict", bundlePath]
+            process.standardOutput = FileHandle.nullDevice
+            process.standardError = FileHandle.nullDevice
+            if (try? process.run()) != nil {
+                process.waitUntilExit()
+                if process.terminationStatus == 0 {
+                    notes.append("code signature valid")
+                } else {
+                    problems.append("code signature does not verify")
+                }
+            }
+        }
+        var text = notes.map { "ok: \($0)" }.joined(separator: "\n")
+        if !problems.isEmpty { text += "\n" + problems.map { "fail: \($0)" }.joined(separator: "\n") }
+        return BridgeResult(exitCode: problems.isEmpty ? 0 : 1, stdout: Data((text + "\n").utf8))
+    }
+}
+
+public enum AtomicFile {
+    /// tmp + rename in the same directory. Returns false on any failure.
+    @discardableResult
+    public static func write(_ data: Data, to path: String, mode: mode_t) -> Bool {
+        let tmp = path + ".tmp.\(getpid()).\(UInt32.random(in: 0...UInt32.max))"
+        let fd = open(tmp, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, mode)
+        guard fd >= 0 else { return false }
+        let written = SocketIO.writeAll(fd, data, timeoutMS: 2000)
+        fchmod(fd, mode)
+        close(fd)
+        guard written, rename(tmp, path) == 0 else {
+            unlink(tmp)
+            return false
+        }
+        return true
+    }
+}

@@ -223,3 +223,119 @@ final class Counter: @unchecked Sendable {
         return count
     }
 }
+
+struct ProcessOutput {
+    var status: Int32
+    var stdout: String
+    var stderr: String
+    var duration: TimeInterval
+}
+
+/// Products directory of the current build (`.build/<triple>/debug`).
+var buildProductsDirectory: URL {
+    Bundle(for: Scratch.self).bundleURL.deletingLastPathComponent()
+}
+
+var bridgeBinaryPath: String { buildProductsDirectory.appendingPathComponent("niko-bridge").path }
+
+/// Runs a process to completion with the given stdin. Kills it after `timeout`.
+@discardableResult
+func runProcess(_ executable: String, _ arguments: [String] = [], stdin: Data = Data(),
+                environment: [String: String] = [:], inheritEnvironment: Bool = true,
+                timeout: TimeInterval = 20, onStart: ((Process) -> Void)? = nil) -> ProcessOutput {
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: executable)
+    process.arguments = arguments
+    var env = inheritEnvironment ? ProcessInfo.processInfo.environment : ["PATH": "/usr/bin:/bin:/usr/sbin:/sbin"]
+    env.removeValue(forKey: "NIKO_ISLAND_HOME")
+    env.removeValue(forKey: "NIKO_BRIDGE_BIN")
+    for (key, value) in environment { env[key] = value }
+    process.environment = env
+    let inPipe = Pipe(), outPipe = Pipe(), errPipe = Pipe()
+    process.standardInput = inPipe
+    process.standardOutput = outPipe
+    process.standardError = errPipe
+    let started = Date()
+    do {
+        try process.run()
+    } catch {
+        return ProcessOutput(status: -1, stdout: "", stderr: "spawn failed: \(error)", duration: 0)
+    }
+    onStart?(process)
+    let outBox = DataBox(), errBox = DataBox()
+    let group = DispatchGroup()
+    group.enter()
+    DispatchQueue.global().async {
+        outBox.set(outPipe.fileHandleForReading.readDataToEndOfFile())
+        group.leave()
+    }
+    group.enter()
+    DispatchQueue.global().async {
+        errBox.set(errPipe.fileHandleForReading.readDataToEndOfFile())
+        group.leave()
+    }
+    DispatchQueue.global().async {
+        // The child may exit before reading everything; a broken pipe here is fine.
+        try? inPipe.fileHandleForWriting.write(contentsOf: stdin)
+        try? inPipe.fileHandleForWriting.close()
+    }
+    let killer = DispatchWorkItem { if process.isRunning { kill(process.processIdentifier, SIGKILL) } }
+    DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: killer)
+    process.waitUntilExit()
+    killer.cancel()
+    _ = group.wait(timeout: .now() + 5)
+    let status = process.terminationReason == .exit ? process.terminationStatus : 128 + process.terminationStatus
+    return ProcessOutput(status: status, stdout: String(decoding: outBox.get(), as: UTF8.self),
+                         stderr: String(decoding: errBox.get(), as: UTF8.self), duration: Date().timeIntervalSince(started))
+}
+
+final class DataBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var data = Data()
+    func set(_ value: Data) { lock.lock(); data = value; lock.unlock() }
+    func get() -> Data { lock.lock(); defer { lock.unlock() }; return data }
+}
+
+/// A running ingress server plus a scripted "user" that answers blocking requests.
+final class TestIsland {
+    let scratch = Scratch()
+    let hub: IngressHub
+    let server: UnixIngressServer
+    let collector = Collector()
+    let log = NikoLog.inMemory()
+
+    /// `responder` returns the reply line for each blocking event, or nil to leave it pending.
+    init(responder: (@Sendable (AgentEvent) -> JSONValue?)? = nil) throws {
+        hub = IngressHub(log: log)
+        server = UnixIngressServer(paths: scratch.paths, hub: hub)
+        let collector = self.collector
+        hub.setHandler { delivery in
+            collector.add(delivery)
+            if let replier = delivery.replier, let reply = responder?(delivery.event) {
+                replier.send(reply)
+            }
+        }
+        try server.start()
+    }
+
+    deinit { server.stop() }
+
+    var paths: NikoPaths { scratch.paths }
+    var environment: [String: String] { ["NIKO_ISLAND_HOME": scratch.paths.root.path] }
+
+    func bridge(_ arguments: [String] = ["--source", "claude"], stdin: String, environment extra: [String: String] = [:],
+                timeout: TimeInterval = 20, onStart: ((Process) -> Void)? = nil) -> ProcessOutput {
+        var env = environment
+        for (key, value) in extra { env[key] = value }
+        return runProcess(bridgeBinaryPath, arguments, stdin: Data(stdin.utf8), environment: env, timeout: timeout, onStart: onStart)
+    }
+}
+
+func decisionReply(_ behavior: String, reason: String? = nil, updatedInput: JSONObject? = nil) -> JSONValue {
+    var decision = JSONObject(["behavior": .string(behavior)])
+    if let reason { decision["reason"] = .string(reason) }
+    if let updatedInput { decision["updatedInput"] = .object(updatedInput) }
+    return .object(["ok": .bool(true), "reply": .object(["hookSpecificOutput": .object([
+        "hookEventName": .string("PermissionRequest"), "decision": .object(decision),
+    ])])])
+}
