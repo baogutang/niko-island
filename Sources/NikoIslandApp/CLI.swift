@@ -369,14 +369,21 @@ public enum NikoCLI {
         let custom = NikoPaths(root: URL(fileURLWithPath: "/tmp/odd path's/ni"))
         var files: [(String, String)] = []
         for (label, paths) in [("default", defaults), ("custom", custom)] {
+            // The hook wrappers are one-line commands stored in agent configs; here
+            // they get a shebang so a linter can read them. The "custom" sample
+            // install path contains a single quote on purpose, which makes the
+            // (correct) nested quoting look like a mistake to shellcheck's SC1003.
+            let head = label == "custom"
+                ? "#!/bin/sh\n# shellcheck disable=SC1003 # sample path contains a quote: the nested quoting is intended\n"
+                : "#!/bin/sh\n"
             files.append(("bridge-shim.\(label).sh", Shims.bridgeShim(paths: paths)))
             files.append(("statusline.\(label).bash", Shims.statuslineScript(paths: paths)))
             files.append(("statusline-chained.\(label).bash",
                           Shims.statuslineScript(paths: paths, userSection: Shims.chainedUserSection(originalCommand: "cat"))))
-            files.append(("hook-command.\(label).sh", "#!/bin/sh\n" + Shims.hookCommand(paths: paths, source: "claude") + "\n"))
+            files.append(("hook-command.\(label).sh", head + Shims.hookCommand(paths: paths, source: "claude") + "\n"))
             files.append(("hook-command-deny.\(label).sh",
-                          "#!/bin/sh\n" + Shims.hookCommand(paths: paths, source: "generic", extraArguments: ["--reply", "exit-code"], propagateDeny: true) + "\n"))
-            files.append(("statusline-command.\(label).sh", "#!/bin/sh\n" + Shims.statuslineCommand(paths: paths) + "\n"))
+                          head + Shims.hookCommand(paths: paths, source: "generic", extraArguments: ["--reply", "exit-code"], propagateDeny: true) + "\n"))
+            files.append(("statusline-command.\(label).sh", head + Shims.statuslineCommand(paths: paths) + "\n"))
         }
         files.append(("cli-shim.sh", Shims.cliShim(appExecutable: "/Applications/Niko Island.app/Contents/MacOS/niko-island")))
         files.append(("scan-probe.sh", ScanProbe.script(agents: AgentRegistry.installable, includeVersions: true)))

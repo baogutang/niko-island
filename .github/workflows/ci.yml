@@ -32,8 +32,12 @@ jobs:
           command -v shellcheck >/dev/null || brew install shellcheck
           "$(swift build --show-bin-path)/niko-island" internal dump-scripts "$RUNNER_TEMP/scripts"
           shellcheck --version | head -n 2
-          shellcheck "$RUNNER_TEMP"/scripts/*.sh
-          shellcheck --shell=bash "$RUNNER_TEMP"/scripts/*.bash scripts/*.sh
+          # Run every group so one finding does not hide the others.
+          status=0
+          shellcheck "$RUNNER_TEMP"/scripts/*.sh || status=1
+          shellcheck --shell=bash "$RUNNER_TEMP"/scripts/*.bash || status=1
+          shellcheck scripts/*.sh || status=1
+          exit "$status"
       - name: Assemble app (host architecture)
         run: scripts/make-app.sh
       - name: Bundle self-check
