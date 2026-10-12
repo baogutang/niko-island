@@ -100,6 +100,15 @@ final class CLITests: XCTestCase {
         if let token = scratch.read("ni/run/ingress-token") { XCTAssertFalse(text.contains(token.trimmingCharacters(in: .newlines))) }
     }
 
+    func testPricingStatusNeedsNoNetwork() {
+        let status = niko("pricing", "status")
+        XCTAssertEqual(status.status, 0)
+        XCTAssertTrue(status.stdout.contains("models (repository)"), status.stdout)
+        XCTAssertTrue(status.stdout.contains("automatic weekly refresh: off"))
+        XCTAssertEqual(niko("pricing", "bogus").status, 64)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.paths.pricingCache.path))
+    }
+
     func testDumpedScriptsParseInEveryShell() throws {
         let directory = scratch.file("scripts")
         XCTAssertEqual(niko("internal", "dump-scripts", directory.path).status, 0)

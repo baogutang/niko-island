@@ -47,7 +47,8 @@ public enum NikoCLI {
       niko-island status                is the app running, which agents are wired
       niko-island doctor                check permissions, shims and the bundle
       niko-island diagnostics [--out F] redacted report for bug reports
-      niko-island pricing refresh       download the latest pricing table (the only network call; opt-in)
+      niko-island pricing [status]      which price list is in use
+      niko-island pricing refresh       download the latest price list (the only network call this app makes)
       niko-island --version | --help
 
     Agent ids: \(AgentRegistry.installable.map(\.id).joined(separator: ", "))
@@ -227,8 +228,42 @@ public enum NikoCLI {
     }
 
     static func pricing(_ args: inout Arguments) -> Int32 {
-        fail("pricing commands arrive with the usage engine")
-        return 64
+        let paths = NikoPaths.resolve()
+        switch args.positional() {
+        case "refresh":
+            // An explicit command is the user's consent for this one request.
+            print("Downloading \(Pricing.refreshURL) …")
+            let box = OutcomeBox()
+            let done = DispatchSemaphore(value: 0)
+            Task.detached {
+                box.set(await PricingRefresher.refresh(paths: paths))
+                done.signal()
+            }
+            done.wait()
+            switch box.get() {
+            case .updated(let models):
+                print("Price list updated: \(models) models → \(paths.pricingCache.path)")
+                return 0
+            case .failed(let reason):
+                fail("refresh failed: \(reason)")
+                return 1
+            }
+        case "status", nil:
+            let pricing = Pricing.load(paths: paths)
+            print("price list: \(pricing.rates.count) models (\(pricing.source))")
+            print("automatic weekly refresh: \(NikoSettings.load(paths: paths).pricingRefreshEnabled ? "on" : "off")")
+            return 0
+        default:
+            fail("usage: niko-island pricing [status|refresh]")
+            return 64
+        }
+    }
+
+    private final class OutcomeBox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var outcome = PricingRefresher.Outcome.failed("no result")
+        func set(_ value: PricingRefresher.Outcome) { lock.lock(); outcome = value; lock.unlock() }
+        func get() -> PricingRefresher.Outcome { lock.lock(); defer { lock.unlock() }; return outcome }
     }
 
     // MARK: internal helpers (CI)

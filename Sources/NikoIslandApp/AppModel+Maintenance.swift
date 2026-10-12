@@ -79,11 +79,36 @@ extension AppModel {
         return url
     }
 
-    // Usage engine wiring lands in M5.
-    func startUsageEngine() {}
-}
+    // MARK: Usage
 
-/// Placeholder until the usage engine lands (M5).
-final class UsageEngine {
-    func stop() {}
+    func startUsageEngine() {
+        let engine = UsageEngine(paths: paths, home: home, pricing: Pricing.load(paths: paths), log: log) { [weak self] snapshot in
+            guard let self else { return }
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self.usage = snapshot }
+            }
+        }
+        usageEngine = engine
+        engine.start()
+        refreshPricingIfDue()
+    }
+
+    /// The only network request the app makes on its own, and only after the
+    /// user switched it on in Settings (SPEC §5).
+    func refreshPricingIfDue() {
+        guard settings.pricingRefreshEnabled, PricingRefresher.isDue(paths: paths) else { return }
+        let paths = self.paths
+        Task.detached(priority: .utility) {
+            let outcome = await PricingRefresher.refresh(paths: paths)
+            await MainActor.run {
+                switch outcome {
+                case .updated(let models):
+                    self.log.info("pricing table refreshed (\(models) models)")
+                    self.usageEngine?.setPricing(Pricing.load(paths: paths))
+                case .failed(let reason):
+                    self.log.warn("pricing refresh failed: \(reason)")
+                }
+            }
+        }
+    }
 }

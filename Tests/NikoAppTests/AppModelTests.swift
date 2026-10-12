@@ -382,6 +382,21 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(model.httpPort, 0)
     }
 
+    func testUsageEnginePublishesToTheModel() async throws {
+        model.stop()
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        scratch.write("home/.claude/projects/-demo/s.jsonl",
+                      "{\"cwd\":\"/demo\",\"sessionId\":\"u1\",\"type\":\"assistant\",\"message\":{\"id\":\"msg_u\",\"model\":\"claude-opus-4-5-20251101\",\"usage\":{\"input_tokens\":3,\"output_tokens\":21}},\"requestId\":\"r\",\"timestamp\":\"\(stamp)\"}\n")
+        let withUsage = AppModel(paths: scratch.paths, home: scratch.file("home"), log: .inMemory())
+        XCTAssertTrue(withUsage.start(usage: true))
+        defer { withUsage.stop() }
+        let counted = await eventually(timeout: 10) { withUsage.usage.todayTokens == 24 }
+        XCTAssertTrue(counted, "tokens: \(withUsage.usage.todayTokens)")
+        XCTAssertEqual(withUsage.usage.today.first?.agent, "claude")
+        XCTAssertFalse(withUsage.settings.pricingRefreshEnabled, "network refresh is opt-in")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.paths.pricingCache.path), "and nothing was downloaded")
+    }
+
     // MARK: Soak (REVIEW "100 concurrent fake sessions: UI stays responsive, no fd leak")
 
     func testHundredConcurrentSessionsKeepMainActorResponsive() async throws {

@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-12T22:15:13+0800
-milestone: M5
-done: [M0, M1, M2, M3, M4]
-next: "M5 — NikoCore/Usage/: SQLiteDB.swift (WAL, corruption-tolerant open), UsageStore.swift (schema per PROTOCOLS §6.1), Tailer.swift (committed_offset/tail_hash/generation), Parsers (Claude/Codex/OpenCode-family), Pricing.swift + Assets/pricing.json (pruned LiteLLM snapshot + notice), RateLimits.swift (cache/rl.json), UsageEngine (FSEvents + poll) replacing the stub in AppModel+Maintenance.swift, UsageView, `niko-island pricing refresh`, fixture tests"
+updated: 2026-10-12T22:32:04+0800
+milestone: M6
+done: [M0, M1, M2, M3, M4, M5]
+next: "M6 — LICENSE (MIT); app icon (drawn in code → Assets/AppIcon.icns); scripts/make-app.sh --universal --zip verified locally (lipo + Rosetta run); .github/workflows/{ci,release,pages}.yml; docs/panel.png from render-preview; README.md + README.zh-CN.md (BUILD-PLAN quality bar); website/index.html; docs/ROADMAP.md; local tag v0.1.0 comes AFTER M7 review"
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -48,3 +48,13 @@ notes:
   - "Swift 6 gotcha: a @MainActor XCTestCase needs `, @unchecked Sendable` for `async let` helpers"
   - "ALWAYS gate commits on `scripts/check.sh` (exit status), not on a grep of the test log — commit 3503552 went in with one failing soak assertion, fixed in the next commit"
   - "M4 perf: ingress deliveries go through DeliveryInbox and are drained on the main actor in batches of 64 with one publish() per batch (a 1200-event burst used to stall the main actor ~0.3 s)"
+  - "M5 usage: SQLite (WAL) at data/usage/usage.sqlite with the exact PROTOCOLS §6.1 schema (+ index on day). The DB is a cache of the transcripts: unreadable/garbage DB is renamed to usage.sqlite.corrupt-<ts> and rebuilt; a deleted or garbage -wal is tolerated."
+  - "M5 identity keys (refinement of §6.1, decided here): Claude = hash(claude, message.id, requestId) — NOT file+offset, because resumed sessions copy old messages into new files and streamed messages are logged several times (upsert keeps the row with the larger output). Codex = hash(codex, session id, running input total, running output total) so archived copies do not double count. Fallback everywhere: hash(provider, file, offset)."
+  - "M5 tailer: committed_offset = end of last complete line; tail_hash = sha256 of the 64 bytes before it. New generation (re-read from 0) on: different dev:inode, size < committed_offset, tail hash mismatch, parser version bump. Known limit: an in-place rewrite that leaves those 64 bytes identical is not detected."
+  - "M5 parsers: Claude (assistant lines with message.usage; skips <synthetic>), Codex (session_meta/turn_context context + token_count deltas; cached input split out of input), OpenCode-family (best effort: tokens{} or usage{} in several nesting spots; reported cost wins). OpenCode usage is UNVERIFIED against real files — fixtures define what is supported."
+  - "M5 sources: ~/.claude/projects/**/*.jsonl, ~/.codex/{sessions,archived_sessions}/**/*.jsonl, ~/.local/{share,state}/{opencode,mimocode}/**/{transcript,wire,events-recent}.jsonl. FSEvents (file events) + 300 s poll fallback, one utility queue."
+  - "M5 pricing: Assets/pricing.json = pruned LiteLLM snapshot (361 models, commit 7efce7f, fetched 2026-10-12 via `gh api` because raw.githubusercontent.com timed out from this network) + Assets/LITELLM-NOTICE.txt. Costs are estimates (flat per-token, no tiering). Lookup: exact → provider prefix either side → strip date/-latest/[1m] → longest known prefix (≥8 chars)."
+  - "M5 network: the ONLY network code is PricingRefresher (URLSession GET of the LiteLLM JSON on raw.githubusercontent.com). Runs when settings.pricingRefreshEnabled (default false) and the cache is >7 days old, or on the explicit `niko-island pricing refresh` command. PROTOCOLS §6.3 vendor usage APIs and Bark push are NOT implemented (planned)."
+  - "M5 rate limits: bridge --task statusline-cache writes cache/rl.json; RateLimits.parse is lenient and drops windows whose reset time has passed"
+  - "ENV: raw.githubusercontent.com is flaky here (timeouts); api.github.com via gh works. Expect the same for git push / release verification → retry, use gh api."
+  - "Swift type-checker: avoid long mixed int/float literal sums in one expression (tests timed out compiling)"

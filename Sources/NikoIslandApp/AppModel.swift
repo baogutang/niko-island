@@ -56,6 +56,7 @@ public final class AppModel: ObservableObject {
             settings.save(paths: paths)
             hub.updatePolicy(settings.admissionPolicy)
             reconcileHTTPIngress()
+            if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot()

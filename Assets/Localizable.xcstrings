@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@ tokens": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ tokens"
+          }
+        }
+      }
+    },
     "%@ wants to edit %@": {
       "localizations": {
         "zh-Hans": {
@@ -97,6 +107,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 项等待你决定"
+          }
+        }
+      }
+    },
+    "+ %lld more": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另有 %lld 项"
+          }
+        }
+      }
+    },
+    "5-hour window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 小时窗口"
+          }
+        }
+      }
+    },
+    "7-day window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天窗口"
           }
         }
       }
@@ -211,12 +251,32 @@
         }
       }
     },
+    "By model, last 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按模型统计（最近 7 天）"
+          }
+        }
+      }
+    },
     "Choose any that apply": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "可多选"
+          }
+        }
+      }
+    },
+    "Claude rate limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude 速率限制"
           }
         }
       }
@@ -237,6 +297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "接入时会先备份，再向代理的配置里添加带 niko-bridge 标记的条目；移除时只会删掉这些条目。"
+          }
+        }
+      }
+    },
+    "Costs are estimates from public list prices; your plan or invoice may differ. Counted from transcripts on this Mac only.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "费用按公开标价估算，可能与你的套餐或账单不同。仅统计这台 Mac 上的会话记录。"
           }
         }
       }
@@ -321,6 +391,16 @@
         }
       }
     },
+    "Last 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 7 天"
+          }
+        }
+      }
+    },
     "Needs your permission": {
       "localizations": {
         "zh-Hans": {
@@ -361,6 +441,16 @@
         }
       }
     },
+    "No price known for: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "以下模型暂无价格：%@"
+          }
+        }
+      }
+    },
     "No sessions": {
       "localizations": {
         "zh-Hans": {
@@ -377,6 +467,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "在你的主目录里没有找到受支持的代理。"
+          }
+        }
+      }
+    },
+    "No usage found yet. Numbers appear after an agent has written a transcript on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有用量数据。代理在这台 Mac 上写下会话记录后，这里就会出现数字。"
           }
         }
       }
@@ -491,6 +591,16 @@
         }
       }
     },
+    "Reading your local transcripts…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在读取本机的会话记录…"
+          }
+        }
+      }
+    },
     "Refresh the model price list from the network (weekly)": {
       "localizations": {
         "zh-Hans": {
@@ -591,6 +701,26 @@
         }
       }
     },
+    "Today": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今天"
+          }
+        }
+      }
+    },
+    "Tokens per day, last 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 7 天每日 token 数"
+          }
+        }
+      }
+    },
     "Usage": {
       "localizations": {
         "zh-Hans": {
@@ -601,12 +731,12 @@
         }
       }
     },
-    "Usage tracking arrives with the usage engine.": {
+    "Usage tracking is unavailable: %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "用量统计将随用量引擎一起提供。"
+            "value": "用量统计不可用：%@"
           }
         }
       }
@@ -747,6 +877,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "读取"
+          }
+        }
+      }
+    },
+    "resets in %lldd %lldh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 天 %2$lld 小时后重置"
+          }
+        }
+      }
+    },
+    "resets in %lldh %lldm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld 小时 %2$lld 分钟后重置"
           }
         }
       }
