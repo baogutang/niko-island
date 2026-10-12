@@ -2,8 +2,7 @@
 DerivedData/
 *.xcodeproj/xcuserdata/
 .DS_Store
-.build/
 dist/
 build/
 *.log
-PROGRESS.md
+.swiftpm/
