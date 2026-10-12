@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-13T01:03:27+0800
+updated: 2026-10-13T01:11:49+0800
 milestone: M7
 done: [M0, M1, M2, M3, M4, M5, M6]
-next: "M7 step 4b — repo is public at https://github.com/baogutang/niko-island (main pushed at e67e974). Now: watch ci.yml on main (`gh run list`), fix forward until green; then 4c tag v0.1.0 + push + watch release.yml; 4d enable Pages (gh api -X POST repos/baogutang/niko-island/pages -f build_type=workflow) + run pages.yml + curl site; 4e issues; 4f HANDOFF.md"
+next: "M7 step 4c — CI is green on main at 332dcc4 (run 38282312709). Pages is live at https://baogutang.github.io/niko-island/. Now: git tag -a v0.1.0 && git push origin v0.1.0 → watch release.yml → verify assets (zip + SHA256SUMS) by downloading; then 4e issues, 4f HANDOFF.md + final PROGRESS"
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -75,3 +75,4 @@ notes:
   - "M7 public-docs rule: nothing personal in committed files (no usage dollar figures, no config contents); REVIEW-RESULTS/HANDOFF/PROGRESS are public once pushed"
   - "M7 CI risk: runners are macos-15 (default Xcode 16.x = Swift 6.1, older SDK) while local is Xcode 26.3 / Swift 6.2 → Sendable annotations in the SDK may differ; expect to fix forward from the first CI log. Soak bound is 1.5 s when CI is set."
   - "New CLI in M7: `niko-island usage` (totals from local transcripts) and `niko-island internal listen <s>` (headless ingress printing event names/keys, never values; replies no-decision to blocking requests)"
+  - "PUBLISH LOG: repo created + pushed 2026-10-13 01:03 CST; Pages enabled via gh api (build_type=workflow), pages.yml run 38281725163 green, site + 4 images return 200; ci.yml needed two follow-ups (SC1003 documented exception on sample wrappers, SC2164 in scripts/check.sh) and is green at 332dcc4 on macos-15 — the runner's Swift 6.1 toolchain built the code unchanged"
