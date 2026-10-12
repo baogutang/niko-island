@@ -88,8 +88,9 @@ jobs:
             echo "### Install"
             echo
             echo "Download the zip, unzip it, move **Niko Island.app** to Applications."
-            echo "The app is ad-hoc signed (no Apple Developer account), so the first launch needs one extra step:"
-            echo "right-click the app → **Open** → **Open**, or run \`xattr -cr \"/Applications/Niko Island.app\"\`."
+            echo "The app is ad-hoc signed (no Apple Developer account), so clear the quarantine flag once:"
+            echo "\`xattr -cr \"/Applications/Niko Island.app\"\`."
+            echo "Without a terminal: on macOS 14 right-click the app → **Open**; on macOS 15+ open it once, then System Settings → Privacy & Security → **Open Anyway**."
             echo
             echo "Verify the download with \`shasum -a 256 -c SHA256SUMS\`."
           } > "$RUNNER_TEMP/notes.md"

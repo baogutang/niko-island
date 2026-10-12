@@ -40,15 +40,17 @@ public final class UsageEngine: @unchecked Sendable {
 
     public static func defaultSources(home: URL) -> [Source] {
         let h = home.path
+        // `**` in PROTOCOLS §6.1 means any depth: Claude Code nests sub-agent and
+        // workflow transcripts six levels down. The cap only guards against runaway trees.
         var sources = [
-            Source(provider: .claude, root: h + "/.claude/projects", fileNames: nil, maxDepth: 5),
-            Source(provider: .codex, root: h + "/.codex/sessions", fileNames: nil, maxDepth: 6),
-            Source(provider: .codex, root: h + "/.codex/archived_sessions", fileNames: nil, maxDepth: 6),
+            Source(provider: .claude, root: h + "/.claude/projects", fileNames: nil, maxDepth: 16),
+            Source(provider: .codex, root: h + "/.codex/sessions", fileNames: nil, maxDepth: 16),
+            Source(provider: .codex, root: h + "/.codex/archived_sessions", fileNames: nil, maxDepth: 16),
         ]
         let names: Set<String> = ["transcript.jsonl", "wire.jsonl", "events-recent.jsonl"]
         for family in ["opencode", "mimocode"] {
             for base in ["/.local/share/", "/.local/state/"] {
-                sources.append(Source(provider: .opencode, root: h + base + family, fileNames: names, maxDepth: 8))
+                sources.append(Source(provider: .opencode, root: h + base + family, fileNames: names, maxDepth: 16))
             }
         }
         return sources

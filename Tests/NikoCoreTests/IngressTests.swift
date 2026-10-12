@@ -222,6 +222,24 @@ final class UnixIngressTests: XCTestCase {
         XCTAssertEqual(recent.last?.raw["n"]?.stringValue, "1099")
     }
 
+    func testRingBufferDoesNotRetainLargePayloads() throws {
+        try server.start()
+        let client = try connect()
+        let big = String(repeating: "z", count: 200_000)
+        client.send("{\"source\":\"claude\",\"hook_event_name\":\"PermissionRequest\",\"session_id\":\"big\",\"cwd\":\"/tmp\",\"tool_name\":\"Write\",\"tool_input\":{\"content\":\"\(big)\"}}\n")
+        client.send(eventJSON("Stop", session: "small", tool: "Bash"))
+        let deliveries = collector.wait(count: 2)
+        XCTAssertEqual(deliveries.first?.event.toolInput?["content"]?.stringValue?.count, 200_000, "the request itself is delivered whole")
+        let remembered = hub.recentEvents
+        XCTAssertEqual(remembered.map(\.name), ["PermissionRequest", "Stop"])
+        XCTAssertNil(remembered[0].toolInput, "but the ring keeps only a summary of it")
+        XCTAssertNil(remembered[0].raw["tool_input"])
+        XCTAssertEqual(remembered[0].toolName, "Write")
+        XCTAssertEqual(remembered[0].raw["session_id"]?.stringValue, "big")
+        XCTAssertNotNil(remembered[1].toolInput, "ordinary small events are kept as they are")
+        deliveries.first?.replier?.send(.null)
+    }
+
     func testSecondInstanceRefusesToStealSocket() throws {
         try server.start()
         let second = UnixIngressServer(paths: scratch.paths, hub: hub)

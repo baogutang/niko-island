@@ -391,6 +391,16 @@
         }
       }
     },
+    "Hooks cannot start the bridge until the flag is cleared. Run this once in a terminal, then reopen the app:": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在清除隔离标记之前，钩子无法启动桥接程序。请在终端里执行一次下面的命令，然后重新打开应用："
+          }
+        }
+      }
+    },
     "Last 7 days": {
       "localizations": {
         "zh-Hans": {
@@ -847,6 +857,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "有问题要问"
+          }
+        }
+      }
+    },
+    "macOS is still holding this app in quarantine": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS 仍把这个应用放在隔离区"
           }
         }
       }

@@ -33,13 +33,15 @@
 ## Quick start (about 30 seconds)
 
 1. **Download** the latest zip from [Releases](https://github.com/baogutang/niko-island/releases/latest) and unzip it.
-2. **Move and open.** The app is ad-hoc signed (no Apple Developer account), so macOS needs one nudge the first time:
+2. **Move it and clear the quarantine flag.** The app is ad-hoc signed (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
 
    ```bash
    mv "Niko Island.app" /Applications/
-   xattr -cr "/Applications/Niko Island.app"   # or: right-click the app → Open → Open
+   xattr -cr "/Applications/Niko Island.app"
    open "/Applications/Niko Island.app"
    ```
+
+   No terminal at hand? On macOS 14, right-click the app → **Open** → **Open**. On macOS 15 or later, try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The `xattr` command is the reliable route because it also clears the flag on the small helper that agent hooks run; if that flag is still set, the panel's **Settings** tab says so.
 
 3. **Connect Claude Code.** Look at the plan first, then apply it:
 
@@ -62,7 +64,7 @@ After installing, `~/.niko-island/bin/niko-island` is a shortcut to the same com
 | 🔔 **Notifications that take you back** — click one and the right Terminal.app or iTerm2 tab comes forward, tmux panes included | 📊 **Usage and cost, locally** — tokens and estimated cost per model for today and the last 7 days, read from transcripts on your disk | 🛟 **An installer you can trust** — scans first, backs up, verifies, rolls back on failure, and removes only what it added |
 | 🔒 **Private by construction** — no telemetry, no account; one optional download, off by default | 🌐 **English and 简体中文** | 🧩 **More agents, opt-in** — experimental adapters for a dozen other tools |
 
-Approvals never time out or disappear on their own. If you quit the app while an agent is waiting, the agent simply shows its own prompt.
+A request stays in the panel until you decide or the agent withdraws it. Nothing is approved unless you said so, and if you quit the app while an agent is waiting, the agent falls back to its own prompt.
 
 <p align="center">
   <img src="docs/images/panel-question.png" width="360" alt="Question wizard">
@@ -115,7 +117,7 @@ Short version: **no telemetry, no accounts, all local.** The long version, so yo
   └── logs/       diagnostics, redacted before they are written
   ```
 
-- **Events are trimmed before they leave the agent.** The bridge drops tool output and shortens long strings; the usage database stores numbers and identifiers, never prompts or replies.
+- **Events are trimmed at the source and kept in memory.** The bridge drops tool output and shortens long text in status events. A permission request carries the command or file in question, so you can see what you are approving. None of this is written to disk; the usage database stores numbers and identifiers, never prompts or replies.
 - **Local only, owner only.** Agents talk to the app over a unix socket; the app checks the caller's user id on every message. A loopback HTTP port (127.0.0.1, bearer token in an owner-only file) is opened only if you connect an agent that needs a plugin.
 - **Your credentials are never read**, stored or forwarded.
 - **Auditable hooks.** Every entry the installer writes contains the text `niko-bridge`. Search your config for it at any time.
@@ -147,10 +149,35 @@ Agents already know how to run a command at each step of their work. `niko-islan
 
 Details for the curious: [SPEC.md](SPEC.md) · [PROTOCOLS.md](PROTOCOLS.md) · [INTEGRATIONS.md](INTEGRATIONS.md).
 
+## What was and was not verified for 0.1.0
+
+This is a first release, so here is exactly how far the checking went.
+
+| Verified | How |
+|---|---|
+| Protocol, bridge, installer, approvals, question wizard, usage engine | More than 200 automated tests, including end-to-end runs with the real bridge binary, fault injection and a 100-session soak |
+| Installer on a real-world config | Round trip on a private copy of a real `settings.json` that already carried another tool's hooks and a status line: nothing foreign changed, byte-identical after uninstall |
+| Usage numbers | Totals for about 1 GB of real Claude Code transcripts match an independent recount exactly; Codex sessions are consistent with their own running totals |
+| Speed | Cold start to first event in under a second; about 25 ms per hook |
+| Universal build | Both halves run, the Intel half under Rosetta |
+
+| Not verified yet | Why |
+|---|---|
+| A live Claude Code session driving the panel | The end-to-end tests use a simulated agent that follows Claude Code's documented hook contract. Confirming it with a real session is the first step in [docs/TESTPLAN.md](docs/TESTPLAN.md) |
+| Notification click-through to Terminal.app, iTerm2 and tmux | Needs a person at the screen; iTerm2 was not available |
+| The notch layout | Developed on a Mac without a notch |
+| Intel hardware, a fresh macOS account | Not available |
+| Any of the experimental agents | See the table above |
+
+If something in the second table bites you, please open an issue.
+
 ## FAQ
 
 **macOS says the app "cannot be opened" or "is damaged".**
-The app is ad-hoc signed because the project has no Apple Developer account, so Gatekeeper does not recognise it. Right-click the app → **Open** → **Open** (once), or run `xattr -cr "/Applications/Niko Island.app"`. The release page lists SHA-256 checksums if you want to verify the download.
+The app is ad-hoc signed because the project has no Apple Developer account, so Gatekeeper does not recognise it. Run `xattr -cr "/Applications/Niko Island.app"` once. Without a terminal: on macOS 14, right-click the app → **Open** → **Open**; on macOS 15 or later, try to open it, then use **System Settings → Privacy & Security → Open Anyway**. The release page lists SHA-256 checksums if you want to verify the download first.
+
+**The app runs but no cards appear.**
+Run `~/.niko-island/bin/niko-island doctor`. The usual cause is the quarantine flag still being set on the bundle, which stops hooks from starting the helper; `doctor` prints the exact `xattr` command to fix it.
 
 **How do I uninstall?**
 
@@ -165,7 +192,7 @@ Then drag the app to the Trash. Your agents keep working throughout. Even if you
 Run `niko-island install --dry-run` to see. It reads your config first, writes a `*.niko-backup-<timestamp>` copy next to it, adds its entries after yours, re-reads the result to verify, and restores the original if anything does not match. Invalid or unusual config files are left untouched.
 
 **Will this slow my agent down?**
-Each hook starts one small native binary that hands off an event and returns in milliseconds. It never waits on a busy or absent app, except when you are being asked for a decision.
+Each hook starts one small native program that hands off an event and exits: about 25 ms per hook on an Apple-silicon Mac with the release build, whether or not the app is running. It only waits when you are being asked for a decision.
 
 **What does "Allow all" do?**
 It approves further requests from that one session until the session ends, you click *Stop*, or the app quits. It is kept in memory only. Questions are never auto-answered.

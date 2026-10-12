@@ -100,6 +100,34 @@ final class CLITests: XCTestCase {
         if let token = scratch.read("ni/run/ingress-token") { XCTAssertFalse(text.contains(token.trimmingCharacters(in: .newlines))) }
     }
 
+    func testUsageCommandReadsLocalTranscripts() {
+        let stamp = ISO8601DateFormatter().string(from: Date())
+        scratch.write("home/.claude/projects/-demo/s.jsonl",
+                      "{\"cwd\":\"/demo\",\"sessionId\":\"u1\",\"type\":\"assistant\",\"message\":{\"id\":\"msg_u\",\"model\":\"claude-opus-4-5-20251101\",\"usage\":{\"input_tokens\":1000,\"output_tokens\":2000}},\"requestId\":\"r\",\"timestamp\":\"\(stamp)\"}\n")
+        let usage = runProcess(cli, ["usage", "--home", home.path], environment: ["NIKO_ISLAND_HOME": scratch.paths.root.path])
+        XCTAssertEqual(usage.status, 0, usage.stderr)
+        XCTAssertTrue(usage.stdout.contains("Today        $0.06   3.0K tokens"), usage.stdout)
+        XCTAssertTrue(usage.stdout.contains("Claude Code / claude-opus-4-5-20251101"))
+        XCTAssertTrue(usage.stdout.contains("Last 7 days  $0.06"))
+        XCTAssertTrue(usage.stdout.contains("estimates"))
+    }
+
+    func testListenPrintsEventNamesButNoValues() {
+        let root = scratch.paths.root.path
+        let bridge = bridgeBinaryPath
+        let output = runProcess(cli, ["internal", "listen", "2"], environment: ["NIKO_ISLAND_HOME": root]) { _ in
+            DispatchQueue.global().asyncAfter(deadline: .now() + 0.8) {
+                let event = "{\"hook_event_name\":\"PreToolUse\",\"session_id\":\"s\",\"cwd\":\"/tmp\",\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"echo TOP-SECRET-VALUE\"}}"
+                runProcess(bridge, ["--source", "claude"], stdin: Data(event.utf8), environment: ["NIKO_ISLAND_HOME": root])
+            }
+        }
+        XCTAssertEqual(output.status, 0, output.stderr)
+        XCTAssertTrue(output.stdout.contains("PreToolUse\tsource=claude\ttool=Bash\tblocking=false"), output.stdout)
+        XCTAssertTrue(output.stdout.contains("input_keys=command"))
+        XCTAssertFalse(output.stdout.contains("TOP-SECRET-VALUE"))
+        XCTAssertTrue(output.stdout.contains("received=1 admitted=1 dropped=0"))
+    }
+
     func testPricingStatusNeedsNoNetwork() {
         let status = niko("pricing", "status")
         XCTAssertEqual(status.status, 0)

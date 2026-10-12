@@ -9,8 +9,9 @@
 #   scripts/make-app.sh --skip-build    reuse existing .build products
 #
 # No Apple Developer account is involved: the bundle is signed ad hoc
-# (`codesign -s -`), which is enough for it to run locally after the user
-# clears Gatekeeper once (right-click → Open, or `xattr -cr`).
+# (`codesign -s -`), which is enough for it to run once the user has cleared
+# the download quarantine (`xattr -cr`; right-click → Open on macOS 14;
+# System Settings → Privacy & Security → Open Anyway on macOS 15+).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

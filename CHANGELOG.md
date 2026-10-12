@@ -28,7 +28,11 @@ First public release.
   events only; approvals from the panel are Claude Code only in this release.
 
 ### Known limitations
-- Ad-hoc signed, not notarized: macOS asks you to confirm the first launch.
-- The notch layout has not been checked on a notched display yet.
+- Ad-hoc signed, not notarized: clear the quarantine flag once with
+  `xattr -cr "/Applications/Niko Island.app"` (on macOS 15+ the alternative is
+  System Settings → Privacy & Security → Open Anyway).
+- The end-to-end tests drive the app with a simulated agent that follows
+  Claude Code's documented hook contract. A live session, notification
+  click-through and the notch layout still need hands-on confirmation.
 - The Intel slice is verified under Rosetta, not on Intel hardware.
-- See `HANDOFF.md` and `docs/ROADMAP.md` for the full list.
+- See the README section "What was and was not verified" and `docs/ROADMAP.md`.

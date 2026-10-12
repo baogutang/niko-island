@@ -37,6 +37,19 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var hooks: some View {
+        if let fix = model.maintenance.quarantineFix {
+            VStack(alignment: .leading, spacing: 4) {
+                Label(L("macOS is still holding this app in quarantine"), systemImage: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.waiting)
+                Text(L("Hooks cannot start the bridge until the flag is cleared. Run this once in a terminal, then reopen the app:"))
+                    .font(.system(size: 11)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(fix).font(.system(size: 11, design: .monospaced)).foregroundStyle(Theme.primary).textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(6).background(RoundedRectangle(cornerRadius: 6).fill(Theme.field))
+            }
+            .padding(8)
+            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.waiting.opacity(0.12)))
+        }
         if model.maintenance.agents.isEmpty {
             Text(L("No supported agent was found in your home directory."))
                 .font(.system(size: 12)).foregroundStyle(Theme.secondary)

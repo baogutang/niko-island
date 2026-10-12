@@ -13,6 +13,9 @@ public struct MaintenanceState: Sendable, Equatable {
     public var agents: [AgentRow] = []
     public var busy = false
     public var message: String?
+    /// Set when the bundled bridge still carries the download quarantine flag:
+    /// the shell command that clears it.
+    public var quarantineFix: String?
 
     public init() {}
 }
@@ -23,7 +26,11 @@ extension AppModel {
         let home = self.home
         Task.detached(priority: .utility) {
             let rows = AppModel.scanRows(home: home)
-            await MainActor.run { self.maintenance.agents = rows }
+            let fix = Shims.locateBridgeBinary().flatMap { Diagnostics.isQuarantined($0) ? Diagnostics.quarantineFix(for: $0) : nil }
+            await MainActor.run {
+                self.maintenance.agents = rows
+                self.maintenance.quarantineFix = fix
+            }
         }
     }
 

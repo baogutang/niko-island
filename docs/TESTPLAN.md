@@ -122,7 +122,11 @@ This is the first step that changes a real config. It is reversible.
 
 ## 5. Release artifact
 
-- ☐ Download the zip from the Releases page on another Mac, unzip, right-click →
-  Open (or `xattr -cr "Niko Island.app"`), confirm it launches.
+- ☐ Download the zip from the Releases page on another Mac, unzip, run
+  `xattr -cr "Niko Island.app"` (or: right-click → Open on macOS 14; System
+  Settings → Privacy & Security → Open Anyway on macOS 15+), confirm it launches.
+- ☐ Before clearing the flag, `niko-island doctor` reports the bridge as
+  quarantined and the Settings tab shows the same warning; after clearing, both
+  are gone. **(not automated beyond the detection itself)**
 - ☐ `lipo -archs "Niko Island.app/Contents/MacOS/niko-island"` → `x86_64 arm64`.
 - ☐ `shasum -a 256 -c SHA256SUMS` passes.

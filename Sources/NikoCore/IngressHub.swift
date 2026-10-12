@@ -116,6 +116,21 @@ public final class IngressHub: @unchecked Sendable {
         public var oversize = 0
     }
 
+    /// Frames above this size are remembered in the ring without their payload,
+    /// so the buffer stays small no matter what is sent (1024 × 16 KiB at most).
+    static let ringPayloadLimit = 16 * 1024
+
+    static func summary(of event: AgentEvent) -> AgentEvent {
+        var copy = event
+        copy.toolInput = nil
+        var raw = JSONObject()
+        for key in ["source", "hook_event_name", "session_id", "cwd", "tool_name", "ts"] {
+            if let value = event.raw[key] { raw[key] = value }
+        }
+        copy.raw = raw
+        return copy
+    }
+
     private let lock = NSLock()
     private var policy: AdmissionPolicy
     private var ring: RingBuffer<AgentEvent>
@@ -196,7 +211,7 @@ public final class IngressHub: @unchecked Sendable {
     /// for blocking events. Returns the replier so the transport can mark it
     /// closed when the connection drops.
     @discardableResult
-    func ingest(_ json: JSONValue, context: IngressContext,
+    func ingest(_ json: JSONValue, context: IngressContext, frameBytes: Int = 0,
                 transmit: @escaping @Sendable (Data) -> Void) -> (outcome: IngressOutcome, replier: IngressReplier?) {
         let event: AgentEvent
         do {
@@ -245,7 +260,7 @@ public final class IngressHub: @unchecked Sendable {
         lock.lock()
         admitted.insert(event.key)
         stats.admitted += 1
-        ring.append(event)
+        ring.append(frameBytes > IngressHub.ringPayloadLimit ? IngressHub.summary(of: event) : event)
         if event.isBlocking {
             replier = IngressReplier(id: nextReplierID, transmit: transmit)
             nextReplierID += 1

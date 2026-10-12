@@ -306,7 +306,7 @@ public final class HTTPIngressServer: @unchecked Sendable {
         let context = IngressContext(channel: .http, peerUID: nil, peerPID: nil, directory: directory,
                                      defaultSource: request.headers["x-niko-source"])
         let connectionID = connection.id
-        let result = hub.ingest(json, context: context) { [weak self] data in
+        let result = hub.ingest(json, context: context, frameBytes: body.count) { [weak self] data in
             guard let self else { return }
             self.queue.async {
                 guard let connection = self.connections[connectionID] else { return }

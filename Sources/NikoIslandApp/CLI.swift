@@ -21,6 +21,7 @@ public enum NikoCLI {
         case "doctor": return doctor(&args)
         case "diagnostics": return diagnostics(&args)
         case "pricing": return pricing(&args)
+        case "usage": return usage(&args)
         case "internal": return internalCommand(&args)
         default:
             // Finder/LaunchServices may pass `-psn_…`/`-NS…` style arguments: that is an app launch.
@@ -47,6 +48,7 @@ public enum NikoCLI {
       niko-island status                is the app running, which agents are wired
       niko-island doctor                check permissions, shims and the bundle
       niko-island diagnostics [--out F] redacted report for bug reports
+      niko-island usage                 today's and the last 7 days' tokens and estimated cost
       niko-island pricing [status]      which price list is in use
       niko-island pricing refresh       download the latest price list (the only network call this app makes)
       niko-island --version | --help
@@ -189,6 +191,8 @@ public enum NikoCLI {
         print("info bridge shim \(shimPresent ? "installed" : "not installed (run `niko-island install`)")")
         if let bridge = Shims.locateBridgeBinary() {
             check("bridge binary", true, bridge)
+            check("bridge is not quarantined", !Diagnostics.isQuarantined(bridge),
+                  Diagnostics.isQuarantined(bridge) ? "hooks cannot run it; fix with: \(Diagnostics.quarantineFix(for: bridge))" : "")
         } else {
             check("bridge binary", false, "not found next to this executable")
         }
@@ -224,6 +228,33 @@ public enum NikoCLI {
         } else {
             print(text, terminator: "")
         }
+        return 0
+    }
+
+    /// Reads the local transcripts once and prints the totals. Read-only apart from our own database.
+    static func usage(_ args: inout Arguments) -> Int32 {
+        let home = home(&args)
+        if rejectLeftovers(args) { return 64 }
+        let paths = NikoPaths.resolve()
+        let started = Date()
+        let engine = UsageEngine(paths: paths, home: home, pricing: Pricing.load(paths: paths)) { _ in }
+        let snapshot = engine.scanNow()
+        engine.stop()
+        if let failure = snapshot.failure {
+            fail("usage is unavailable: \(failure)")
+            return 1
+        }
+        func line(_ row: UsageTotals) -> String {
+            let name = "\(AgentRegistry.displayName(for: row.agent)) / \(row.model)"
+            return "  " + name.padding(toLength: 44, withPad: " ", startingAt: 0)
+                + tokenText(row.tokens).padding(toLength: 10, withPad: " ", startingAt: 0) + costText(row.cost)
+        }
+        print("Today        \(costText(snapshot.todayCost))   \(tokenText(snapshot.todayTokens)) tokens")
+        snapshot.today.forEach { print(line($0)) }
+        print("Last 7 days  \(costText(snapshot.weekCost))   \(tokenText(snapshot.weekTokens)) tokens")
+        snapshot.week.forEach { print(line($0)) }
+        if !snapshot.unpricedModels.isEmpty { print("No price known for: \(snapshot.unpricedModels.joined(separator: ", "))") }
+        print("Costs are estimates from public list prices (\(snapshot.pricingSource)). Scan took \(String(format: "%.1f", Date().timeIntervalSince(started))) s.")
         return 0
     }
 
@@ -276,6 +307,34 @@ public enum NikoCLI {
                 return 64
             }
             return dumpScripts(to: URL(fileURLWithPath: directory))
+        case "listen":
+            // Headless ingress for checking an integration: prints one line per
+            // admitted event (names and keys only, never values) and makes no decisions.
+            let seconds = args.positional().flatMap(Double.init) ?? 30
+            let paths = NikoPaths.resolve()
+            let hub = IngressHub(policy: NikoSettings.load(paths: paths).admissionPolicy, log: NikoLog())
+            hub.setHandler { delivery in
+                let event = delivery.event
+                let inputKeys = (event.toolInput?.keys ?? []).sorted().joined(separator: ",")
+                print("\(event.name)\tsource=\(event.source)\ttool=\(event.toolName ?? "-")\tblocking=\(event.isBlocking)"
+                      + "\tkeys=\(event.raw.keys.sorted().joined(separator: ","))\tinput_keys=\(inputKeys)")
+                fflush(stdout)
+                delivery.replier?.send(ReplyBuilder.line(for: .passToTerminal, event: event))
+            }
+            let server = UnixIngressServer(paths: paths, hub: hub)
+            do {
+                try server.start()
+            } catch {
+                fail("\(error)")
+                return 1
+            }
+            print("listening on \(paths.socket.path) for \(Int(seconds)) s")
+            fflush(stdout)
+            Thread.sleep(forTimeInterval: seconds)
+            server.stop()
+            let counters = hub.counters
+            print("received=\(counters.received) admitted=\(counters.admitted) dropped=\(counters.dropped)")
+            return 0
         case "render-icon":
             guard let directory = args.positional() else {
                 fail("usage: niko-island internal render-icon <AppIcon.iconset>")

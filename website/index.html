@@ -208,7 +208,7 @@
       <p class="sub" data-i18n="features.sub">Built for the moment an agent stops and waits for you while you are looking at something else.</p>
       <div class="grid">
         <div class="card"><div class="glyph" aria-hidden="true">🏝</div><h3 data-i18n="f1.t">Live status</h3><p data-i18n="f1.d">One card per session: thinking, reading a file, editing, running a command. You see which one is busy and which one is waiting for you.</p></div>
-        <div class="card"><div class="glyph" aria-hidden="true">✅</div><h3 data-i18n="f2.t">Approvals in place</h3><p data-i18n="f2.d">Allow once, always allow a tool, allow everything for the session, deny, or send the decision back to the terminal. A request never resolves on its own.</p></div>
+        <div class="card"><div class="glyph" aria-hidden="true">✅</div><h3 data-i18n="f2.t">Approvals in place</h3><p data-i18n="f2.d">Allow once, always allow a tool, allow everything for the session, deny, or send the decision back to the terminal. Nothing is decided for you.</p></div>
         <div class="card"><div class="glyph" aria-hidden="true">❓</div><h3 data-i18n="f3.t">Question wizard</h3><p data-i18n="f3.d">When an agent asks you to choose, answer its questions step by step, single or multiple choice, without switching windows.</p></div>
         <div class="card"><div class="glyph" aria-hidden="true">🔔</div><h3 data-i18n="f4.t">Notifications that take you back</h3><p data-i18n="f4.d">Click a notification and the right Terminal.app or iTerm2 tab comes to the front, tmux panes included.</p></div>
         <div class="card"><div class="glyph" aria-hidden="true">📊</div><h3 data-i18n="f5.t">Usage and cost, locally</h3><p data-i18n="f5.d">Tokens and estimated cost per model for today and the last seven days, read from the transcripts already on your disk.</p></div>
@@ -247,10 +247,11 @@
         <span class="chip"><span class="dot planned"></span>Amp</span>
       </div>
       <div class="legend">
-        <span><span class="dot stable"></span><span data-i18n="legend.stable">Stable: tested end to end</span></span>
+        <span><span class="dot stable"></span><span data-i18n="legend.stable">Stable: tested end to end against the documented hook contract</span></span>
         <span><span class="dot experimental"></span><span data-i18n="legend.experimental">Experimental: opt-in, not yet validated against the live agent</span></span>
         <span><span class="dot planned"></span><span data-i18n="legend.planned">Planned</span></span>
       </div>
+      <p class="fine" style="margin-top:18px" data-i18n="agents.status">This is a first release. The README lists exactly <a href="https://github.com/baogutang/niko-island#what-was-and-was-not-verified-for-010">what was and was not verified</a>, including the hands-on checks still to do.</p>
     </div>
   </section>
 
@@ -263,7 +264,7 @@
           <li data-i18n="p1"><strong>Nothing phones home.</strong> There is no analytics, crash reporting or update check in the app.</li>
           <li data-i18n="p2"><strong>One optional download, off by default:</strong> a public list of model prices for the cost estimates. That is the only network code in the project.</li>
           <li data-i18n="p3"><strong>Owner-only local channel.</strong> Agents reach the app through a socket in a private directory, and the app checks who is calling on every message.</li>
-          <li data-i18n="p4"><strong>Trimmed at the source.</strong> Tool output is dropped and long text is shortened before an event leaves the agent. The usage database holds numbers and identifiers, never prompts or replies.</li>
+          <li data-i18n="p4"><strong>Trimmed at the source, kept in memory.</strong> Tool output is dropped and long text in status events is shortened before it leaves the agent. Nothing from an event is written to disk; the usage database holds numbers and identifiers, never prompts or replies.</li>
           <li data-i18n="p5"><strong>Your credentials are never read.</strong> No keys, no tokens, no proxying.</li>
           <li data-i18n="p6"><strong>Hooks you can audit.</strong> Every entry the installer writes contains <code>niko-bridge</code>. Search for it any time.</li>
         </ul>
@@ -280,7 +281,7 @@
   <section id="install">
     <div class="wrap">
       <h2 data-i18n="install.title">Up and running in about 30 seconds</h2>
-      <p class="sub" data-i18n="install.sub">The app is ad-hoc signed because the project has no Apple Developer account. macOS asks you to confirm the first launch; after that it opens like any other app.</p>
+      <p class="sub" data-i18n="install.sub">The app is ad-hoc signed because the project has no Apple Developer account, so macOS will not open a downloaded copy until you clear its quarantine flag once. After that it opens like any other app.</p>
       <div class="steps">
         <div class="step"><div>
           <h3 data-i18n="s1.t">Download and unzip</h3>
@@ -288,7 +289,7 @@
         </div></div>
         <div class="step"><div>
           <h3 data-i18n="s2.t">Move it to Applications and open it</h3>
-          <p data-i18n="s2.d">Either right-click the app and choose Open twice, or clear the quarantine flag:</p>
+          <p data-i18n="s2.d">Clear the quarantine flag with the command below. Without a terminal: on macOS 14, right-click the app and choose Open; on macOS 15 or later, try to open it once, then use System Settings → Privacy &amp; Security → Open Anyway.</p>
 <pre>mv "Niko Island.app" /Applications/
 xattr -cr "/Applications/Niko Island.app"
 open "/Applications/Niko Island.app"</pre>
@@ -353,7 +354,7 @@ open "/Applications/Niko Island.app"</pre>
     "features.title": "一个小面板，装下全部",
     "features.sub": "为这样的时刻而做：你正看着别处，代理却停下来等你。",
     "f1.t": "实时状态", "f1.d": "每个会话一张卡片：思考中、读取文件、编辑、运行命令。哪个在忙、哪个在等你，一眼就能看出来。",
-    "f2.t": "就地审批", "f2.d": "允许一次、始终允许某个工具、本次会话全部允许、拒绝，或者把决定交还给终端。请求绝不会自行处理。",
+    "f2.t": "就地审批", "f2.d": "允许一次、始终允许某个工具、本次会话全部允许、拒绝，或者把决定交还给终端。没有你的指示，什么都不会被批准。",
     "f3.t": "提问向导", "f3.d": "代理让你做选择时，可以一步步回答它的问题，单选多选都行，不用切换窗口。",
     "f4.t": "能带你回去的通知", "f4.d": "点一下通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位。",
     "f5.t": "本地的用量与费用", "f5.d": "今天和最近七天每个模型的 token 数与估算费用，直接读取磁盘上已有的会话记录。",
@@ -361,21 +362,22 @@ open "/Applications/Niko Island.app"</pre>
     "duo.alt1": "带有三个选项的提问向导", "duo.alt2": "用量页：按模型统计的费用与速率限制",
     "agents.title": "配合你正在用的代理",
     "agents.sub": "Claude Code 已端到端支持。其余为实验性：由你自己开启，面板显示它们的状态。",
-    "legend.stable": "稳定：端到端测试通过", "legend.experimental": "实验性：需手动开启，尚未在真实代理上验证", "legend.planned": "计划中",
+    "legend.stable": "稳定：按公开的钩子约定完成端到端测试", "legend.experimental": "实验性：需手动开启，尚未在真实代理上验证", "legend.planned": "计划中",
+    "agents.status": "这是第一个版本。README 里如实列出了<a href=\"https://github.com/baogutang/niko-island/blob/main/README.zh-CN.md\">哪些已经验证、哪些还没有</a>，包括仍需人工完成的检查。",
     "privacy.title": "无遥测。无账号。全部在本地。",
     "privacy.sub": "一个夹在你和代理之间的工具，应该很容易被核查。下面是它对你的数据所做的全部事情。",
     "p1": "<strong>不向任何地方回传数据。</strong>应用里没有统计、崩溃上报或更新检查。",
     "p2": "<strong>只有一项可选下载，默认关闭：</strong>用于费用估算的公开模型价格表。这是整个项目里唯一的联网代码。",
     "p3": "<strong>仅本人可用的本地通道。</strong>代理通过私有目录里的套接字连接应用，应用会对每条消息核对调用者身份。",
-    "p4": "<strong>在源头就裁剪。</strong>事件离开代理之前，工具输出会被丢弃、长文本会被截短。用量数据库只保存数字和标识符，绝不保存提示词或回复。",
+    "p4": "<strong>在源头裁剪，只留在内存里。</strong>事件离开代理之前，工具输出会被丢弃，状态事件里的长文本会被截短。事件内容不会写入磁盘；用量数据库只保存数字和标识符，绝不保存提示词或回复。",
     "p5": "<strong>绝不读取你的凭据。</strong>不碰密钥、不碰令牌、不做代理转发。",
     "p6": "<strong>钩子可审计。</strong>安装器写入的每一条都包含 <code>niko-bridge</code>，随时可以搜索。",
     "tree.bin": "桥接与状态栏启动脚本", "tree.run": "本地套接字，仅本人可访问", "tree.cache": "速率限制、可选的价格表",
     "tree.data": "SQLite 里的 token 计数", "tree.logs": "已脱敏的诊断日志",
     "install.title": "大约 30 秒即可用上",
-    "install.sub": "因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名。macOS 会要求你确认第一次启动，之后就和其他应用一样打开。",
+    "install.sub": "因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名，所以在你清除一次隔离标记之前，macOS 不会打开下载来的副本。之后它就和其他应用一样打开。",
     "s1.t": "下载并解压", "s1.d": "从 GitHub 获取最新版本",
-    "s2.t": "移到“应用程序”并打开", "s2.d": "可以右键点击应用并选择两次“打开”，或者清除隔离标记：",
+    "s2.t": "移到“应用程序”并打开", "s2.d": "用下面的命令清除隔离标记。不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15 及更新版本上，先尝试打开一次，再到“系统设置 → 隐私与安全性”里点击“仍要打开”。",
     "s3.t": "接入 Claude Code", "s3.d": "先看计划。在第二条命令之前不会改动任何东西。也可以在面板的“设置”里完成。",
     "s3.c1": "# 查看将要改动的内容", "s3.c2": "# 执行（会在旁边保留一份配置备份）",
     "s4.t": "改主意了？", "s4.d": "卸载只会移除它自己的条目并恢复你的状态栏。你的代理照常工作。",

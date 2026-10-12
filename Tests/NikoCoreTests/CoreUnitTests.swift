@@ -223,6 +223,33 @@ final class SecureDirectoryTests: XCTestCase {
         }
     }
 
+    func testRejectsDirectoriesOwnedBySomeoneElse() {
+        // /usr is a real directory, not a symlink, and owned by root.
+        XCTAssertThrowsError(try SecureDirectory.validate(URL(fileURLWithPath: "/usr"))) { error in
+            XCTAssertEqual(error as? SecureDirectoryError, .wrongOwner("/usr", 0))
+        }
+        XCTAssertThrowsError(try SecureDirectory.ensure(URL(fileURLWithPath: "/usr"))) { error in
+            XCTAssertEqual(error as? SecureDirectoryError, .wrongOwner("/usr", 0), "and it is never chmod-ed into shape")
+        }
+        let foreign = NikoPaths(root: URL(fileURLWithPath: "/usr"))
+        XCTAssertThrowsError(try UnixIngressServer(paths: foreign, hub: IngressHub(log: .inMemory())).start())
+    }
+
+    func testQuarantineDetection() throws {
+        let scratch = Scratch()
+        let file = scratch.write("Fake.app/Contents/Helpers/niko-bridge", "#!/bin/sh\n")
+        XCTAssertFalse(Diagnostics.isQuarantined(file.path))
+        let flag = "0083;6532b1f0;Safari;"
+        XCTAssertEqual(setxattr(file.path, "com.apple.quarantine", flag, flag.utf8.count, 0, 0), 0)
+        XCTAssertTrue(Diagnostics.isQuarantined(file.path))
+        XCTAssertEqual(removexattr(file.path, "com.apple.quarantine", 0), 0)
+        XCTAssertFalse(Diagnostics.isQuarantined(file.path))
+        XCTAssertFalse(Diagnostics.isQuarantined("/no/such/file"))
+        XCTAssertEqual(Diagnostics.quarantineFix(for: "/Applications/Niko Island.app/Contents/Helpers/niko-bridge"),
+                       "xattr -cr '/Applications/Niko Island.app'")
+        XCTAssertEqual(Diagnostics.quarantineFix(for: "/tmp/build/niko-bridge"), "xattr -cr '/tmp/build/niko-bridge'")
+    }
+
     func testPathHelpers() {
         XCTAssertEqual(NikoPaths.normalize("/private/tmp//a/./b/../c/"), "/private/tmp/a/c")
         let custom = NikoPaths(root: URL(fileURLWithPath: "/private/tmp/it's here/ni"))

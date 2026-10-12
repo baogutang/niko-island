@@ -15,6 +15,20 @@ public enum Diagnostics {
         return read(fd, &byte, 1) == 1
     }
 
+    /// Whether macOS still has the download quarantine flag on a file. A
+    /// quarantined, ad-hoc signed bridge is refused by Gatekeeper when a hook
+    /// tries to run it, which would leave hooks silently doing nothing.
+    public static func isQuarantined(_ path: String) -> Bool {
+        getxattr(path, "com.apple.quarantine", nil, 0, 0, XATTR_NOFOLLOW) >= 0
+    }
+
+    /// The command that clears the flag for a bundle (or a single file).
+    public static func quarantineFix(for bridgePath: String) -> String {
+        var target = bridgePath
+        if let range = bridgePath.range(of: ".app/") { target = String(bridgePath[..<range.lowerBound]) + ".app" }
+        return "xattr -cr " + ShellQuote.single(target)
+    }
+
     static func describe(_ url: URL) -> String {
         var st = stat()
         guard lstat(url.path, &st) == 0 else { return "missing" }

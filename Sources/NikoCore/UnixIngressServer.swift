@@ -334,7 +334,7 @@ public final class UnixIngressServer: @unchecked Sendable {
             }
             let context = IngressContext(channel: .unixSocket, peerUID: connection.peerUID, peerPID: connection.peerPID)
             let connectionID = connection.id
-            let result = hub.ingest(json, context: context) { [weak self] data in
+            let result = hub.ingest(json, context: context, frameBytes: line.count) { [weak self] data in
                 guard let self else { return }
                 self.queue.async { self.transmit(data, to: connectionID) }
             }

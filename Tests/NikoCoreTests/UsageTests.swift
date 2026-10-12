@@ -530,6 +530,9 @@ final class UsageEngineIntegrationTests: XCTestCase {
                       claudeLine(id: "m1", output: 100, time: nowISO()) + "\n" + claudeLine(id: "m2", output: 50, time: nowISO(-3 * 86_400)) + "\n"
                       + claudeLine(id: "old", output: 999, time: nowISO(-30 * 86_400)) + "\n")
         scratch.write("home/.claude/projects/-work-app/subagents/agent-1.jsonl", claudeLine(id: "m3", model: "claude-haiku-9-9", output: 7, time: nowISO()) + "\n")
+        // Workflow sub-agents are nested six levels below the projects directory.
+        scratch.write("home/.claude/projects/-work-app/s1/subagents/workflows/wf_1/agent-9.jsonl",
+                      claudeLine(id: "m-deep", model: "claude-haiku-9-9", output: 5, time: nowISO()) + "\n")
         scratch.write("home/.claude/projects/-work-app/notes.txt", claudeLine(id: "ignored", output: 1, time: nowISO()) + "\n")
         scratch.write("home/.codex/sessions/2026/10/12/rollout-x.jsonl", """
         {"timestamp":"\(nowISO())","type":"session_meta","payload":{"id":"cx","cwd":"/w"}}
@@ -549,12 +552,13 @@ final class UsageEngineIntegrationTests: XCTestCase {
         let engine = UsageEngine(paths: scratch.paths, home: home, pricing: pricing, log: .inMemory()) { _ in }
         defer { engine.stop() }
 
-        XCTAssertEqual(engine.discover().count, 4, "txt files and unlisted opencode files are not transcripts")
+        XCTAssertEqual(engine.discover().count, 5, "txt files and unlisted opencode files are not transcripts")
         let snapshot = engine.scanNow()
         XCTAssertNil(snapshot.failure)
         XCTAssertEqual(Set(snapshot.today.map { "\($0.agent)/\($0.model)" }),
                        ["claude/claude-opus-4-5-20251101", "claude/claude-haiku-9-9", "codex/gpt-5-codex", "opencode/gpt-5-codex"])
         XCTAssertEqual(snapshot.today.first { $0.model == "claude-opus-4-5-20251101" }?.output, 100)
+        XCTAssertEqual(snapshot.today.first { $0.model == "claude-haiku-9-9" }?.output, 12, "deeply nested sub-agent transcripts count too")
         XCTAssertEqual(snapshot.week.first { $0.model == "claude-opus-4-5-20251101" }?.output, 150, "the 30-day-old message is outside the week")
         XCTAssertEqual(snapshot.days.count, 7)
         XCTAssertEqual(snapshot.days.last?.tokens, snapshot.todayTokens)
