@@ -6,6 +6,7 @@ import SwiftUI
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
     private var panel: PanelController?
+    private var notifier: SystemNotifier?
     public let model: AppModel
 
     public override init() {
@@ -23,7 +24,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         model.onAttentionNeeded = { [weak panel, weak statusItem] in
             panel?.show(relativeTo: statusItem?.button)
         }
+        let notifier = SystemNotifier(model: model)
+        self.notifier = notifier
+        model.notifier = notifier
+
         model.start()
+        if model.startFailure == .anotherInstanceRunning {
+            // One menu-bar icon is enough: the running instance keeps the socket.
+            NSApp.terminate(nil)
+        }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

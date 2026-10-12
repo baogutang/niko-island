@@ -1,22 +1,71 @@
 #!/bin/bash
-# Launch the assembled app against a throwaway runtime dir, check it stays up, then quit it.
+# End-to-end smoke test of the assembled app bundle, against a throwaway runtime
+# directory (your real ~/.niko-island and agent configs are never touched).
+#
 #   scripts/smoke-launch.sh [path/to/Niko Island.app]
+#
+# Checks: the app starts, the ingress socket answers, the bundled bridge can
+# deliver an event, a pending approval is released when the app quits, and how
+# long a cold start takes until the first event is accepted.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:-$ROOT/dist/Niko Island.app}"
 BIN="$APP/Contents/MacOS/niko-island"
+BRIDGE="$APP/Contents/Helpers/niko-bridge"
 [ -x "$BIN" ] || { echo "smoke: $BIN not found (run scripts/make-app.sh first)" >&2; exit 1; }
+[ -x "$BRIDGE" ] || { echo "smoke: $BRIDGE not found" >&2; exit 1; }
 
-HOME_DIR="$(mktemp -d /private/tmp/nk-smoke.XXXXXX)"
-trap 'kill "$PID" 2>/dev/null || true; rm -rf "$HOME_DIR"' EXIT
-NIKO_ISLAND_HOME="$HOME_DIR/ni" "$BIN" -NikoNotificationsDisabled YES >"$HOME_DIR/out.log" 2>&1 &
+now_ms() { perl -MTime::HiRes=time -e 'printf "%.0f\n", time * 1000'; }
+
+WORK="$(mktemp -d /private/tmp/nk-smoke.XXXXXX)"
+export NIKO_ISLAND_HOME="$WORK/ni"
+PID=""
+cleanup() {
+    if [ -n "$PID" ]; then kill "$PID" 2>/dev/null || true; fi
+    rm -rf "$WORK"
+}
+trap cleanup EXIT
+
+EVENT='{"hook_event_name":"SessionStart","session_id":"smoke","cwd":"'"$ROOT"'"}'
+
+START="$(now_ms)"
+"$BIN" -NikoNotificationsDisabled YES >"$WORK/out.log" 2>&1 &
 PID=$!
 
-for _ in $(seq 1 30); do
-    kill -0 "$PID" 2>/dev/null || { echo "smoke: app exited early" >&2; cat "$HOME_DIR/out.log" >&2; exit 1; }
-    sleep 0.1
+# Cold start: keep offering an event until the app has accepted one.
+READY=""
+for _ in $(seq 1 200); do
+    kill -0 "$PID" 2>/dev/null || { echo "smoke: app exited early" >&2; cat "$WORK/out.log" >&2; exit 1; }
+    if "$BIN" status 2>/dev/null | grep -q "app: running"; then
+        printf '%s' "$EVENT" | "$BRIDGE" --source claude
+        READY="$(now_ms)"
+        break
+    fi
+    sleep 0.02
 done
-echo "smoke: app alive after 3s (pid $PID)"
-if [ -S "$HOME_DIR/ni/run/niko-island.sock" ]; then
-    echo "smoke: ingress socket present"
-fi
+[ -n "$READY" ] || { echo "smoke: ingress never came up" >&2; cat "$WORK/out.log" >&2; exit 1; }
+echo "smoke: cold start to first accepted event: $((READY - START)) ms"
+
+[ -S "$NIKO_ISLAND_HOME/run/niko-island.sock" ] || { echo "smoke: socket missing" >&2; exit 1; }
+MODE="$(stat -f '%Lp' "$NIKO_ISLAND_HOME/run")"
+[ "$MODE" = "700" ] || { echo "smoke: run dir mode is $MODE, expected 700" >&2; exit 1; }
+echo "smoke: socket present, run dir 0700"
+
+# A pending approval must be released (exit 0, no output) when the app goes away.
+REQUEST='{"hook_event_name":"PermissionRequest","session_id":"smoke","cwd":"'"$ROOT"'","tool_name":"Bash","tool_input":{"command":"true"}}'
+(printf '%s' "$REQUEST" | "$BRIDGE" --source claude >"$WORK/reply.txt" 2>&1; echo $? >"$WORK/reply.status") &
+BRIDGE_JOB=$!
+sleep 0.5
+kill "$PID"
+wait "$PID" 2>/dev/null || true
+PID=""
+wait "$BRIDGE_JOB" || true
+STATUS="$(cat "$WORK/reply.status" 2>/dev/null || echo missing)"
+[ "$STATUS" = "0" ] || { echo "smoke: bridge exited $STATUS after app quit" >&2; exit 1; }
+[ ! -s "$WORK/reply.txt" ] || { echo "smoke: bridge printed output without a decision:" >&2; cat "$WORK/reply.txt" >&2; exit 1; }
+echo "smoke: pending approval released cleanly on app quit"
+
+# With the app gone, hooks are no-ops.
+printf '%s' "$EVENT" | "$BRIDGE" --source claude
+echo "smoke: bridge is a silent no-op without the app"
+echo "smoke: OK"

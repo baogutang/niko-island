@@ -224,7 +224,7 @@ final class Counter: @unchecked Sendable {
     }
 }
 
-struct ProcessOutput {
+struct ProcessOutput: Sendable {
     var status: Int32
     var stdout: String
     var stderr: String
@@ -338,4 +338,18 @@ func decisionReply(_ behavior: String, reason: String? = nil, updatedInput: JSON
     return .object(["ok": .bool(true), "reply": .object(["hookSpecificOutput": .object([
         "hookEventName": .string("PermissionRequest"), "decision": .object(decision),
     ])])])
+}
+
+/// `runProcess` off the calling actor, so a main-actor test can keep servicing its model.
+func runProcessAsync(_ executable: String, _ arguments: [String] = [], stdin: Data = Data(),
+                     environment: [String: String] = [:], timeout: TimeInterval = 20,
+                     onStart: (@Sendable (Int32) -> Void)? = nil) async -> ProcessOutput {
+    await withCheckedContinuation { continuation in
+        DispatchQueue.global().async {
+            let output = runProcess(executable, arguments, stdin: stdin, environment: environment, timeout: timeout) { process in
+                onStart?(process.processIdentifier)
+            }
+            continuation.resume(returning: output)
+        }
+    }
 }

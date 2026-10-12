@@ -31,9 +31,24 @@ final class PanelController: NSObject, NSWindowDelegate {
         panel.isReleasedWhenClosed = false
         panel.delegate = self
 
-        let host = NSHostingView(rootView: PanelView(model: model).frame(width: Self.width))
-        host.sizingOptions = [.intrinsicContentSize]
+        let attached = NSScreen.main.map(Self.hasNotch) ?? false
+        let root = PanelView(model: model, attachedToTop: attached) { [weak self] height in
+            self?.contentHeightChanged(height)
+        }
+        // Top-aligned so the content does not jump while the window catches up with a new height.
+        let host = NSHostingView(rootView: root.frame(maxHeight: .infinity, alignment: .top))
+        host.sizingOptions = []
         panel.contentView = host
+    }
+
+    private var contentHeight: CGFloat = 200
+    private weak var anchor: NSStatusBarButton?
+
+    /// SwiftUI reports its natural height; the panel follows it, top edge pinned.
+    private func contentHeightChanged(_ height: CGFloat) {
+        guard height > 0, abs(height - contentHeight) > 0.5 else { return }
+        contentHeight = height
+        if panel.isVisible { position(relativeTo: anchor) }
     }
 
     var isVisible: Bool { panel.isVisible }
@@ -43,7 +58,8 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     func show(relativeTo button: NSStatusBarButton?) {
-        position(relativeTo: button)
+        if let button { anchor = button }
+        position(relativeTo: anchor)
         panel.orderFrontRegardless()
         panel.makeKey()
         installClickMonitor()
@@ -55,10 +71,7 @@ final class PanelController: NSObject, NSWindowDelegate {
     }
 
     private func position(relativeTo button: NSStatusBarButton?) {
-        panel.layoutIfNeeded()
-        let fitting = panel.contentView?.fittingSize ?? NSSize(width: Self.width, height: 320)
-        let height = min(max(fitting.height, 120), 640)
-        let size = NSSize(width: Self.width, height: height)
+        let size = NSSize(width: Self.width, height: min(max(contentHeight, 80), 760))
         let screen = button?.window?.screen ?? NSScreen.main ?? NSScreen.screens.first
         guard let screen else { return }
 

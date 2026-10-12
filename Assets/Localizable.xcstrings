@@ -1,0 +1,806 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ has a question": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 有一个问题"
+          }
+        }
+      }
+    },
+    "%@ wants to edit %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 想要编辑 %2$@"
+          }
+        }
+      }
+    },
+    "%@ wants to fetch a URL": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 想要抓取一个网址"
+          }
+        }
+      }
+    },
+    "%@ wants to read %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 想要读取 %2$@"
+          }
+        }
+      }
+    },
+    "%@ wants to run a command": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 想要运行一条命令"
+          }
+        }
+      }
+    },
+    "%@ wants to search the project": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 想要搜索项目"
+          }
+        }
+      }
+    },
+    "%@ wants to start a sub-agent": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 想要启动一个子代理"
+          }
+        }
+      }
+    },
+    "%@ wants to use %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ 想要使用 %2$@"
+          }
+        }
+      }
+    },
+    "%lld sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个会话"
+          }
+        }
+      }
+    },
+    "%lld waiting for your decision": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 项等待你决定"
+          }
+        }
+      }
+    },
+    "Allow all": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部允许"
+          }
+        }
+      }
+    },
+    "Allow every request for the rest of this session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次会话后续的所有请求都允许"
+          }
+        }
+      }
+    },
+    "Allow once": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许一次"
+          }
+        }
+      }
+    },
+    "Allow this tool for the rest of the session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次会话后续都允许这个工具"
+          }
+        }
+      }
+    },
+    "Always allow %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "始终允许 %@"
+          }
+        }
+      }
+    },
+    "An agent asks a question": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理向我提问时"
+          }
+        }
+      }
+    },
+    "An agent asks for permission": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理请求权限时"
+          }
+        }
+      }
+    },
+    "An agent finishes and waits for me": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理完成并等待我时"
+          }
+        }
+      }
+    },
+    "Auto-approving everything this session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本次会话正在自动批准所有请求"
+          }
+        }
+      }
+    },
+    "Auto-approving: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在自动批准：%@"
+          }
+        }
+      }
+    },
+    "Back": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上一步"
+          }
+        }
+      }
+    },
+    "Choose any that apply": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可多选"
+          }
+        }
+      }
+    },
+    "Connect": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接入"
+          }
+        }
+      }
+    },
+    "Connecting adds entries tagged niko-bridge to the agent's config after a backup. Removing takes out only those entries.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接入时会先备份，再向代理的配置里添加带 niko-bridge 标记的条目；移除时只会删掉这些条目。"
+          }
+        }
+      }
+    },
+    "Decide in the agent's own prompt instead": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改为在代理自己的提示里决定"
+          }
+        }
+      }
+    },
+    "Deny": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒绝"
+          }
+        }
+      }
+    },
+    "Dismiss": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除卡片"
+          }
+        }
+      }
+    },
+    "Export diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "导出诊断信息"
+          }
+        }
+      }
+    },
+    "Finished and waiting for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成，正在等你"
+          }
+        }
+      }
+    },
+    "Has a question for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有问题需要你回答"
+          }
+        }
+      }
+    },
+    "Hooks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钩子"
+          }
+        }
+      }
+    },
+    "Hooks are not installed yet. Nothing is changed until you say so.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "尚未安装钩子。在你确认之前不会改动任何东西。"
+          }
+        }
+      }
+    },
+    "Needs your permission": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要你的许可"
+          }
+        }
+      }
+    },
+    "Next": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下一步"
+          }
+        }
+      }
+    },
+    "Niko Island could not start listening": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niko Island 无法开始监听"
+          }
+        }
+      }
+    },
+    "No agents running yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有正在运行的代理。"
+          }
+        }
+      }
+    },
+    "No sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有会话"
+          }
+        }
+      }
+    },
+    "No supported agent was found in your home directory.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你的主目录里没有找到受支持的代理。"
+          }
+        }
+      }
+    },
+    "Notify me when": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在这些时候通知我"
+          }
+        }
+      }
+    },
+    "Off by default. It is the only network request this app can make; everything else stays on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认关闭。这是本应用唯一可能发出的网络请求，其余一切都留在这台 Mac 上。"
+          }
+        }
+      }
+    },
+    "Open Releases Page": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开发布页面"
+          }
+        }
+      }
+    },
+    "Open in Terminal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在终端中打开"
+          }
+        }
+      }
+    },
+    "Other…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他…"
+          }
+        }
+      }
+    },
+    "Play a sound when": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在这些时候播放声音"
+          }
+        }
+      }
+    },
+    "Plugin ingress listening on 127.0.0.1:%lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "插件入口正在监听 127.0.0.1:%lld"
+          }
+        }
+      }
+    },
+    "Privacy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐私"
+          }
+        }
+      }
+    },
+    "Question %lld of %lld": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第 %1$lld 个问题，共 %2$lld 个"
+          }
+        }
+      }
+    },
+    "Quit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出"
+          }
+        }
+      }
+    },
+    "Quit Niko Island": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "退出 Niko Island"
+          }
+        }
+      }
+    },
+    "Refresh the model price list from the network (weekly)": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从网络更新模型价格表（每周一次）"
+          }
+        }
+      }
+    },
+    "Releases": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发布页"
+          }
+        }
+      }
+    },
+    "Remove": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移除"
+          }
+        }
+      }
+    },
+    "Send answer": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "发送回答"
+          }
+        }
+      }
+    },
+    "Sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话"
+          }
+        }
+      }
+    },
+    "Set up hooks…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置钩子…"
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置"
+          }
+        }
+      }
+    },
+    "Start an agent in any terminal and it will show up here.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在任意终端里启动一个代理，它就会出现在这里。"
+          }
+        }
+      }
+    },
+    "Stop": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止"
+          }
+        }
+      }
+    },
+    "Stop auto-approving": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止自动批准"
+          }
+        }
+      }
+    },
+    "Usage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用量"
+          }
+        }
+      }
+    },
+    "Usage tracking arrives with the usage engine.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用量统计将随用量引擎一起提供。"
+          }
+        }
+      }
+    },
+    "Version %@ · no telemetry, no account, MIT licensed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %@ · 无遥测、无需账号、MIT 许可"
+          }
+        }
+      }
+    },
+    "Wants to use %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "想要使用 %@"
+          }
+        }
+      }
+    },
+    "a file": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一个文件"
+          }
+        }
+      }
+    },
+    "compacting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "压缩上下文"
+          }
+        }
+      }
+    },
+    "connected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已接入"
+          }
+        }
+      }
+    },
+    "delegating": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "委派"
+          }
+        }
+      }
+    },
+    "editing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "编辑"
+          }
+        }
+      }
+    },
+    "experimental": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "实验性"
+          }
+        }
+      }
+    },
+    "fetching": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "抓取"
+          }
+        }
+      }
+    },
+    "finding": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找"
+          }
+        }
+      }
+    },
+    "has a question": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有问题要问"
+          }
+        }
+      }
+    },
+    "needs permission": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要许可"
+          }
+        }
+      }
+    },
+    "not connected": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未接入"
+          }
+        }
+      }
+    },
+    "reading": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取"
+          }
+        }
+      }
+    },
+    "running": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "运行"
+          }
+        }
+      }
+    },
+    "starting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动中"
+          }
+        }
+      }
+    },
+    "thinking": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "思考中"
+          }
+        }
+      }
+    },
+    "waiting for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等你回复"
+          }
+        }
+      }
+    },
+    "working": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工作中"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

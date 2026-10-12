@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-12T21:58:44+0800
-milestone: M4
-done: [M0, M1, M2, M3]
-next: "M4 — NikoCore/SessionStore.swift + Questions.swift + TerminalJump.swift (pure, tested); NikoIslandApp: AppModel (ingress wiring, pending approvals, session rules), PanelView/SessionCard/PermissionCard/QuestionWizard, Notifier (UNUserNotificationCenter + click → AppleScript jump), preview renderer (ImageRenderer → docs/panel.png), docs/TESTPLAN.md, Assets/Localizable.xcstrings"
+updated: 2026-10-12T22:12:56+0800
+milestone: M5
+done: [M0, M1, M2, M3, M4]
+next: "M5 — NikoCore/Usage/: SQLiteDB.swift (WAL, corruption-tolerant open), UsageStore.swift (schema per PROTOCOLS §6.1), Tailer.swift (committed_offset/tail_hash/generation), Parsers (Claude/Codex/OpenCode-family), Pricing.swift + Assets/pricing.json (pruned LiteLLM snapshot + notice), RateLimits.swift (cache/rl.json), UsageEngine (FSEvents + poll) replacing the stub in AppModel+Maintenance.swift, UsageView, `niko-island pricing refresh`, fixture tests"
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -37,3 +37,12 @@ notes:
   - "M3 partial uninstall (--agents x) keeps shims; full uninstall removes shims, keeps usage data + backups unless --purge"
   - "Tests/NikoAppTests/TestSupport.swift is a copy of the NikoCoreTests one (HookMergeTests.testSupportFilesStayInSync guards drift) — after editing one, cp to the other"
   - "CLI: install/uninstall/scan/status/doctor/diagnostics/internal dump-scripts (pricing refresh lands in M5); `--home DIR` + NIKO_ISLAND_HOME make everything testable off the real home"
+  - "M4 panel: borderless non-activating NSPanel; notch displays → top-centre, else dropdown under the status item (this Mac mini has no notch: notch layout is UNVERIFIED visually). Height follows SwiftUI content via a PreferenceKey; click outside closes the panel but never resolves anything."
+  - "M4 approvals: PendingRequest lives until an explicit decide() or the sender disconnects (replier.onClose). Decisions: allowOnce / allowAlwaysTool / allowAllSession / deny / block / answer / passToTerminal(reply:null + jump). Session grants are in-memory, per session, never cover questions, revoked on SessionEnd."
+  - "M4 notifications: UNUserNotificationCenter only inside a real .app bundle (swift run has none); permission asked lazily on first event; banner skipped when the session's terminal is frontmost; launch arg `-NikoNotificationsDisabled YES` for smoke runs. Sounds opt-in per event; custom file ~/.niko-island/sounds/<permission|question|idle>.<aiff|wav|mp3|m4a|caf> overrides the system sound."
+  - "M4 jump-back: bridge reports TERM_PROGRAM/ITERM_SESSION_ID/TMUX/TMUX_PANE/tty/ancestors in _niko; iTerm2 by session GUID, Terminal.app by tty (via tmux client tty when inside tmux), tmux select-window/select-pane, other hosts → activate app. Scripts run through /usr/bin/osascript. NOT implemented: creating a new iTerm window + tmux attach when no client is attached. iTerm2 is not installed on this machine → iTerm2 script is unverified (Terminal.app script is compile-checked with osacompile)."
+  - "M4 not done from SPEC v3 (planned): focus-mode-aware sound suppression, sound packs beyond per-event files, onboarding window (empty state + Settings tab stand in), SSH remote, self-update check (deliberately only an 'Open Releases Page' item: a network version check is not on the SPEC §5 whitelist)."
+  - "Localisation: every UI string goes through L(); Assets/Localizable.xcstrings holds zh-Hans; LocalizationTests fails if a key is missing/stale → when adding UI strings, add them to the catalog. make-app.sh compiles it with xcstringstool."
+  - "Preview images: `niko-island internal render-preview <dir>` renders the real SwiftUI views with fake sessions (ImageRenderer) → used for docs/ screenshots; AppKit-backed controls cannot be rendered, hence CheckToggleStyle and the isStaticPreview text-field stand-in."
+  - "scripts/smoke-launch.sh: real bundle against a throwaway dir; measured cold start → first accepted event = 834 ms (debug build, M-series)"
+  - "Swift 6 gotcha: a @MainActor XCTestCase needs `, @unchecked Sendable` for `async let` helpers"

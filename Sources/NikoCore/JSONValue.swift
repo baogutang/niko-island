@@ -56,6 +56,13 @@ public struct JSONObject: Sendable, Equatable {
     }
 }
 
+extension JSONObject: ExpressibleByDictionaryLiteral {
+    /// `["a": .int(1), "b": .null]` — order of the literal is kept.
+    public init(dictionaryLiteral elements: (String, JSONValue)...) {
+        self.members = elements.map { Member($0.0, $0.1) }
+    }
+}
+
 // MARK: - Convenience accessors
 
 extension JSONValue {
@@ -104,10 +111,6 @@ extension JSONValue {
         guard value.isFinite else { return .null }
         if value == value.rounded(), abs(value) < 9.0e15 { return .number(String(Int64(value))) }
         return .number(String(value))
-    }
-
-    public static func object(_ pairs: KeyValuePairs<String, JSONValue>) -> JSONValue {
-        .object(JSONObject(pairs))
     }
 
     /// Order-insensitive structural equality (object key order ignored, numbers compared numerically).

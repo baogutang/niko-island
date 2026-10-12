@@ -241,6 +241,20 @@ public enum NikoCLI {
                 return 64
             }
             return dumpScripts(to: URL(fileURLWithPath: directory))
+        case "render-preview":
+            guard let directory = args.positional() else {
+                fail("usage: niko-island internal render-preview <dir>")
+                return 64
+            }
+            // Called from main.swift, i.e. on the main thread.
+            return MainActor.assumeIsolated {
+                var failed = 0
+                for scene in PreviewRenderer.Scene.allCases {
+                    let url = URL(fileURLWithPath: directory).appendingPathComponent("panel-\(scene.rawValue).png")
+                    if PreviewRenderer.render(scene, to: url) { print("wrote \(url.path)") } else { failed += 1 }
+                }
+                return failed == 0 ? 0 : 1
+            }
         default:
             fail("unknown internal command")
             return 64

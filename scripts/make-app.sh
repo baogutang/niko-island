@@ -104,6 +104,12 @@ if [ -f "$ROOT/Assets/Localizable.xcstrings" ]; then
         echo "make-app.sh: xcstringstool not found, shipping English only" >&2
     fi
 fi
+# English is the key itself. An (empty) en.lproj makes "en" a real localization
+# so English systems do not fall through to the only other table.
+mkdir -p "$APP/Contents/Resources/en.lproj"
+if [ ! -f "$APP/Contents/Resources/en.lproj/Localizable.strings" ]; then
+    printf '/* English strings are the lookup keys. */\n' > "$APP/Contents/Resources/en.lproj/Localizable.strings"
+fi
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

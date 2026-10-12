@@ -14,6 +14,11 @@ public final class IngressReplier: @unchecked Sendable {
         self.transmit = transmit
     }
 
+    /// A replier that goes nowhere — for previews and tests of UI code.
+    public static func detached(id: UInt64) -> IngressReplier {
+        IngressReplier(id: id, transmit: { _ in })
+    }
+
     /// `true` while the sender is still waiting and no reply has been sent.
     public var isOpen: Bool {
         lock.lock()
@@ -70,6 +75,12 @@ public struct IngressDelivery: Sendable {
     public let evidence: AdmissionEvidence
     /// Present exactly when `event.isBlocking`.
     public let replier: IngressReplier?
+
+    public init(event: AgentEvent, evidence: AdmissionEvidence, replier: IngressReplier?) {
+        self.event = event
+        self.evidence = evidence
+        self.replier = replier
+    }
 }
 
 /// What a transport knows about the sender of one frame.
