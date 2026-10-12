@@ -3,7 +3,7 @@
 # Prints only the summary (and the failures, if any).
 set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$ROOT"
+cd "$ROOT" || exit 1
 LOG="$(mktemp "${TMPDIR:-/tmp}/niko-check.XXXXXX")"
 trap 'rm -f "$LOG"' EXIT
 if swift test "$@" >"$LOG" 2>&1; then
