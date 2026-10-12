@@ -69,6 +69,7 @@ public final class AppModel: ObservableObject {
 
     private var store = SessionStore()
     private var grants = SessionGrants()
+    private let inbox = DeliveryInbox()
     private var unixServer: UnixIngressServer?
     private var httpServer: HTTPIngressServer?
     private var pruneTimer: Timer?
@@ -97,11 +98,11 @@ public final class AppModel: ObservableObject {
         AppModel.raiseFileDescriptorLimit()
 
         hub.setHandler { [weak self] delivery in
-            // Ingress queue → main actor. Order is preserved by the main queue.
+            // Ingress queue → main actor, in order. Deliveries are queued and
+            // drained in bounded batches so a burst of events cannot starve
+            // the UI or trigger one re-render per event.
             guard let self else { return }
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated { self.handle(delivery) }
-            }
+            if self.inbox.push(delivery) { self.scheduleDrain() }
         }
         let server = UnixIngressServer(paths: paths, hub: hub)
         do {
@@ -184,7 +185,26 @@ public final class AppModel: ObservableObject {
 
     // MARK: Ingress
 
+    nonisolated private func scheduleDrain() {
+        DispatchQueue.main.async {
+            MainActor.assumeIsolated { self.drainInbox() }
+        }
+    }
+
+    private func drainInbox() {
+        let (batch, more) = inbox.pop(max: 64)
+        for delivery in batch { process(delivery, now: Date()) }
+        if !batch.isEmpty { publish() }
+        if more { scheduleDrain() }   // yield the main actor between batches
+    }
+
+    /// Applies one delivery and publishes the result (previews and tests call this directly).
     func handle(_ delivery: IngressDelivery, now: Date = Date()) {
+        process(delivery, now: now)
+        publish()
+    }
+
+    private func process(_ delivery: IngressDelivery, now: Date) {
         let event = delivery.event
         let change = store.apply(event, evidence: delivery.evidence, now: now)
 
@@ -205,7 +225,8 @@ public final class AppModel: ObservableObject {
                     }
                 }
                 if !replier.isOpen {
-                    requestWithdrawn(id)   // the sender left before we could even show it
+                    pending.removeAll { $0.id == id }   // the sender left before we could even show it
+                    store.resolveAttention(event.key, activity: .thinking, now: now)
                 } else {
                     selectedTab = .sessions
                     if let session = store[event.key] {
@@ -226,7 +247,6 @@ public final class AppModel: ObservableObject {
         case .updated(let key):
             if store[key]?.phase == .working { notifier?.clear(session: key) }
         }
-        publish()
     }
 
     private func announce(_ kind: NikoSettings.EventKind, session: Session, body: String) {
@@ -313,5 +333,33 @@ public final class AppModel: ObservableObject {
 
     public func pendingRequests(for key: SessionKey) -> [PendingRequest] {
         pending.filter { $0.sessionKey == key }
+    }
+}
+
+/// Thread-safe FIFO between the ingress queue and the main actor.
+final class DeliveryInbox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var queue: [IngressDelivery] = []
+    private var drainScheduled = false
+
+    /// Returns true when the caller must schedule a drain.
+    func push(_ delivery: IngressDelivery) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        queue.append(delivery)
+        if drainScheduled { return false }
+        drainScheduled = true
+        return true
+    }
+
+    /// Takes up to `max` deliveries. `more` means another drain is needed (and is the caller's to schedule).
+    func pop(max: Int) -> (batch: [IngressDelivery], more: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        let count = min(max, queue.count)
+        let batch = Array(queue.prefix(count))
+        queue.removeFirst(count)
+        if queue.isEmpty { drainScheduled = false }
+        return (batch, !queue.isEmpty)
     }
 }

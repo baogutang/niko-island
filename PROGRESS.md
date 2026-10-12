@@ -1,5 +1,5 @@
 # PROGRESS
-updated: 2026-10-12T22:12:56+0800
+updated: 2026-10-12T22:15:13+0800
 milestone: M5
 done: [M0, M1, M2, M3, M4]
 next: "M5 — NikoCore/Usage/: SQLiteDB.swift (WAL, corruption-tolerant open), UsageStore.swift (schema per PROTOCOLS §6.1), Tailer.swift (committed_offset/tail_hash/generation), Parsers (Claude/Codex/OpenCode-family), Pricing.swift + Assets/pricing.json (pruned LiteLLM snapshot + notice), RateLimits.swift (cache/rl.json), UsageEngine (FSEvents + poll) replacing the stub in AppModel+Maintenance.swift, UsageView, `niko-island pricing refresh`, fixture tests"
@@ -46,3 +46,5 @@ notes:
   - "Preview images: `niko-island internal render-preview <dir>` renders the real SwiftUI views with fake sessions (ImageRenderer) → used for docs/ screenshots; AppKit-backed controls cannot be rendered, hence CheckToggleStyle and the isStaticPreview text-field stand-in."
   - "scripts/smoke-launch.sh: real bundle against a throwaway dir; measured cold start → first accepted event = 834 ms (debug build, M-series)"
   - "Swift 6 gotcha: a @MainActor XCTestCase needs `, @unchecked Sendable` for `async let` helpers"
+  - "ALWAYS gate commits on `scripts/check.sh` (exit status), not on a grep of the test log — commit 3503552 went in with one failing soak assertion, fixed in the next commit"
+  - "M4 perf: ingress deliveries go through DeliveryInbox and are drained on the main actor in batches of 64 with one publish() per batch (a 1200-event burst used to stall the main actor ~0.3 s)"
