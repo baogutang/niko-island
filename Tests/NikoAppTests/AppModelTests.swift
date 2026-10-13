@@ -616,6 +616,95 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
 
     // MARK: Views render
 
+    func testSessionsFoundOnDiskAreListedAndAnnouncedOnlyWhenLive() {
+        let recorder = RecordingSoundPlayer()
+        model.soundPlayer = recorder
+        model.settings.soundsEnabled = true
+        let key = SessionKey(source: "codex", sessionID: "desk")
+        let written = Date().addingTimeInterval(-10)        // when the transcript was last touched
+        func snapshot(_ phase: Session.Phase, reply: String? = nil) -> TranscriptSnapshot {
+            TranscriptSnapshot(key: key, path: "/dev/null", cwd: "/tmp/shot", host: .codexDesktop, firstPrompt: "Add a share sheet",
+                               lastPrompt: "Add a share sheet", lastReply: reply, phase: phase,
+                               activity: phase == .working ? .thinking : .waiting, updatedAt: written)
+        }
+        // The first reading after launch: listed, nothing announced.
+        model.mergeTranscripts([snapshot(.waiting)])
+        XCTAssertEqual(model.sessions.map(\.key), [key])
+        XCTAssertEqual(model.sessions.first?.origin, .transcript)
+        XCTAssertTrue(recorder.played.isEmpty)
+        XCTAssertNil(model.toast)
+        // From then on a turn finishing is news.
+        model.mergeTranscripts([snapshot(.working)])
+        model.mergeTranscripts([snapshot(.waiting, reply: "Done.")])
+        XCTAssertEqual(recorder.played, [.completed])
+        XCTAssertEqual(model.toast?.key, key)
+        XCTAssertEqual(model.sessions.first?.replyLine, "Done.")
+        // Dismissed: gone until the transcript has something new to say.
+        model.dismiss(key)
+        model.mergeTranscripts([snapshot(.waiting, reply: "Done.")])
+        XCTAssertTrue(model.sessions.isEmpty)
+        var later = snapshot(.working)
+        later.updatedAt = Date().addingTimeInterval(5)
+        model.mergeTranscripts([later])
+        XCTAssertEqual(model.sessions.map(\.key), [key])
+        // The transcript leaving the window takes the session with it.
+        model.mergeTranscripts([])
+        XCTAssertTrue(model.sessions.isEmpty)
+    }
+
+    func testUsageCountersAreResetByMovingTheirStartNotByDeletingAnything() {
+        let moment = Date(timeIntervalSince1970: 1_800_000_000)
+        model.resetUsage("claude", now: moment)
+        XCTAssertEqual(model.settings.usageResets, ["claude": moment])
+        XCTAssertEqual(NikoSettings.load(paths: model.paths).usageResets, ["claude": moment], "kept across launches")
+        model.resetUsage("all", now: moment.addingTimeInterval(60))
+        XCTAssertEqual(model.settings.usageResets.count, 2)
+        model.clearUsageReset("claude")
+        XCTAssertEqual(Array(model.settings.usageResets.keys), ["all"])
+    }
+
+    func testAppearanceAndTimingSettingsHaveSaneDefaultsAndStick() {
+        let settings = NikoSettings()
+        XCTAssertEqual(settings.islandWidth.points, 640)
+        XCTAssertEqual(settings.accent, .mint)
+        XCTAssertEqual(settings.hoverOpenDelayMS, 160)
+        XCTAssertEqual(settings.hoverCloseDelayMS, 450)
+        XCTAssertEqual(settings.toastSeconds, 5)
+        XCTAssertEqual(settings.visibleRows, 6)
+        XCTAssertEqual(settings.language, "system")
+        XCTAssertEqual(settings.islandDisplay, "auto")
+        XCTAssertTrue(settings.discoverSessions && settings.showMascots && settings.hotkeyEnabled)
+        XCTAssertTrue(NikoSettings.RowChip.allCases.allSatisfy(settings.showsChip))
+
+        model.settings.accent = .violet
+        model.settings.islandWidth = .wide
+        model.settings.setChip(.host, shown: false)
+        model.settings.setMascot("crab", for: "claude")
+        model.settings.language = "zh-Hans"
+        let saved = NikoSettings.load(paths: model.paths)
+        XCTAssertEqual(saved.accent, .violet)
+        XCTAssertEqual(saved.islandWidth.points, 720)
+        XCTAssertFalse(saved.showsChip(.host))
+        XCTAssertEqual(saved.mascotChoices, ["claude": "crab"])
+        XCTAssertEqual(saved.language, "zh-Hans")
+        let look = IslandLook(settings: saved)
+        XCTAssertEqual(look.chips, [.elapsed, .agent])
+        XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "crab")
+        XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "whale")
+        model.settings.setMascot(nil, for: "claude")
+        XCTAssertTrue(model.settings.mascotChoices.isEmpty)
+        XCTAssertEqual(NikoSettings(raw: ["language": .string("klingon"), "visibleRows": .int(500)]).language, "system")
+        XCTAssertEqual(NikoSettings(raw: ["visibleRows": .int(500)]).visibleRows, 20)
+    }
+
+    func testRunningAgentsAreRecognisedByAppAndByProcessName() {
+        XCTAssertEqual(AgentPresence.running(apps: ["com.openai.codex", "com.apple.finder"], processes: ["zsh", "claude", "zcode-cli"]),
+                       ["claude", "codex", "zcode"])
+        XCTAssertEqual(AgentPresence.running(apps: [], processes: ["node", "CursorUIViewServ"]), [], "look-alikes are not agents")
+        XCTAssertEqual(AgentPresence.running(apps: ["com.todesktop.230313mzl4w4u92"], processes: []), ["cursor"])
+        XCTAssertTrue(AgentPresence.runningProcessNames().contains { !$0.isEmpty }, "the process table can be read")
+    }
+
     func testEverySceneRenders() throws {
         for scene in PreviewRenderer.Scene.allCases {
             let url = scratch.file("render/\(scene.rawValue).png")
@@ -633,10 +722,18 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
                        Mascots.all.count)
 
         let list = PreviewRenderer.demoModel(.sessions)
-        XCTAssertEqual(list.sessions.count, 5)
+        XCTAssertEqual(list.sessions.count, 6, "five announced by hooks, one known only from its transcript")
         XCTAssertTrue(list.isExpanded)
         XCTAssertEqual(list.sessions.first?.phase, .needsAttention, "sessions needing attention sort first")
-        XCTAssertEqual(Set(list.sessions.compactMap(\.hostName)), ["iTerm2", "Ghostty", "Terminal", "Cursor", "WezTerm"])
+        XCTAssertEqual(Set(list.sessions.compactMap(\.hostName)), ["iTerm2", "Ghostty", "Terminal", "Cursor", "WezTerm", "Codex"])
+        let desktop = try XCTUnwrap(list.sessions.first { $0.origin == .transcript })
+        XCTAssertEqual(desktop.subagents, 2)
+        XCTAssertEqual(desktop.hostLabel, "Desktop", "the agent's own app is not named twice")
+        XCTAssertEqual(list.sessions.first { $0.customTitle != nil }?.headline, "Install guide")
+        let usage = PreviewRenderer.demoModel(.usage)
+        XCTAssertEqual(usage.usage.agents.map(\.id), ["all", "claude", "codex"])
+        XCTAssertNotNil(usage.usage.agent("claude")?.sinceReset)
+        XCTAssertEqual(PreviewRenderer.demoModel(.empty).runningAgents, ["claude", "codex", "zcode"])
         let permission = PreviewRenderer.demoModel(.permission)
         XCTAssertEqual(permission.pending.count, 1)
         XCTAssertFalse(PreviewRenderer.demoModel(.attention).isExpanded)
