@@ -44,10 +44,14 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         scratch = nil
     }
 
+    /// What the bridge sees of the terminal it runs in; a test sets it to stand in a tmux pane or a desktop app.
+    private var terminalEnvironment: [String: String] = [:]
+
     private func bridge(_ stdin: String, _ arguments: [String] = ["--source", "claude"],
                         onStart: (@Sendable (Int32) -> Void)? = nil) async -> ProcessOutput {
-        await runProcessAsync(bridgeBinaryPath, arguments, stdin: Data(stdin.utf8),
-                              environment: ["NIKO_ISLAND_HOME": scratch.paths.root.path], onStart: onStart)
+        var environment = ["NIKO_ISLAND_HOME": scratch.paths.root.path]
+        for (name, value) in terminalEnvironment { environment[name] = value }
+        return await runProcessAsync(bridgeBinaryPath, arguments, stdin: Data(stdin.utf8), environment: environment, onStart: onStart)
     }
 
     private func eventually(timeout: TimeInterval = 5, _ condition: () -> Bool) async -> Bool {
@@ -514,10 +518,10 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
     /// One whole turn; returns once the session is waiting again.
     private func turn(prompt: String = "ship the fix", closing words: String? = nil) async {
         _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"\(prompt)\""))
-        let working = await eventually { self.model.sessions.first?.phase == .working }
+        let working = await eventually { self.model.sessions.first { $0.key == self.key }?.phase == .working }
         XCTAssertTrue(working)
         _ = await bridge(event("Stop", extra: words ?? closing))
-        let waiting = await eventually { self.model.sessions.first?.phase == .waiting }
+        let waiting = await eventually { self.model.sessions.first { $0.key == self.key }?.phase == .waiting }
         XCTAssertTrue(waiting)
     }
 
@@ -658,6 +662,247 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         _ = await bridge(event("Stop", extra: closing + transcript))
         let atOnce = await eventually(timeout: 3) { self.model.completion != nil }
         XCTAssertTrue(atOnce)
+    }
+
+    // MARK: Back at the screen
+
+    func testWhatEndedWhileNobodyWasThereIsSaidOnceOnReturn() async throws {
+        model.isAway = true
+        await turn(prompt: "ship the fix")
+        _ = await bridge(event("UserPromptSubmit", session: "s2", extra: ",\"prompt\":\"write the docs\""))
+        _ = await bridge(event("StopFailure", session: "s2", extra: ",\"error\":\"overloaded\""))
+        _ = await bridge(event("UserPromptSubmit", session: "s3", extra: ",\"prompt\":\"tidy up\""))
+        _ = await bridge(event("Stop", session: "s3", extra: closing))
+        // One of them is asked for more before anybody is back: it has not finished any more.
+        _ = await bridge(event("UserPromptSubmit", session: "s3", extra: ",\"prompt\":\"and the tests\""))
+        let settled = await eventually { self.model.sessions.count == 3 && self.model.sessions.filter { $0.phase == .waiting }.count == 2 }
+        XCTAssertTrue(settled)
+        XCTAssertNil(model.completion)
+        XCTAssertNil(model.recap, "nothing is said to an empty room")
+
+        model.isAway = false
+        let recap = try XCTUnwrap(model.recap)
+        XCTAssertEqual(recap.items.map(\.key.sessionID), ["s1", "s2"])
+        XCTAssertEqual(recap.items.map(\.failed), [false, true])
+        XCTAssertEqual(recap.items.first?.title, "ship the fix")
+        XCTAssertEqual(recap.items.first?.project, "demo-project")
+        XCTAssertNil(model.completion, "one card for all of it, not one each")
+
+        // A line of it goes to that session; the rest goes with it.
+        model.openRecap(SessionKey(source: "claude", sessionID: "s2"))
+        XCTAssertNil(model.recap)
+        XCTAssertEqual(jumps.map(\.sessionID), ["s2"])
+
+        // Nothing ended: nothing to say. And coming back twice says it once.
+        model.isAway = true
+        model.isAway = false
+        XCTAssertNil(model.recap)
+
+        // Opening the island puts it away; "nothing" as the way to hear of finished turns means no recap either.
+        model.isAway = true
+        await turn()
+        model.isAway = false
+        XCTAssertNotNil(model.recap)
+        model.holdRecap(true)
+        model.holdRecap(false)
+        model.expand(.click)
+        XCTAssertNil(model.recap)
+        model.collapse()
+        model.settings.completionStyle = .off
+        model.isAway = true
+        await turn()
+        model.isAway = false
+        XCTAssertNil(model.recap)
+    }
+
+    // MARK: A line to the phone
+
+    private final class Outbox: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _sent: [JSONValue] = []
+        private var _hosts: [String] = []
+        var sent: [JSONValue] { lock.lock(); defer { lock.unlock() }; return _sent }
+        var hosts: [String] { lock.lock(); defer { lock.unlock() }; return _hosts }
+        func take(_ request: URLRequest) {
+            lock.lock(); defer { lock.unlock() }
+            _hosts.append(request.url?.host ?? "?")
+            if let body = request.httpBody, let json = try? JSONValue.parse(body) { _sent.append(json) }
+        }
+    }
+
+    func testThePhoneIsOnlyTextedWhenAskedAndOnlyAsMuchAsAsked() async throws {
+        let outbox = Outbox()
+        model.makePushClient = { PushClient(transport: { request in outbox.take(request); return (Data(), 200) }, key: { "device-key" }) }
+        model.settings.expandOnAttention = false
+
+        // Out of the box: nothing, whatever happens.
+        XCTAssertFalse(model.settings.pushEnabled)
+        model.isAway = true
+        await turn()
+        XCTAssertTrue(outbox.sent.isEmpty)
+
+        // Switched on but without a key: still nothing.
+        model.settings.pushEnabled = true
+        await turn()
+        XCTAssertTrue(outbox.sent.isEmpty)
+
+        // With a key, and nobody at the screen: one line per moment, saying who, where and what kind. Not what.
+        model.hasPushKey = true
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash", command: "git push --force"))
+        let asked = await eventually { outbox.sent.count == 1 }
+        XCTAssertTrue(asked)
+        XCTAssertEqual(outbox.sent[0]["title"]?.stringValue, "Claude Code · demo-project")
+        XCTAssertEqual(outbox.sent[0]["body"]?.stringValue, "Needs your decision")
+        XCTAssertEqual(outbox.sent[0]["device_key"]?.stringValue, "device-key")
+        XCTAssertEqual(outbox.hosts, ["api.day.app"])
+        XCTAssertFalse(outbox.sent[0].serialized(.compact).contains("git push"), "what is being asked stays on this Mac")
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+
+        // "Say what it is about" adds the tool and the command, or the first line of the reply.
+        model.settings.pushDetails = true
+        async let second = bridge(event("PermissionRequest", session: "s2", tool: "Bash", command: "git push --force"))
+        let detailed = await eventually { outbox.sent.count == 2 }
+        XCTAssertTrue(detailed)
+        XCTAssertEqual(outbox.sent[1]["body"]?.stringValue, "Needs your decision: Bash: git push --force")
+        model.decide(model.pending[0].id, .deny)
+        _ = await second
+        await turn()
+        let finished = await eventually { outbox.sent.count == 3 }
+        XCTAssertTrue(finished)
+        XCTAssertEqual(outbox.sent[2]["body"]?.stringValue, "Fixed the race in Hub.swift. Tests pass.")
+        model.settings.pushDetails = false
+
+        // Not for finished turns, if that is too much.
+        model.settings.pushWhenFinished = false
+        await turn()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(outbox.sent.count, 3)
+        model.settings.pushWhenFinished = true
+
+        // At the Mac the island is how you are told...
+        model.isAway = false
+        model.dismissRecap()
+        await turn()
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(outbox.sent.count, 3)
+        // ...unless the phone is wanted there too. (A different session: the same line about the same one is not sent twice in half a minute.)
+        model.settings.pushOnlyWhenAway = false
+        _ = await bridge(event("UserPromptSubmit", session: "s4", extra: ",\"prompt\":\"one more\""))
+        _ = await bridge(event("Stop", session: "s4", extra: closing))
+        let atDesk = await eventually { outbox.sent.count == 4 }
+        XCTAssertTrue(atDesk)
+        XCTAssertEqual(outbox.sent[3]["body"]?.stringValue, "Finished")
+
+        // Quiet hours hold lines back as they hold sounds back.
+        let minute = Calendar.current.component(.hour, from: Date()) * 60 + Calendar.current.component(.minute, from: Date())
+        model.settings.quietFrom = minute / 30 * 30
+        model.settings.quietUntil = (minute / 30 * 30 + 60) % 1440
+        model.settings.quietHoursEnabled = true
+        _ = await bridge(event("UserPromptSubmit", session: "s5", extra: ",\"prompt\":\"late one\""))
+        _ = await bridge(event("Stop", session: "s5", extra: closing))
+        let late = await eventually { self.model.sessions.first { $0.key.sessionID == "s5" }?.phase == .waiting }
+        XCTAssertTrue(late)
+        try await Task.sleep(nanoseconds: 150_000_000)
+        XCTAssertEqual(outbox.sent.count, 4)
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        model.play(.completed)
+        XCTAssertTrue(sounds.played.isEmpty, "quiet hours are quiet")
+        model.settings.quietHoursEnabled = false
+        model.play(.completed)
+        XCTAssertEqual(sounds.played, [.completed])
+
+        // The test line goes out whatever the other switches say, and how it went is kept for Settings.
+        model.sendTestPush()
+        let tested = await eventually { outbox.sent.count == 5 && self.model.pushStatus == .sent }
+        XCTAssertTrue(tested)
+        XCTAssertEqual(outbox.sent[4]["title"]?.stringValue, "Niko Island")
+    }
+
+    // MARK: Answering from the island
+
+    func testAFollowUpGoesToTheTerminalOnlyWhenThereIsAWayIn() async throws {
+        final class Typed: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _lines: [String] = []
+            var accepts = true
+            var lines: [String] { lock.lock(); defer { lock.unlock() }; return _lines }
+            func take(_ line: String) -> Bool { lock.lock(); defer { lock.unlock() }; _lines.append(line); return accepts }
+        }
+        let typed = Typed()
+        model.replySender = { _, line in typed.take(line) }
+        terminalEnvironment = ["TMUX": "/private/tmp/tmux-501/default,4242,0", "TMUX_PANE": "%3", "TERM_PROGRAM": "tmux"]
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\""))
+        let working = await eventually { self.model.sessions.first?.phase == .working }
+        XCTAssertTrue(working)
+        XCTAssertFalse(model.canReply(to: key), "off unless switched on")
+        model.settings.replyFromIsland = true
+        XCTAssertFalse(model.canReply(to: key), "an agent at work is not waiting for words")
+        model.reply(to: key, "hello")
+        XCTAssertTrue(typed.lines.isEmpty)
+
+        _ = await bridge(event("Stop", extra: closing))
+        let waiting = await eventually { self.model.completion != nil }
+        XCTAssertTrue(waiting)
+        XCTAssertTrue(model.canReply(to: key))
+        model.reply(to: key, "  now run\nthe tests ")
+        let sent = await eventually { self.model.replies[self.key] == .sent }
+        XCTAssertTrue(sent)
+        XCTAssertEqual(typed.lines, ["now run the tests"], "one line, as typed")
+        XCTAssertNil(model.completion, "answered: the card has done its job")
+        model.reply(to: key, "   ")
+        XCTAssertEqual(typed.lines.count, 1, "nothing typed, nothing sent")
+
+        // The terminal turned it down (a shell is at the prompt, say): the island says so and sends nothing else.
+        typed.accepts = false
+        model.reply(to: key, "again")
+        let failed = await eventually { self.model.replies[self.key] == .failed }
+        XCTAssertTrue(failed)
+
+        // A session without a terminal that can be named has no field at all.
+        terminalEnvironment = ["TERM_PROGRAM": "ghostty"]
+        _ = await bridge(event("UserPromptSubmit", session: "s2", extra: ",\"prompt\":\"other\""))
+        _ = await bridge(event("Stop", session: "s2", extra: closing))
+        let other = SessionKey(source: "claude", sessionID: "s2")
+        let there = await eventually { self.model.sessions.first { $0.key == other }?.phase == .waiting }
+        XCTAssertTrue(there)
+        XCTAssertFalse(model.canReply(to: other))
+        model.reply(to: other, "hello")
+        XCTAssertEqual(typed.lines.count, 2)
+    }
+
+    func testTheListCanBeArrangedByProjectOrByAgent() {
+        func snapshot(_ source: String, _ id: String, cwd: String, phase: Session.Phase) -> TranscriptSnapshot {
+            TranscriptSnapshot(key: SessionKey(source: source, sessionID: id), path: "/dev/null", cwd: cwd, firstPrompt: id, lastPrompt: id,
+                               phase: phase, activity: phase == .working ? .thinking : .waiting, updatedAt: Date())
+        }
+        model.mergeTranscripts([snapshot("claude", "a", cwd: "/tmp/atlas", phase: .working), snapshot("codex", "b", cwd: "/tmp/shop", phase: .working),
+                                snapshot("codex", "c", cwd: "/tmp/atlas", phase: .waiting), snapshot("claude", "d", cwd: "/tmp/shop", phase: .waiting)])
+        let listed = model.sessions
+        XCTAssertEqual(listed.count, 4)
+
+        let plain = SessionGroups.make(listed, by: .none)
+        XCTAssertEqual(plain.count, 1)
+        XCTAssertNil(plain[0].title, "as it comes: no headings")
+        XCTAssertEqual(plain[0].sessions.map(\.key), listed.map(\.key))
+
+        let byProject = SessionGroups.make(listed, by: .project)
+        XCTAssertEqual(Set(byProject.compactMap(\.title)), ["atlas", "shop"])
+        XCTAssertEqual(byProject.first?.sessions.first?.key, listed.first?.key, "the group of the first row comes first")
+        XCTAssertEqual(byProject.flatMap(\.sessions).count, 4)
+        XCTAssertTrue(byProject.allSatisfy { group in Set(group.sessions.map(\.cwd)).count == 1 })
+
+        let byAgent = SessionGroups.make(listed, by: .agent)
+        XCTAssertEqual(Set(byAgent.compactMap(\.title)), ["Claude Code", "Codex"])
+        XCTAssertEqual(Set(byAgent.compactMap(\.source)), ["claude", "codex"])
+        // One group is no grouping: the heading would only repeat every row.
+        XCTAssertNil(SessionGroups.make(listed.filter { $0.source == "codex" }, by: .agent).first?.title)
+        XCTAssertTrue(SessionGroups.make([], by: .project).isEmpty)
+
+        XCTAssertEqual(listed.first { $0.key.sessionID == "a" }?.resumeCommand, "claude --resume a")
+        XCTAssertEqual(listed.first { $0.key.sessionID == "b" }?.resumeCommand, "codex resume b")
     }
 
     func testNobodyAtTheScreenMeansNoSoundsAndNoCards() async throws {

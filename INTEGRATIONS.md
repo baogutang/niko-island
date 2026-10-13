@@ -61,7 +61,18 @@ Sessions of Claude Code and Codex are also read from their session logs
 task list is `.zcode/v2/tasks-index.sqlite`), all read-only. None of that needs
 registration. See `Sources/NikoCore/Scout/`.
 
-Limits of a plan (0.4.0, extended in 0.5.0) come from, in this order of trust: files the agent
+Seen from a real Claude Code (2.1.295, headless run, 0.6.0): every hook input
+carries `session_id`, `transcript_path`, `cwd`, `hook_event_name`,
+`scratchpad_dir`, and from the first prompt on `prompt_id`, `permission_mode`
+and `effort`; `Stop` adds `last_assistant_message`, `stop_hook_active`,
+`background_tasks` and `session_crons`; `PostToolUse` adds `tool_response` and
+`duration_ms`. The agent keeps its list of steps with `TaskCreate {subject,
+description}` and `TaskUpdate {taskId, status}`, one file per task in
+`~/.claude/tasks/<session id>/<n>.json` (`id`, `subject`, `description`,
+`status`, `blocks`, `blockedBy`), next to a `.lock` and a `.highwatermark`.
+
+Limits of a plan (0.4.0, extended in 0.5.0 and 0.6.0: Claude Code's own cached
+answer in `~/.claude.json`, key `cachedUsageUtilization`) come from, in this order of trust: files the agent
 writes (Codex rollouts: `rate_limits`), Claude Code's status line, Claude
 Code's transcript when a request is refused (`apiErrorParams.rate_limit_info`),
 and, only when the user switches it on, the provider:

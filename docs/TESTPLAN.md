@@ -7,7 +7,7 @@ screen and ears: the island window, full-screen apps, sounds, notifications,
 and real agents. Nothing here touches your real agent configuration until
 section 10.
 
-Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0, 0.4.0 or 0.5.0, on one
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 to 0.6.0, on one
 setup: macOS 15 with an external display that has no camera housing. A ☑ says nothing about
 a MacBook's own display or two displays at once. Items marked **(not
 automated)** have no test at all behind them.
@@ -253,6 +253,36 @@ echo '{"hook_event_name":"Stop",'$S',"last_assistant_message":"Fixed. The retry 
   2 min, sounds on: leave a request alone; its cue plays again after two
   minutes, at most three times. **(a real wait was not sat through)**
 
+Back at the screen, the phone, quiet hours, the list (0.6.0):
+
+- ☑ Start the app with `-NikoAwayFor 8` (a stand-in for a locked screen), send
+  two finished turns inside those eight seconds: nothing shows; after them one
+  card "While you were away · 2 finished" with a line per session. ☐ The same
+  with a real lock. ☐ A click on a line goes to that session.
+- ☑ Settings → Sessions → *Arrange the list* → By project: headings with the
+  project's name and a count; rows under them drop the project's name.
+  ☐ By agent.
+- ☐ Settings → General → *Quiet hours* from now until an hour from now, sounds
+  on: a finished turn makes no sound; switch it off and it does.
+- ☑ `NIKO_PUSH_KEY=x niko-island internal push bark http://127.0.0.1:<port>`
+  against a server of your own on this Mac: one POST to `/push` with
+  `device_key`, `title`, `body` as JSON. `… push ntfy …`: one POST to `/` with
+  `topic`, `title`, `message`. `… push bark http://example.org`: refused.
+- ☐ Settings → General → *A line to your phone*: paste a real Bark key or ntfy
+  topic, *Send a test*: the phone shows "Niko Island" and one line; the note
+  says the server accepted it. A wrong key says the server said no.
+  **(never sent through the real services)**
+- ☐ With it on, lock the screen and let an agent ask for a decision: the phone
+  shows the agent, the project and "Needs your decision", not the command.
+  With *Say what it is about* on, the command is there too.
+- ☑ Settings → Sessions → *Reply from the island*, and a session whose bridge
+  ran inside tmux: the card and the row get a line "Reply…". ☐ In a real tmux
+  pane with the agent waiting: what is typed arrives in the agent and the row
+  goes back to work. ☐ With the agent gone and the shell back at the prompt:
+  "Not sent", and nothing arrives in the shell. ☐ The same two checks in
+  iTerm2 and in Terminal (macOS asks for permission to control them first).
+  **(never run against a real terminal)**
+
 ## 6. Usage and limits
 
 Click the bars icon in the island's header.
@@ -269,6 +299,10 @@ Click the bars icon in the island's header.
   files.
 - ☐ Claude Code in a terminal: a 5-hour and a weekly bar appear once a
   connected session has drawn its status line.
+- ☑ `niko-island internal limits claude-cache` prints the windows Claude Code
+  last kept in `~/.claude.json` and which of them have not reset yet; no
+  sign-in is read. ☐ With a recent one, the Claude tab shows it as "as Claude
+  Code last saw them, … ago".
 - ☐ Claude Code turned away at a limit (the transcript gets a "usage limit
   reached" entry): the row says "hit its limit" and the usage view shows that
   window full, with the time it opens again. It disappears at that time.
@@ -382,6 +416,18 @@ Needs the bundled app (not `swift run`) and notification permission.
   forward (tab selection is not supported there), and the row's chip names it.
 
 ## 10. Real agents
+
+Done once for 0.6.0, without touching the real configuration: Claude Code
+2.1.295, headless, in an empty folder, with `--settings` naming a temporary
+hook file that points at a development build's bridge
+(`claude -p "…" --settings <file> --allowedTools TodoWrite`).
+
+- ☑ `Stop` carries `last_assistant_message`; the card showed that sentence
+  with its bold drawn as bold.
+- ☑ The agent kept its list with `TaskCreate` / `TaskUpdate`; the files under
+  `~/.claude/tasks/<session id>/` were read and the card showed 1/3.
+- ☐ The same with an interactive session, and a request approved from the
+  island (a headless run does not ask for permission).
 
 This is the first step that changes a real config. It is reversible.
 

@@ -188,3 +188,141 @@ public enum TerminalJump {
         return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
     }
 }
+
+/// A follow-up typed on the island and sent into the terminal the agent runs
+/// in, as if typed there. Only where the terminal can be addressed exactly
+/// (a tmux pane, an iTerm2 session, a Terminal.app tab), and only after
+/// checking that what sits at that terminal's prompt is the agent and not a shell.
+public enum TerminalReply {
+    public enum Channel: Sendable, Equatable {
+        case tmux(socket: String?, pane: String)
+        case iterm(guid: String)
+        case terminal(tty: String)
+    }
+
+    public static let limit = 2000
+
+    /// Where a reply to this session can go, if anywhere.
+    public static func channel(for session: Session) -> Channel? {
+        let target = JumpTarget(terminal: session.terminal, ancestors: session.ancestors)
+        if let pane = target.tmuxPane, pane.hasPrefix("%"), pane.count > 1, pane.dropFirst().allSatisfy(\.isNumber) {
+            return .tmux(socket: target.tmuxSocket, pane: pane)
+        }
+        switch target.app {
+        case .iterm2:
+            guard let guid = target.itermSessionGUID, !guid.isEmpty else { return nil }
+            return .iterm(guid: guid)
+        case .appleTerminal:
+            guard let tty = target.ttyDevice, tty.hasPrefix("/dev/tty"), tty.dropFirst(5).allSatisfy({ $0.isLetter || $0.isNumber }) else { return nil }
+            return .terminal(tty: tty)
+        case .other:
+            return nil
+        }
+    }
+
+    /// One line: line breaks become spaces, control characters go, and it has an end.
+    public static func clean(_ text: String) -> String? {
+        var out = ""
+        for scalar in text.unicodeScalars {
+            if scalar == "\n" || scalar == "\r" || scalar == "\t" {
+                out += " "
+            } else if scalar.value >= 0x20, scalar.value != 0x7F {
+                out.unicodeScalars.append(scalar)
+            }
+        }
+        let trimmed = out.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return nil }
+        return trimmed.count > limit ? String(trimmed.prefix(limit)) : trimmed
+    }
+
+    static let shells: Set<String> = ["zsh", "bash", "sh", "fish", "dash", "ksh", "tcsh", "csh", "nu", "pwsh", "login", "tmux", "screen", "ssh", "sudo", "su"]
+
+    /// Whether what is in the foreground of a terminal is this agent waiting for
+    /// input. A shell there means the agent has gone, and text sent now would
+    /// be run as a command: that is refused, whatever else is in the list.
+    public static func isAgentWaiting(foreground commands: [String], source: String) -> Bool {
+        let names = commands.map { command -> String in
+            var name = command.trimmingCharacters(in: .whitespaces)
+            if let slash = name.lastIndex(of: "/") { name = String(name[name.index(after: slash)...]) }
+            while name.hasPrefix("-") { name.removeFirst() }
+            return name.lowercased()
+        }.filter { !$0.isEmpty }
+        guard !names.isEmpty, !names.contains(where: shells.contains) else { return false }
+        let agent = Set((AgentRegistry.descriptor(source)?.processes ?? []).map { $0.lowercased() } + [source.lowercased(), "node", "bun", "deno"])
+        return names.contains { name in agent.contains { name == $0 || name.hasPrefix($0 + "-") } }
+    }
+
+    /// The foreground commands of a terminal, from `ps -o stat=,comm= -t <tty>`: the lines whose state carries a `+`.
+    public static func foreground(psOutput: String) -> [String] {
+        psOutput.split(whereSeparator: \.isNewline).compactMap { line -> String? in
+            let fields = line.split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+            guard fields.count == 2, fields[0].contains("+") else { return nil }
+            return fields[1].trimmingCharacters(in: .whitespaces)
+        }
+    }
+
+    /// tmux: asks what the pane is running.
+    public static func tmuxProbe(socket: String?, pane: String) -> [String] {
+        (socket.map { ["-S", $0] } ?? []) + ["display-message", "-p", "-t", pane, "#{pane_current_command}"]
+    }
+
+    /// tmux: the text, literally, then Return.
+    public static func tmuxSend(socket: String?, pane: String, text: String) -> [[String]] {
+        let prefix = socket.map { ["-S", $0] } ?? []
+        return [prefix + ["send-keys", "-t", pane, "-l", "--", text], prefix + ["send-keys", "-t", pane, "Enter"]]
+    }
+
+    /// The tty of an iTerm2 session, to check what runs there.
+    public static func itermTTYScript(guid: String) -> String {
+        """
+        tell application "iTerm2"
+            repeat with aWindow in windows
+                repeat with aTab in tabs of aWindow
+                    repeat with aSession in sessions of aTab
+                        if (unique id of aSession) is \(TerminalJump.literal(guid)) then return (tty of aSession)
+                    end repeat
+                end repeat
+            end repeat
+        end tell
+        return ""
+        """
+    }
+
+    /// AppleScript that types the text into the session or tab and presses Return. Nothing is activated.
+    public static func appleScript(for channel: Channel, text: String) -> String? {
+        switch channel {
+        case .tmux:
+            return nil
+        case .iterm(let guid):
+            return """
+            tell application "iTerm2"
+                repeat with aWindow in windows
+                    repeat with aTab in tabs of aWindow
+                        repeat with aSession in sessions of aTab
+                            if (unique id of aSession) is \(TerminalJump.literal(guid)) then
+                                tell aSession to write text \(TerminalJump.literal(text))
+                                return "sent"
+                            end if
+                        end repeat
+                    end repeat
+                end repeat
+            end tell
+            return "missing"
+            """
+        case .terminal(let tty):
+            return """
+            tell application "Terminal"
+                repeat with aWindow in windows
+                    repeat with aTab in tabs of aWindow
+                        if (tty of aTab) is \(TerminalJump.literal(tty)) then
+                            do script \(TerminalJump.literal(text)) in aTab
+                            return "sent"
+                        end if
+                    end repeat
+                end repeat
+            end tell
+            return "missing"
+            """
+        }
+    }
+}

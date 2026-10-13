@@ -279,8 +279,11 @@ public struct Activity: Sendable, Equatable {
             return "reading"
         case "write", "edit", "multiedit", "notebookedit", "write_file", "edit_file", "apply_patch", "str_replace", "replace", "patch":
             return "editing"
-        case "grep", "glob", "search", "find", "ls", "list", "search_file_content", "codebase_search":
+        case "grep", "glob", "search", "find", "ls", "list", "search_file_content", "codebase_search", "toolsearch", "websearch", "web_search":
             return "finding"
+        case "taskcreate", "taskupdate", "tasklist", "taskget", "todowrite", "todo_write", "update_plan":
+            // Keeping its own list of steps (Claude Code's task tools, and the older single list).
+            return "planning"
         case "webfetch", "web_fetch", "fetch":
             return "fetching"
         case "task", "agent", "subagent":
@@ -308,6 +311,8 @@ public struct Activity: Sendable, Equatable {
                 detail = input["url"]?.stringValue.flatMap { URL(string: $0)?.host ?? $0 }
             case "delegating":
                 detail = (input["description"] ?? input["subagent_type"])?.stringValue
+            case "planning":
+                detail = (input["subject"] ?? input["activeForm"])?.stringValue
             default:
                 detail = tool
             }

@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 @MainActor
 enum PreviewRenderer {
     enum Scene: String, CaseIterable {
-        case idle, working, attention, toast, done
+        case idle, working, attention, toast, done, recap, grouped
         case sessions, permission, question, usage, empty
         case settingsSounds = "settings-sounds"
         case settingsAgents = "settings-agents"
@@ -140,6 +140,24 @@ enum PreviewRenderer {
                 "last_assistant_message": "Fixed. The retry fired before the first upload had closed its stream, so two writers raced for `upload.tmp`. "
                     + "The retry now waits for the stream to close, with a **250 ms backoff**.\n\nAll 42 upload tests pass.",
             ])
+        case .recap:
+            // Three turns end while the screen is locked; somebody comes back.
+            model.isAway = true
+            send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 900, prompt: "Fix the flaky upload retry test")
+            send("claude", "Stop", session: "a", project: "atlas-api", ago: 610, extra: ["last_assistant_message": "Fixed."])
+            send("codex", "UserPromptSubmit", session: "b", project: "storefront", ago: 800, prompt: "Move the checkout form to the new validation hooks",
+                 host: ("ghostty", "com.mitchellh.ghostty"))
+            send("codex", "Stop", session: "b", project: "storefront", ago: 420, host: ("ghostty", "com.mitchellh.ghostty"))
+            send("gemini", "UserPromptSubmit", session: "c", project: "docs-site", ago: 700, prompt: "Tighten the install guide", host: ("Apple_Terminal", nil))
+            send("gemini", "StopFailure", session: "c", project: "docs-site", ago: 300, host: ("Apple_Terminal", nil), extra: ["error": "overloaded"])
+            model.isAway = false
+        case .grouped:
+            fleet()
+            transcripts()
+            send("claude", "UserPromptSubmit", session: "f", project: "storefront", ago: 150, prompt: "Write tests for the checkout form")
+            send("claude", "PreToolUse", session: "f", project: "storefront", ago: 20, tool: "Edit",
+                 input: ["file_path": .string("/Users/dev/code/storefront/src/CheckoutForm.test.tsx")])
+            model.settings.sessionGrouping = .project
         case .attention, .permission:
             fleet()
             send("claude", "PermissionRequest", session: "a", project: "atlas-api", ago: 12, tool: "Bash",
@@ -192,8 +210,8 @@ enum PreviewRenderer {
         }
 
         switch scene {
-        case .sessions, .permission, .question, .usage, .empty: model.expand(.click)
-        case .toast, .done: break
+        case .sessions, .permission, .question, .usage, .empty, .grouped: model.expand(.click)
+        case .toast, .done, .recap: break
         default: model.collapse()
         }
         if scene != .toast { model.dismissToast() }

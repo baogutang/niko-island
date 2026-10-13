@@ -387,6 +387,19 @@ public final class UsageEngine: @unchecked Sendable {
         onSnapshot(makeSnapshot())
     }
 
+    private var claudeCacheStamp: Date?
+    private var claudeCached: ProviderLimits?
+
+    /// Claude Code's own cached answer, read again only when its file has changed.
+    private func claudeCache() -> ProviderLimits? {
+        let file = home.appendingPathComponent(".claude.json")
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date
+        guard stamp != claudeCacheStamp else { return claudeCached }
+        claudeCacheStamp = stamp
+        claudeCached = stamp == nil ? nil : ClaudeUsageAPI.cached(home: home)
+        return claudeCached
+    }
+
     private func makeSnapshot(now: Date = Date()) -> UsageSnapshot {
         var snapshot = UsageSnapshot()
         snapshot.indexing = indexing
@@ -397,6 +410,7 @@ public final class UsageEngine: @unchecked Sendable {
         // Each source knows some windows; whichever looked last wins a window.
         var sources: [String: [ProviderLimits]] = [:]
         sources["claude", default: []].append(ProviderLimits(windows: lastRateLimits.windows, capturedAt: lastRateLimits.capturedAt, source: .statusLine))
+        if let cached = claudeCache() { sources["claude", default: []].append(cached) }
         sources["codex", default: []].append(codexLimits)
         for (id, asked) in askedLimits { sources[id, default: []].append(asked) }
         for (id, reached) in reachedLimits { sources[id, default: []].append(reached) }

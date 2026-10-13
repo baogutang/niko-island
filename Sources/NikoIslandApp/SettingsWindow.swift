@@ -165,6 +165,7 @@ struct SettingsPageView: View {
     @State private var loginItemError: String?
     @State private var exportedPath: String?
     @State private var glmKeyDraft = ""
+    @State private var pushKeyDraft = ""
     @Environment(\.look) private var look
 
     var body: some View {
@@ -268,6 +269,7 @@ struct SettingsPageView: View {
                     get: { model.settings.notificationsEnabled(for: .idle) },
                     set: { model.settings.setNotifications($0, for: .idle) }))
             }
+            phone
             card(L("App")) {
                 toggleRow(L("Open Niko Island at login"), loginItemError, isOn: Binding(
                     get: { LoginItem.isEnabled },
@@ -282,10 +284,108 @@ struct SettingsPageView: View {
                 choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times. Not while the screen is locked."),
                           options: NikoSettings.reminderChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
                           selection: settingsBinding(\.reminderMinutes))
+                toggleRow(L("Quiet hours"), L("No sounds and nothing sent to a phone between these times. The island itself shows what it always shows."),
+                          divider: !model.settings.quietHoursEnabled, isOn: settingsBinding(\.quietHoursEnabled))
+                if model.settings.quietHoursEnabled {
+                    row(L("From"), divider: false) { timeMenu(settingsBinding(\.quietFrom)) }
+                    row(L("Until")) { timeMenu(settingsBinding(\.quietUntil)) }
+                }
                 choiceRow(L("Language"), divider: false,
                           options: [("system", L("Same as macOS")), ("en", "English"), ("zh-Hans", "简体中文")],
                           selection: settingsBinding(\.language))
             }
+        }
+    }
+
+    /// A time of day in half-hour steps.
+    private func timeMenu(_ minutes: Binding<Int>) -> some View {
+        Menu {
+            ForEach(Array(stride(from: 0, to: 1440, by: 30)), id: \.self) { value in
+                Button(Self.clock(value)) { minutes.wrappedValue = value }
+            }
+        } label: {
+            Chip(text: Self.clock(minutes.wrappedValue))
+        }
+        .menuStyle(.borderlessButton)
+        .fixedSize()
+    }
+
+    static func clock(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }
+
+    // MARK: A phone
+
+    private var phone: some View {
+        card(L("A line to your phone")) {
+            toggleRow(L("Send a line to my phone"),
+                      L("Through a push service you set up yourself. It says which agent, which project and what kind of moment, to the one server below and nowhere else. Off until you turn it on."),
+                      isOn: Binding(get: { model.settings.pushEnabled && model.hasPushKey },
+                                    set: { model.settings.pushEnabled = $0 && model.hasPushKey }))
+            choiceRow(L("Service"), options: [("bark", "Bark"), ("ntfy", "ntfy")], selection: settingsBinding(\.pushService))
+            pushKeyRow
+            row(L("Server"), L("Empty: the service's own. A server of your own needs https, or an address on this network.")) {
+                if isStaticPreview {
+                    Text(PushService(rawValue: model.settings.pushService)?.defaultServer ?? "").font(Theme.mono(12)).foregroundStyle(Theme.tertiary)
+                } else {
+                    TextField(PushService(rawValue: model.settings.pushService)?.defaultServer ?? "", text: settingsBinding(\.pushServer))
+                        .textFieldStyle(.plain).font(Theme.mono(12)).frame(width: 230)
+                        .padding(.horizontal, 10).padding(.vertical, 6)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                }
+            }
+            toggleRow(L("Only while the screen is locked or asleep"), L("At the Mac, the island is how you are told."), isOn: settingsBinding(\.pushOnlyWhenAway))
+            toggleRow(L("Also when an agent finishes"), L("Off: only when one needs a decision or has a question."), isOn: settingsBinding(\.pushWhenFinished))
+            toggleRow(L("Say what it is about"), L("Adds the tool and command being asked for, or the first line of a reply. Off: none of that leaves this Mac."),
+                      isOn: settingsBinding(\.pushDetails))
+            row(pushNote ?? L("Nothing has been sent yet."), divider: false) {
+                Button(L("Send a test")) { model.sendTestPush() }.buttonStyle(PillButtonStyle())
+                    .disabled(!model.hasPushKey).opacity(model.hasPushKey ? 1 : 0.4)
+            }
+        }
+    }
+
+    /// How the last line went, in words.
+    private var pushNote: String? {
+        switch model.pushStatus {
+        case nil: return nil
+        case .sent?: return L("The last line was accepted by the server.")
+        case .notSetUp?: return L("There is no key yet, or the server address cannot be used.")
+        case .refused(let status)?: return L("The server said no (%lld). Check the key.", status)
+        case .unreachable?: return L("The server could not be reached.")
+        }
+    }
+
+    private var pushKeyRow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                if model.hasPushKey {
+                    Image(systemName: "key.fill").font(.system(size: 11)).foregroundStyle(look.accent)
+                    Text(L("A key is saved in your Keychain.")).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
+                    Spacer(minLength: 8)
+                    Button(L("Remove")) {
+                        model.setPushKey(nil)
+                        pushKeyDraft = ""
+                    }.buttonStyle(PillButtonStyle())
+                } else if isStaticPreview {
+                    Text(L("Paste the device key (Bark) or the topic (ntfy)")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                        .padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Button(L("Save")) {}.buttonStyle(PillButtonStyle(kind: .primary))
+                } else {
+                    SecureField(L("Paste the device key (Bark) or the topic (ntfy)"), text: $pushKeyDraft)
+                        .textFieldStyle(.plain).font(Theme.mono(12))
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Button(L("Save")) {
+                        model.setPushKey(pushKeyDraft)
+                        pushKeyDraft = ""
+                        if model.hasPushKey { model.settings.pushEnabled = true }
+                    }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(pushKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count < 4)
+                }
+            }
+            .padding(.vertical, 10)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
         }
     }
 
@@ -377,9 +477,15 @@ struct SettingsPageView: View {
                 toggleRow(L("Find sessions by reading the agents' own session logs"),
                           L("Claude Code and Codex sessions show up even when they are idle, were started before this app, or run in a desktop app that is not connected. The logs are only read, on this Mac."),
                           isOn: settingsBinding(\.discoverSessions))
-                choiceRow(L("Keep a quiet session listed for"), divider: false,
+                choiceRow(L("Keep a quiet session listed for"),
                           options: [(10, L("10 min")), (30, L("30 min")), (120, L("2 hours")), (480, L("8 hours"))],
                           selection: settingsBinding(\.sessionRetentionMinutes))
+                choiceRow(L("Arrange the list"), L("Under a heading per project or per agent. The group with something that needs you comes first."),
+                          options: [(NikoSettings.SessionGrouping.none, L("As it comes")), (.project, L("By project")), (.agent, L("By agent"))],
+                          selection: settingsBinding(\.sessionGrouping))
+                toggleRow(L("Reply from the island (experimental)"),
+                          L("A session that has stopped gets a line to type a follow-up into. It is sent into the terminal the agent runs in, as if typed there: a tmux pane, an iTerm2 session or a Terminal tab, and only while the agent itself is waiting at that prompt. Sessions in a desktop app have no such way in. macOS will ask before the first one."),
+                          divider: false, isOn: settingsBinding(\.replyFromIsland))
             }
             Text(L("Sessions found this way can be watched and jumped to. Approving from the island needs the agent to be connected."))
                 .font(Theme.body(12)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)

@@ -215,6 +215,31 @@ final class DocsTests: XCTestCase {
         XCTAssertTrue(site.contains("⌃⌥A") && site.contains("⌃⌥D"))
     }
 
+    /// What the pages say about 0.6.0's phone, quiet hours, list and reply is what the code does.
+    func testReadmesDescribeThePhoneTheListAndTheReplyAsTheyAre() throws {
+        let settings = NikoSettings()
+        XCTAssertFalse(settings.pushEnabled, "the pages say nothing is sent to a phone until switched on")
+        XCTAssertTrue(settings.pushOnlyWhenAway, "and then only while the screen is locked")
+        XCTAssertFalse(settings.pushDetails, "and without what is being asked for")
+        XCTAssertFalse(settings.quietHoursEnabled)
+        XCTAssertFalse(settings.replyFromIsland, "the pages call replying experimental and off by default")
+        XCTAssertEqual(settings.sessionGrouping, .none)
+        XCTAssertEqual(PushService.allCases.map(\.rawValue), ["bark", "ntfy"])
+        XCTAssertNil(PushRequest.endpoint(server: "http://example.org", service: .bark), "the pages say https, or an address on your own network")
+        for readme in ["README.md", "README.zh-CN.md"] {
+            let text = try read(readme)
+            for needle in ["Bark", "ntfy", "docs/images/island-recap.png", "~/.claude.json", "`TaskCreate`", "tmux"] {
+                XCTAssertTrue(text.contains(needle), "\(readme): \(needle)")
+            }
+            XCTAssertFalse(text.contains("two optional things"), readme)
+            XCTAssertFalse(text.contains("两件可选的事"), readme)
+        }
+        XCTAssertTrue(try read("README.md").contains("Three optional uses of the network"))
+        XCTAssertTrue(try read("README.zh-CN.md").contains("只有三件可选的事会用到网络"))
+        let site = try read("website/index.html")
+        XCTAssertTrue(site.contains("Bark") && site.contains("ntfy"))
+    }
+
     /// What the pages promise about sign-ins and the network is what the code does.
     func testPrivacyClaimsMatchTheCode() throws {
         XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say all three lookups are off until switched on")

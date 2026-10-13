@@ -41,6 +41,17 @@ extension Session {
         return text.isEmpty ? nil : text
     }
 
+    /// What to type in a terminal to pick this conversation up again, for the agents that have such a thing.
+    var resumeCommand: String? {
+        let id = key.sessionID
+        guard !id.isEmpty, id.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) else { return nil }
+        switch source {
+        case "claude": return "claude --resume \(id)"
+        case "codex": return "codex resume \(id)"
+        default: return nil
+        }
+    }
+
     /// The model, shortened to what fits on a chip.
     var modelLabel: String? {
         model.map(ModelLabel.short).flatMap { $0.isEmpty ? nil : $0 }
@@ -53,6 +64,8 @@ struct SessionRowView: View {
     @ObservedObject var model: AppModel
     let session: Session
     var now: Date
+    /// Off under a heading that already names the project.
+    var showsProject = true
     @State private var hovering = false
     @Environment(\.look) private var look
 
@@ -61,15 +74,55 @@ struct SessionRowView: View {
     }
 
     var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            summary
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    // A row that is waiting on you opens its request; any other row takes you to its terminal.
+                    if let pendingHere { model.focusedRequestID = pendingHere.id } else { model.jump(to: session.key) }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+            if model.canReply(to: session.key) || model.replies[session.key] != nil {
+                // Its own line, so that a click into the field is not a click on the row.
+                ReplyField(model: model, key: session.key).padding(.leading, 43)
+            }
+        }
+        .padding(.vertical, look.compact ? 5 : 9)
+        .padding(.horizontal, 10)
+        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(hovering ? Theme.hover : Color.clear))
+        .padding(.horizontal, -10)
+        .onHover { hovering = $0 }
+        .contextMenu {
+            Button(L("Open in Terminal")) { model.jump(to: session.key) }
+            if let reply = session.lastReply, !reply.isEmpty {
+                Button(L("Copy the last reply")) { model.copy(reply) }
+            }
+            if let folder = session.cwd {
+                Button(L("Show the folder in Finder")) { model.reveal(folder) }
+            }
+            if let command = session.resumeCommand {
+                Button(L("Copy the command that resumes it")) { model.copy(command) }
+            }
+            if model.grantedSessions.contains(session.key) {
+                Button(L("Stop auto-approving")) { model.revokeGrants(for: session.key) }
+            }
+            Button(L("Dismiss")) { model.dismiss(session.key) }
+        }
+    }
+
+    private var summary: some View {
         HStack(alignment: .top, spacing: 13) {
             MascotView(source: session.source, size: 30, animated: session.phase == .working)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    Text(session.projectName)
-                        .font(look.body(12.5, .medium)).foregroundStyle(Theme.secondary)
-                        .lineLimit(1).fixedSize()
+                    if showsProject {
+                        Text(session.projectName)
+                            .font(look.body(12.5, .medium)).foregroundStyle(Theme.secondary)
+                            .lineLimit(1).fixedSize()
+                    }
                     if look.chips.contains(.branch), let branch = session.cwd.flatMap({ model.branches[$0] }) {
                         // The branch belongs to the project, so it sits with its name.
                         HStack(spacing: 2) {
@@ -81,7 +134,9 @@ struct SessionRowView: View {
                         .fixedSize()
                         .help(branch)
                     }
-                    Text("·").font(look.body(12.5)).foregroundStyle(Theme.tertiary)
+                    if showsProject || (look.chips.contains(.branch) && session.cwd.flatMap({ model.branches[$0] }) != nil) {
+                        Text("·").font(look.body(12.5)).foregroundStyle(Theme.tertiary)
+                    }
                     Text(session.headline)
                         .font(look.title(15, .medium)).foregroundStyle(Theme.primary)
                         .lineLimit(1).truncationMode(.tail)
@@ -115,25 +170,6 @@ struct SessionRowView: View {
             }
             .padding(.top, 1)
         }
-        .padding(.vertical, look.compact ? 5 : 9)
-        .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(hovering ? Theme.hover : Color.clear))
-        .padding(.horizontal, -10)
-        .contentShape(Rectangle())
-        .onHover { hovering = $0 }
-        .onTapGesture {
-            // A row that is waiting on you opens its request; any other row takes you to its terminal.
-            if let pendingHere { model.focusedRequestID = pendingHere.id } else { model.jump(to: session.key) }
-        }
-        .contextMenu {
-            Button(L("Open in Terminal")) { model.jump(to: session.key) }
-            if model.grantedSessions.contains(session.key) {
-                Button(L("Stop auto-approving")) { model.revokeGrants(for: session.key) }
-            }
-            Button(L("Dismiss")) { model.dismiss(session.key) }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isButton)
     }
 
     private var activityLine: some View {

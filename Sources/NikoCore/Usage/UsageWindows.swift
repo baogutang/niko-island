@@ -53,6 +53,8 @@ public enum LimitsSource: String, Sendable, Equatable {
     case agentFiles = "files"
     /// Claude Code's status line.
     case statusLine = "statusline"
+    /// What the agent last fetched for itself and kept on disk; as old as that.
+    case agentCache = "cache"
     /// The provider, asked directly (opt-in).
     case provider
     /// The agent was turned away: all that is known is that the window is full, and until when.

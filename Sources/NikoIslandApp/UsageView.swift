@@ -172,6 +172,7 @@ struct UsageView: View {
         switch agent.limitsSource {
         case .provider?: return agent.limitsCapturedAt.map { L("asked %@", sinceText($0)) } ?? ""
         case .statusLine?: return L("from %@'s status line", name)
+        case .agentCache?: return agent.limitsCapturedAt.map { L("as %@ last saw them, %@", name, sinceText($0)) } ?? ""
         case .limitReached?: return L("%@ was turned away", name)
         case .agentFiles?, nil: return L("as %@ reports them", name)
         }

@@ -373,6 +373,14 @@ public enum NikoCLI {
                 }
                 return (data, status)
             }
+            if which == "claude-cache" {
+                // What Claude Code last fetched for itself: no sign-in is read, nothing is asked.
+                guard let cached = ClaudeUsageAPI.cached(home: home) else { print("no cached answer in ~/.claude.json"); return 0 }
+                let hours = cached.capturedAt.map { Int(Date().timeIntervalSince($0) / 3600) } ?? -1
+                print("cached \(hours) h ago: \(cached.windows.map(\.id).joined(separator: ", "))")
+                print("still current: \(cached.current(now: Date()).windows.map(\.id).joined(separator: ", "))")
+                return 0
+            }
             if which == "claude" {
                 // When the stored sign-in runs out says whether a lookup can work at all. The sign-in itself is not shown.
                 switch ClaudeCodeLogin.read(home: home) {
@@ -404,6 +412,29 @@ public enum NikoCLI {
                     }
                 }
                 await client.configure(.init())
+                done.signal()
+            }
+            done.wait()
+            return 0
+        case "push":
+            // One line through a push service, to check that a server takes it in the form this version sends.
+            // The key comes from the environment (NIKO_PUSH_KEY) and is never printed.
+            let service = PushService(rawValue: args.positional() ?? "bark") ?? .bark
+            let server = args.positional() ?? ""
+            guard let key = ProcessInfo.processInfo.environment["NIKO_PUSH_KEY"], !key.isEmpty else {
+                print("set NIKO_PUSH_KEY to the device key or topic")
+                return 1
+            }
+            guard let endpoint = PushRequest.endpoint(server: server, service: service) else {
+                print("that server address cannot be used")
+                return 1
+            }
+            let done = DispatchSemaphore(value: 0)
+            Task.detached {
+                let client = PushClient(key: { key })
+                let outcome = await client.send(PushMessage(title: NikoVersion.displayName, body: "A test line from niko-island internal push"),
+                                                server: server, service: service)
+                print("\(endpoint.host ?? "?")\(endpoint.path) → \(outcome)")
                 done.signal()
             }
             done.wait()

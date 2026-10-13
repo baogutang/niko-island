@@ -36,7 +36,7 @@ final class LocalizationTests: XCTestCase {
     func testEveryStringInTheAppIsTranslated() throws {
         let strings = try catalog()
         let verbs: Set<String> = ["starting", "thinking", "running", "reading", "editing", "finding", "fetching", "delegating",
-                                  "working", "compacting", "waiting for you", "needs permission", "has a question", "hit an error", "hit its limit"]
+                                  "working", "planning", "compacting", "waiting for you", "needs permission", "has a question", "hit an error", "hit its limit"]
         // Looked up by value rather than by literal: activity verbs, and what an agent asks of the user after connecting.
         let needed = try keysInSources().union(verbs).union(AgentRegistry.all.compactMap(\.followUp))
         XCTAssertGreaterThan(needed.count, 60)

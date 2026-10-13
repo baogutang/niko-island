@@ -174,6 +174,93 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["quietWhenAway"] = .bool(newValue) }
     }
 
+    // MARK: Quiet hours
+
+    /// A stretch of the day in which nothing makes a sound and nothing is pushed
+    /// to a phone. What is shown on the island is shown as usual: it is silent anyway.
+    public var quietHoursEnabled: Bool {
+        get { bool("quietHoursEnabled", default: false) }
+        set { raw["quietHoursEnabled"] = .bool(newValue) }
+    }
+
+    /// Minutes after midnight, in steps of half an hour.
+    public var quietFrom: Int {
+        get { NikoSettings.halfHour(raw["quietFrom"]?.intValue ?? 22 * 60) }
+        set { raw["quietFrom"] = .int(NikoSettings.halfHour(newValue)) }
+    }
+
+    public var quietUntil: Int {
+        get { NikoSettings.halfHour(raw["quietUntil"]?.intValue ?? 8 * 60) }
+        set { raw["quietUntil"] = .int(NikoSettings.halfHour(newValue)) }
+    }
+
+    static func halfHour(_ minutes: Int) -> Int { min(1410, max(0, minutes / 30 * 30)) }
+
+    /// Whether `date` falls inside the quiet stretch. A stretch may run over midnight.
+    public func isQuiet(at date: Date, calendar: Calendar = .current) -> Bool {
+        guard quietHoursEnabled, quietFrom != quietUntil else { return false }
+        let parts = calendar.dateComponents([.hour, .minute], from: date)
+        let minute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        return quietFrom < quietUntil ? (quietFrom..<quietUntil).contains(minute) : (minute >= quietFrom || minute < quietUntil)
+    }
+
+    // MARK: The list
+
+    public enum SessionGrouping: String, Sendable, CaseIterable {
+        case none, project, agent
+    }
+
+    /// How the open island's list is arranged once there are several sessions.
+    public var sessionGrouping: SessionGrouping {
+        get { raw["sessionGrouping"]?.stringValue.flatMap(SessionGrouping.init(rawValue:)) ?? .none }
+        set { raw["sessionGrouping"] = .string(newValue.rawValue) }
+    }
+
+    /// Type a follow-up to a session from the island. It is sent into the
+    /// terminal the agent runs in, as if typed there. Off unless switched on.
+    public var replyFromIsland: Bool {
+        get { bool("replyFromIsland", default: false) }
+        set { raw["replyFromIsland"] = .bool(newValue) }
+    }
+
+    // MARK: A phone (opt-in)
+
+    /// Send a short line to the user's own phone through a push service they
+    /// set up themselves. Off unless switched on; the key lives in the Keychain.
+    public var pushEnabled: Bool {
+        get { bool("pushEnabled", default: false) }
+        set { raw["pushEnabled"] = .bool(newValue) }
+    }
+
+    /// `bark` or `ntfy`.
+    public var pushService: String {
+        get { raw["pushService"]?.stringValue == "ntfy" ? "ntfy" : "bark" }
+        set { raw["pushService"] = .string(newValue == "ntfy" ? "ntfy" : "bark") }
+    }
+
+    /// The server to send to; empty means the service's own public one.
+    public var pushServer: String {
+        get { raw["pushServer"]?.stringValue ?? "" }
+        set { raw["pushServer"] = .string(newValue.trimmingCharacters(in: .whitespacesAndNewlines)) }
+    }
+
+    /// Only while nobody is at the screen: that is when a phone is the way to reach someone.
+    public var pushOnlyWhenAway: Bool {
+        get { bool("pushOnlyWhenAway", default: true) }
+        set { raw["pushOnlyWhenAway"] = .bool(newValue) }
+    }
+
+    public var pushWhenFinished: Bool {
+        get { bool("pushWhenFinished", default: true) }
+        set { raw["pushWhenFinished"] = .bool(newValue) }
+    }
+
+    /// Say what it is about (the tool, the first line of a reply). Off: only who, where and what kind.
+    public var pushDetails: Bool {
+        get { bool("pushDetails", default: false) }
+        set { raw["pushDetails"] = .bool(newValue) }
+    }
+
     /// Minutes a request may wait unanswered before the app speaks up again. 0: never.
     public static let reminderChoices = [0, 2, 5, 10]
 

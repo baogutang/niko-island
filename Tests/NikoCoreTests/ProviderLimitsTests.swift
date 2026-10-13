@@ -124,6 +124,47 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertNotNil(ClaudeCodeLogin.parse(try Data(contentsOf: scratch.file("home/.claude/.credentials.json"))))
     }
 
+    func testTheAnswerAsClaudeCodeItselfKeepsItIsReadWithoutASignIn() throws {
+        // The shape of a real answer, as Claude Code caches it in ~/.claude.json: windows under code names next to
+        // the ones with a meaning, a list whose weekly entry is called "weekly_all", and extra usage that is off.
+        let answer = #"""
+        {"five_hour":{"utilization":12,"resets_at":"2099-01-01T05:00:00.000000+00:00","limit_dollars":null,"locked_reason":null},
+         "seven_day":{"utilization":34,"resets_at":"2099-01-06T00:00:00.000000+00:00","limit_dollars":null},
+         "seven_day_oauth_apps":null,"seven_day_opus":null,"seven_day_sonnet":null,"tangelo":null,"iguana_necktie":null,
+         "nimbus_quill":{"utilization":0,"resets_at":null,"limit_dollars":null},
+         "extra_usage":{"is_enabled":false,"monthly_limit":5000,"used_credits":0,"utilization":0,"currency":"USD"},
+         "limits":[{"kind":"session","group":"session","percent":12,"severity":"ok","resets_at":"2099-01-01T05:00:00+00:00","scope":null,"is_active":true},
+                   {"kind":"weekly_all","group":"weekly","percent":34,"severity":"ok","resets_at":"2099-01-06T00:00:00+00:00","scope":null,"is_active":false}],
+         "seven_day_breakdown":{"as_of":"2098-12-31T00:00:00Z","rows":[{"key":"opus","display_name":"Opus","percent":20}]}}
+        """#
+        let parsed = try XCTUnwrap(ClaudeUsageAPI.parse(Data(answer.utf8), now: now))
+        XCTAssertEqual(parsed.windows.map(\.id), ["five_hour", "seven_day"], "a window under a code name says nothing a person can use")
+        XCTAssertEqual(parsed.windows.map(\.usedPercent), [12, 34])
+        // Only the list: the weekly entry is "weekly_all", and "not the one that bites right now" is still a limit.
+        let listOnly = #"{"limits":[{"kind":"session","group":"session","percent":50,"resets_at":null,"is_active":false},{"kind":"weekly_all","group":"weekly","percent":70,"resets_at":null,"is_active":false}]}"#
+        XCTAssertEqual(ClaudeUsageAPI.parse(Data(listOnly.utf8), now: now)?.windows.map(\.id), ["five_hour", "seven_day"])
+
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        XCTAssertNil(ClaudeUsageAPI.cached(home: home))
+        let fetched = now.addingTimeInterval(-7200)
+        let file = #"{"numStartups":3,"projects":{"/x":{"history":["secret prompt"]}},"oauthAccount":{"emailAddress":"x@example.org"},"cachedUsageUtilization":{"accountUuid":"u","fetchedAtMs":\#(Int(fetched.timeIntervalSince1970 * 1000)),"utilization":\#(answer)}}"#
+        try Data(file.utf8).write(to: home.appendingPathComponent(".claude.json"))
+        let cached = try XCTUnwrap(ClaudeUsageAPI.cached(home: home))
+        XCTAssertEqual(cached.source, .agentCache)
+        XCTAssertEqual(cached.capturedAt, fetched, "as old as the last time Claude Code looked, and said so")
+        XCTAssertEqual(cached.windows.map(\.id), ["five_hour", "seven_day"])
+        // A fresher answer from anywhere wins a window; an old cache whose windows have reset says nothing.
+        let asked = ProviderLimits(windows: [RateLimitWindow(id: "five_hour", usedPercent: 60, resetsAt: now.addingTimeInterval(600))], capturedAt: now, source: .provider)
+        let merged = try XCTUnwrap(ProviderLimits.merged([cached, asked], now: now))
+        XCTAssertEqual(merged.windows.first { $0.id == "five_hour" }?.usedPercent, 60)
+        XCTAssertEqual(merged.windows.first { $0.id == "seven_day" }?.usedPercent, 34)
+        XCTAssertTrue(cached.current(now: Date(timeIntervalSince1970: 4_200_000_000)).windows.isEmpty)
+        try Data(#"{"cachedUsageUtilization":{"fetchedAtMs":1,"utilization":{}}}"#.utf8).write(to: home.appendingPathComponent(".claude.json"))
+        XCTAssertNil(ClaudeUsageAPI.cached(home: home))
+    }
+
     func testChatGPTsAnswerAboutACodexPlanIsRead() throws {
         // A plan with only a weekly window, as seen: the second window is null.
         let weekly = Data(#"""
@@ -489,7 +530,7 @@ final class ProviderLimitsTests: XCTestCase {
     }
 
     /// SPEC §5: the network is the price list and, when switched on, the providers. Nothing else.
-    func testOnlyTwoFilesCanReachTheNetwork() throws {
+    func testOnlyThreeFilesCanReachTheNetwork() throws {
         let sources = repositoryRoot.appendingPathComponent("Sources")
         var offenders: [String] = []
         let walker = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
@@ -499,9 +540,12 @@ final class ProviderLimitsTests: XCTestCase {
                 offenders.append(file.lastPathComponent)
             }
         }
-        XCTAssertEqual(offenders.sorted(), ["Pricing.swift", "ProviderLookups.swift"])
+        // The price list, the provider lookups, and a line to the user's own phone: each off until switched on.
+        XCTAssertEqual(offenders.sorted(), ["Pricing.swift", "ProviderLookups.swift", "Push.swift"])
         XCTAssertFalse(NikoSettings().claudeLimitsLookup)
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
+        XCTAssertFalse(NikoSettings().codexLimitsLookup)
         XCTAssertFalse(NikoSettings().pricingRefreshEnabled)
+        XCTAssertFalse(NikoSettings().pushEnabled)
     }
 }

@@ -43,6 +43,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             ProviderLimitsClient(paths: paths, secrets: .system(home: home), onChange: onChange)
         }
         model.hasGLMKey = ProviderKeychain.exists(ProviderLimitsClient.glmAccount)
+        model.hasPushKey = ProviderKeychain.exists(PushClient.account)
         model.start()
         if model.startFailure == .anotherInstanceRunning {
             // One island is enough: the running instance keeps the socket.
@@ -75,6 +76,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &subscriptions)
         model.isFrontmost = { TerminalJumper.isFrontmost($0) }
+        model.replySender = { session, text in await TerminalJumper.reply(text, to: session) }
         watchScreen()
         model.$wantsOnboarding
             .receive(on: DispatchQueue.main)
@@ -96,6 +98,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             if let agent = UserDefaults.standard.string(forKey: "NikoUsageAgent") { model.usageAgent = agent }
             model.expand(.click)
             model.heldOpen = true
+        }
+
+        // `-NikoAwayFor <seconds>` stands in for a locked screen, to look at what happens on return.
+        let awayFor = UserDefaults.standard.double(forKey: "NikoAwayFor")
+        if awayFor > 0 {
+            model.isAway = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + awayFor) { [weak self] in
+                guard let self else { return }
+                MainActor.assumeIsolated { self.model.isAway = false }
+            }
         }
 
         // The first launch gets the welcome (scripted launches say no thanks).

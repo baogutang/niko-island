@@ -160,6 +160,18 @@ extension AppModel {
         if hasGLMKey { refreshProviderLimits() } else { settings.glmLimitsLookup = false }
     }
 
+    /// Puts text on the clipboard (a reply, a command), and nothing else.
+    public func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// Shows a session's folder in Finder.
+    public func reveal(_ folder: String) {
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: folder)
+        collapse()
+    }
+
     /// Brings an agent's own app forward: where a quota reset is actually spent.
     public func openAgentApp(_ id: String) {
         guard let bundle = AgentRegistry.all.first(where: { $0.id == id })?.apps.first,

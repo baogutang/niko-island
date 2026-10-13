@@ -43,6 +43,45 @@ enum TerminalJumper {
         return session.hostBundleID == front
     }
 
+    /// Sends a follow-up into the session's terminal. Returns false when there
+    /// is no way in, or when what sits at that terminal is not the agent.
+    static func reply(_ text: String, to session: Session) async -> Bool {
+        guard let channel = TerminalReply.channel(for: session) else { return false }
+        let ancestors = session.ancestors
+        let source = session.source
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(returning: send(text, through: channel, source: source, ancestors: ancestors))
+            }
+        }
+    }
+
+    private static func send(_ text: String, through channel: TerminalReply.Channel, source: String, ancestors: [ProcessNode]) -> Bool {
+        func waiting(onTTY tty: String) -> Bool {
+            let name = tty.hasPrefix("/dev/") ? String(tty.dropFirst(5)) : tty
+            guard let listing = run("/bin/ps", ["-o", "stat=,comm=", "-t", name]) else { return false }
+            return TerminalReply.isAgentWaiting(foreground: TerminalReply.foreground(psOutput: listing), source: source)
+        }
+        switch channel {
+        case .tmux(let socket, let pane):
+            guard let tmux = TerminalJump.locateTmux(ancestors: ancestors),
+                  let command = run(tmux, TerminalReply.tmuxProbe(socket: socket, pane: pane)),
+                  TerminalReply.isAgentWaiting(foreground: [command], source: source) else { return false }
+            for arguments in TerminalReply.tmuxSend(socket: socket, pane: pane, text: text) {
+                guard run(tmux, arguments) != nil else { return false }
+            }
+            return true
+        case .iterm(let guid):
+            guard let tty = run("/usr/bin/osascript", ["-e", TerminalReply.itermTTYScript(guid: guid)])?
+                .trimmingCharacters(in: .whitespacesAndNewlines), !tty.isEmpty, waiting(onTTY: tty),
+                  let script = TerminalReply.appleScript(for: channel, text: text) else { return false }
+            return run("/usr/bin/osascript", ["-e", script])?.contains("sent") ?? false
+        case .terminal(let tty):
+            guard waiting(onTTY: tty), let script = TerminalReply.appleScript(for: channel, text: text) else { return false }
+            return run("/usr/bin/osascript", ["-e", script])?.contains("sent") ?? false
+        }
+    }
+
     private static func run(_ executable: String, _ arguments: [String]) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)

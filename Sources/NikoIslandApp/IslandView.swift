@@ -34,8 +34,10 @@ struct IslandBody: View {
     @Environment(\.isStaticPreview) private var isStaticPreview
 
     var body: some View {
-        let card = model.isExpanded ? nil : model.completion
-        let shape = IslandShape(ear: model.isExpanded ? 10 : (card == nil ? 6 : 8), radius: model.isExpanded ? 30 : (card == nil ? 13 : 24))
+        let recap = model.isExpanded ? nil : model.recap
+        let card = model.isExpanded || recap != nil ? nil : model.completion
+        let showsCard = card != nil || recap != nil
+        let shape = IslandShape(ear: model.isExpanded ? 10 : (showsCard ? 8 : 6), radius: model.isExpanded ? 30 : (showsCard ? 24 : 13))
         // Opening has a little bounce; closing is quicker and settles without one,
         // so the island is out of the way the moment it is not wanted.
         let spring = model.isExpanded ? Animation.spring(response: 0.34 * look.motion, dampingFraction: 0.84)
@@ -44,6 +46,9 @@ struct IslandBody: View {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
                     .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.08)))
+            } else if let recap {
+                RecapCard(model: model, recap: recap, metrics: metrics)
+                    .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.06)))
             } else if let card {
                 CompletionCard(model: model, completion: card, metrics: metrics)
                     .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.06)))
@@ -56,13 +61,14 @@ struct IslandBody: View {
         .background(shape.fill(Theme.island))
         .clipShape(shape)
         .contentShape(shape)
-        .shadow(color: .black.opacity(model.isExpanded ? 0.55 : (card == nil ? 0 : 0.45)), radius: 24, y: 14)
+        .shadow(color: .black.opacity(model.isExpanded ? 0.55 : (showsCard ? 0.45 : 0)), radius: 24, y: 14)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: IslandFrameKey.self, value: proxy.frame(in: .named("island-canvas")))
         })
         .animation(isStaticPreview ? nil : spring, value: model.isExpanded)
         .animation(isStaticPreview ? nil : spring, value: model.toast)
         .animation(isStaticPreview ? nil : Animation.spring(response: 0.36 * look.motion, dampingFraction: 0.86), value: model.completion)
+        .animation(isStaticPreview ? nil : Animation.spring(response: 0.36 * look.motion, dampingFraction: 0.86), value: model.recap)
         .animation(isStaticPreview ? nil : spring, value: model.badge)
     }
 }
@@ -302,9 +308,24 @@ struct SessionsPane: View {
     }
 
     private func rowStack(_ rows: [Session], now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            ForEach(rows) { session in
-                SessionRowView(model: model, session: session, now: now)
+        let groups = SessionGroups.make(rows, by: model.settings.sessionGrouping)
+        return VStack(alignment: .leading, spacing: 2) {
+            ForEach(groups) { group in
+                if let title = group.title {
+                    HStack(spacing: 6) {
+                        if let source = group.source { MascotView(source: source, size: 12) }
+                        Text(title.uppercased()).font(look.mono(10, .semibold)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                        Text("\(group.sessions.count)").font(look.mono(10)).foregroundStyle(Theme.tertiary.opacity(0.7))
+                        Rectangle().fill(Theme.hairline).frame(height: 1)
+                    }
+                    .padding(.top, group.id == groups.first?.id ? 2 : 10)
+                    .padding(.bottom, 2)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityAddTraits(.isHeader)
+                }
+                ForEach(group.sessions) { session in
+                    SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project)
+                }
             }
         }
     }
@@ -381,4 +402,40 @@ struct ListHeightKey: PreferenceKey {
 /// Fixed "now" for documentation images, so they do not change on every run.
 enum PreviewClock {
     static let now = Date(timeIntervalSince1970: 1_791_800_000)
+}
+
+
+/// The list in sections: by project, by agent, or as it comes.
+struct SessionGroups {
+    struct Group: Identifiable {
+        var id: String
+        /// nil for the one group of an ungrouped list.
+        var title: String?
+        /// The agent, when that is what the group is.
+        var source: String?
+        var sessions: [Session]
+    }
+
+    /// Groups keep the order in which their first session appears, so what
+    /// needs attention stays at the top; a list with one group gets no heading.
+    static func make(_ sessions: [Session], by grouping: NikoSettings.SessionGrouping) -> [Group] {
+        guard grouping != .none else { return sessions.isEmpty ? [] : [Group(id: "all", title: nil, source: nil, sessions: sessions)] }
+        var order: [String] = []
+        var groups: [String: Group] = [:]
+        for session in sessions {
+            let id = grouping == .project ? (session.cwd ?? "agent:" + session.source) : session.source
+            if groups[id] == nil {
+                order.append(id)
+                groups[id] = Group(id: id, title: grouping == .project ? session.projectName : AgentRegistry.displayName(for: session.source),
+                                   source: grouping == .agent ? session.source : nil, sessions: [])
+            }
+            groups[id]?.sessions.append(session)
+        }
+        let made = order.compactMap { groups[$0] }
+        if made.count == 1, var only = made.first {
+            only.title = nil
+            return [only]
+        }
+        return made
+    }
 }

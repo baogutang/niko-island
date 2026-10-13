@@ -40,6 +40,18 @@ final class SessionDetailsTests: XCTestCase {
         XCTAssertNil(TaskProgress.from(tool: nil, input: write))
     }
 
+    func testTheTaskToolsARealClaudeCodeUsesReadAsPlanning() {
+        // Seen from Claude Code 2.1.295: no TodoWrite any more, but TaskCreate {subject, description} and
+        // TaskUpdate {taskId, status}, with one file per task under ~/.claude/tasks/<session id>/.
+        XCTAssertEqual(Activity.forTool("TaskCreate", input: ["subject": .string("Boil the water"), "description": .string("Until it bubbles")]),
+                       Activity(verb: "planning", detail: "Boil the water"))
+        XCTAssertEqual(Activity.forTool("TaskUpdate", input: ["taskId": .string("1"), "status": .string("completed")]), Activity(verb: "planning"))
+        XCTAssertEqual(Activity.forTool("TodoWrite", input: nil).verb, "planning")
+        XCTAssertEqual(Activity.forTool("update_plan", input: nil).verb, "planning")
+        XCTAssertEqual(Activity.forTool("ToolSearch", input: ["query": .string("select:TaskCreate"), "max_results": .int(3)]),
+                       Activity(verb: "finding", detail: "select:TaskCreate"))
+    }
+
     func testClaudeCodesTaskFilesAreCountedAndLeftAlone() throws {
         let scratch = Scratch()
         let home = scratch.file("home")
@@ -51,6 +63,11 @@ final class SessionDetailsTests: XCTestCase {
         try Data(#"{"id":"2","subject":"Move the parser","activeForm":"Moving the parser","status":"in_progress"}"#.utf8).write(to: folder.appendingPathComponent("2.json"))
         try Data(#"{"id":"3","subject":"Delete the old one","status":"pending"}"#.utf8).write(to: folder.appendingPathComponent("3.json"))
         try Data("not a task".utf8).write(to: folder.appendingPathComponent("notes.txt"))
+        // What a real folder also holds: an empty lock, a counter, and tasks with more fields than are read.
+        try Data().write(to: folder.appendingPathComponent(".lock"))
+        try Data("3".utf8).write(to: folder.appendingPathComponent(".highwatermark"))
+        try Data(#"{"id":"3","subject":"Delete the old one","description":"…","status":"pending","blocks":[],"blockedBy":["2"]}"#.utf8)
+            .write(to: folder.appendingPathComponent("3.json"))
         try Data("{ broken".utf8).write(to: folder.appendingPathComponent("4.json"))
         let before = try FileManager.default.contentsOfDirectory(atPath: folder.path).sorted()
         XCTAssertEqual(TaskProgress.claudeTasks(home: home, sessionID: "abc"), TaskProgress(done: 1, total: 3, current: "Moving the parser"))

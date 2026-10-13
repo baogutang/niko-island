@@ -49,6 +49,18 @@ public final class AppModel: ObservableObject {
         public var progress: TaskProgress?
     }
 
+    /// Turns that ended while the screen was locked or asleep.
+    public struct Recap: Equatable, Sendable {
+        public struct Item: Equatable, Sendable, Identifiable {
+            public var key: SessionKey
+            public var project: String
+            public var title: String
+            public var failed: Bool
+            public var id: SessionKey { key }
+        }
+        public var items: [Item]
+    }
+
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
         public enum Kind: Sendable { case completed, failed }
@@ -94,7 +106,14 @@ public final class AppModel: ObservableObject {
     /// The card for a turn that has just finished; nil most of the time.
     @Published public private(set) var completion: Completion?
     /// The screen is locked or asleep: nobody is there to hear or see anything.
-    @Published public internal(set) var isAway = false
+    @Published public internal(set) var isAway = false {
+        didSet { if oldValue, !isAway { welcomeBack() } }
+    }
+    /// What finished while nobody was there, shown once when somebody is back.
+    @Published public private(set) var recap: Recap?
+    /// How the last line to the phone went; nil until one was sent.
+    @Published public internal(set) var pushStatus: PushClient.Outcome?
+    @Published public internal(set) var hasPushKey = false
     /// Branch per working directory, for the rows that are listed.
     @Published public internal(set) var branches: [String: String] = [:]
     /// Says whether the island can be seen right now (it is away over a full-screen app). Set by the window.
@@ -482,6 +501,9 @@ public final class AppModel: ObservableObject {
                     if let session = store[event.key] {
                         announce(request.isQuestion ? .question : .permission, session: session,
                                  body: request.isQuestion ? (request.questions.first?.text ?? "") : (event.toolName ?? ""))
+                        push(request.isQuestion ? .question : .permission, session: session,
+                             detail: request.isQuestion ? request.questions.first?.text
+                                 : [event.toolName, request.summary.detail].compactMap { $0 }.joined(separator: ": "), now: now)
                     }
                     play(.attention)
                     if settings.expandOnAttention { expand(.attention) }
@@ -523,6 +545,7 @@ public final class AppModel: ObservableObject {
             // Known only from its transcript: it can be shown and jumped to, not answered here.
             if let session = store[key] {
                 announce(.question, session: session, body: L("Waiting for you in %@", session.host?.name ?? AgentRegistry.displayName(for: key.source)))
+                push(.question, session: session)
             }
             play(.attention)
         case .updated(let key):
@@ -541,7 +564,7 @@ public final class AppModel: ObservableObject {
     /// Plays a cue if the user has it switched on. The same cue is not repeated
     /// within a second and a half, so a burst of events is one sound, not ten.
     func play(_ event: SoundEvent, now: Date = Date()) {
-        guard settings.shouldPlay(event), !(isAway && settings.quietWhenAway) else { return }
+        guard settings.shouldPlay(event), !(isAway && settings.quietWhenAway), !settings.isQuiet(at: now) else { return }
         if let last = lastPlayed[event], now.timeIntervalSince(last) < 1.5 { return }
         lastPlayed[event] = now
         soundPlayer?.play(event)
@@ -564,6 +587,7 @@ public final class AppModel: ObservableObject {
         isExpanded = true
         toast = nil
         dismissCompletion()
+        dismissRecap()
     }
 
     /// Held open for a screenshot (`-NikoOpenIsland`): nothing closes it.
@@ -589,7 +613,14 @@ public final class AppModel: ObservableObject {
     /// Shows a finished turn the way the user chose: not at all, as a notice
     /// on the closed island, or as a card with the agent's last words.
     func present(_ session: Session, failed: Bool) {
-        guard !isExpanded, !(isAway && settings.quietWhenAway) else { return }
+        push(failed ? .failed : .finished, session: session)
+        if isAway && settings.quietWhenAway {
+            // Nobody is there: it is kept for when somebody is.
+            missed.removeAll { $0.key == session.key }
+            missed.append(Recap.Item(key: session.key, project: session.projectName, title: session.headline, failed: failed))
+            return
+        }
+        guard !isExpanded else { return }
         let toast = Toast(key: session.key, title: session.title, kind: failed ? .failed : .completed)
         switch settings.completionStyle {
         case .off:
@@ -604,6 +635,7 @@ public final class AppModel: ObservableObject {
                 return
             }
             self.toast = nil
+            dismissRecap()
             completion = Completion(key: session.key, source: session.source, project: session.projectName, title: session.headline,
                                     reply: text, failed: failed, progress: session.progress)
             scheduleCompletionDismissal()
@@ -617,7 +649,8 @@ public final class AppModel: ObservableObject {
 
     private func presentWhenSettled(_ key: SessionKey, failed: Bool, replyIsIn: Bool) {
         guard let session = store[key] else { return }
-        let waits = settings.completionStyle == .card && !replyIsIn && session.origin == .hooks && session.transcriptPath != nil
+        let wantsWords = settings.completionStyle == .card || (settings.pushEnabled && settings.pushDetails)
+        let waits = wantsWords && !replyIsIn && session.origin == .hooks && session.transcriptPath != nil
             && scout != nil && completionSettleDelay > 0
         guard waits else {
             present(session, failed: failed)
@@ -633,6 +666,136 @@ public final class AppModel: ObservableObject {
 
     /// Tests replace this; the app asks which application is in front.
     var isFrontmost: (Session) -> Bool = { _ in false }
+
+    // MARK: Back at the screen
+
+    private var missed: [Recap.Item] = []
+    private var recapTask: Task<Void, Never>?
+    private var recapHeld = false
+
+    /// Somebody is back. What ended in the meantime is said once, in one card,
+    /// instead of having been said to an empty room card by card.
+    private func welcomeBack() {
+        let items = missed.filter { item in store[item.key]?.phase == .waiting }
+        missed = []
+        guard settings.completionStyle != .off, !items.isEmpty, !isExpanded, islandIsVisible() else { return }
+        toast = nil
+        dismissCompletion()
+        recap = Recap(items: Array(items.suffix(4)))
+        scheduleRecapDismissal()
+    }
+
+    private func scheduleRecapDismissal() {
+        recapTask?.cancel()
+        guard !recapHeld else { return }
+        recapTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 20 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.recap = nil
+        }
+    }
+
+    public func holdRecap(_ held: Bool) {
+        guard held != recapHeld else { return }
+        recapHeld = held
+        if held { recapTask?.cancel() } else if recap != nil { scheduleRecapDismissal() }
+    }
+
+    public func dismissRecap() {
+        recapTask?.cancel()
+        recapHeld = false
+        if recap != nil { recap = nil }
+    }
+
+    /// A line of the recap was clicked: go to that session.
+    public func openRecap(_ key: SessionKey) {
+        dismissRecap()
+        jump(to: key)
+    }
+
+    // MARK: Answering from the island (opt-in)
+
+    public enum ReplyState: Equatable, Sendable { case sending, sent, failed }
+
+    /// How the last follow-up to a session went.
+    @Published public private(set) var replies: [SessionKey: ReplyState] = [:]
+    /// Tests replace this; the app types into the session's terminal.
+    var replySender: (Session, String) async -> Bool = { _, _ in false }
+
+    /// A follow-up can be typed for a session that has stopped and whose terminal can be addressed exactly.
+    public func canReply(to key: SessionKey) -> Bool {
+        guard settings.replyFromIsland, let session = store[key], session.phase == .waiting else { return false }
+        return TerminalReply.channel(for: session) != nil
+    }
+
+    /// Sends what was typed into the session's terminal, as if typed there.
+    public func reply(to key: SessionKey, _ text: String) {
+        guard canReply(to: key), let session = store[key], let line = TerminalReply.clean(text), replies[key] != .sending else { return }
+        replies[key] = .sending
+        Task { [weak self] in
+            guard let self else { return }
+            let sent = await self.replySender(session, line)
+            self.replies[key] = sent ? .sent : .failed
+            if sent, self.completion?.key == key { self.dismissCompletion() }
+            try? await Task.sleep(nanoseconds: 4 * 1_000_000_000)
+            if self.replies[key] != .sending { self.replies[key] = nil }
+        }
+    }
+
+    // MARK: A line to the phone (opt-in)
+
+    enum PushKind { case permission, question, finished, failed }
+
+    /// Tests replace this with a client that sends nowhere.
+    var makePushClient: () -> PushClient = { PushClient() }
+    private var pushClient: PushClient?
+
+    /// What a line says. Without "say what it is about" it names the agent, the project and the kind of moment, nothing else.
+    func pushMessage(_ kind: PushKind, session: Session, detail: String? = nil) -> PushMessage {
+        let title = AgentRegistry.displayName(for: session.source) + " · " + session.projectName
+        let words = settings.pushDetails ? detail.map { Activity.oneLine($0, limit: 140) }.flatMap { $0.isEmpty ? nil : $0 } : nil
+        switch kind {
+        case .permission: return PushMessage(title: title, body: words.map { L("Needs your decision: %@", $0) } ?? L("Needs your decision"))
+        case .question: return PushMessage(title: title, body: words ?? L("Has a question for you"))
+        case .finished: return PushMessage(title: title, body: words ?? L("Finished"))
+        case .failed: return PushMessage(title: title, body: words ?? L("Stopped with an error"))
+        }
+    }
+
+    func push(_ kind: PushKind, session: Session, detail: String? = nil, now: Date = Date()) {
+        guard settings.pushEnabled, hasPushKey, !settings.isQuiet(at: now) else { return }
+        if settings.pushOnlyWhenAway, !isAway { return }
+        if kind == .finished || kind == .failed {
+            guard settings.pushWhenFinished else { return }
+        }
+        let words = detail ?? ((kind == .finished || kind == .failed) ? (kind == .failed ? (session.activity.detail ?? session.lastReply) : session.lastReply) : nil)
+        send(pushMessage(kind, session: session, detail: words.map { ReplyText.flattened($0, limit: 140) }),
+             subject: "\(session.key.source)/\(session.key.sessionID)/\(kind)")
+    }
+
+    private func send(_ message: PushMessage, subject: String?) {
+        if pushClient == nil { pushClient = makePushClient() }
+        guard let client = pushClient else { return }
+        let server = settings.pushServer
+        let service = PushService(rawValue: settings.pushService) ?? .bark
+        Task { [weak self] in
+            let outcome = await client.send(message, server: server, service: service, subject: subject)
+            self?.pushStatus = outcome
+        }
+    }
+
+    /// "Send a test" in Settings: goes out whatever the other switches say.
+    public func sendTestPush() {
+        send(PushMessage(title: NikoVersion.displayName, body: L("This is what a line from your Mac looks like.")), subject: nil)
+    }
+
+    /// Bark's device key or ntfy's topic, typed by the user. Kept in the Keychain, never in a file.
+    public func setPushKey(_ key: String?) {
+        ProviderKeychain.store(key, account: PushClient.account)
+        hasPushKey = ProviderKeychain.exists(PushClient.account)
+        if !hasPushKey { settings.pushEnabled = false }
+        pushStatus = nil
+    }
 
     private func scheduleCompletionDismissal() {
         completionTask?.cancel()

@@ -41,8 +41,10 @@ public enum ClaudeUsageAPI {
             windows.append(window)
         }
         for key in known { if let value = root[key] { add(id: key, value) } }
-        // A window this version has no name for is still a window.
-        for member in object.members where !known.contains(member.key) && member.key != "limits" && member.key != "extra_usage" {
+        // A week or a five-hour window this version has no name for is still a window. (The answer also
+        // carries entries under code names; what those count is not known, so they are not shown.)
+        for member in object.members where !known.contains(member.key)
+            && (member.key.hasPrefix("seven_day_") || member.key.hasPrefix("five_hour_")) {
             if member.value["utilization"]?.doubleValue != nil { add(id: member.key, member.value) }
         }
         let list = (root["limits"] ?? root["windows"])?.arrayValue ?? []
@@ -57,10 +59,11 @@ public enum ClaudeUsageAPI {
         }
         // The list says the same things under other names; it is only needed when the named windows are gone.
         if !windows.contains(where: { $0.id == "five_hour" || $0.id == "seven_day" }) {
-            let names = ["session": "five_hour", "five_hour": "five_hour", "weekly": "seven_day", "week": "seven_day", "seven_day": "seven_day"]
+            // `is_active` says which limit is the one that bites right now, not which exist.
+            let names = ["session": "five_hour", "five_hour": "five_hour", "weekly": "seven_day", "weekly_all": "seven_day",
+                         "week": "seven_day", "seven_day": "seven_day"]
             for item in list {
                 guard let kind = (item["kind"] ?? item["type"] ?? item["id"] ?? item["name"])?.stringValue, let id = names[kind.lowercased()] else { continue }
-                if item["is_active"]?.boolValue == false { continue }
                 add(id: id, item)
             }
         }
@@ -73,6 +76,21 @@ public enum ClaudeUsageAPI {
             return l == r ? $0.offset < $1.offset : l < r
         }.map(\.element)
         return ProviderLimits(windows: windows, capturedAt: now, source: .provider)
+    }
+
+    /// The last answer Claude Code itself got and kept in `~/.claude.json`
+    /// (`cachedUsageUtilization`). It needs no sign-in to read, and is as old
+    /// as the last time Claude Code looked: windows that have reset since are
+    /// dropped by whoever shows it.
+    public static func cached(home: URL) -> ProviderLimits? {
+        guard let data = try? Data(contentsOf: home.appendingPathComponent(".claude.json")), data.count < 8_000_000,
+              let root = try? JSONValue.parse(data, skipping: ["projects", "cachedGrowthBookFeatures", "cachedExperimentData", "cachedArtifactRoster"]),
+              let cache = root["cachedUsageUtilization"], let answer = cache["utilization"], answer.objectValue != nil,
+              let fetched = cache["fetchedAtMs"]?.doubleValue else { return nil }
+        let at = Date(timeIntervalSince1970: fetched > 100_000_000_000 ? fetched / 1000 : fetched)
+        guard var limits = parse(answer.serializedData(.compact), now: at) else { return nil }
+        limits.source = .agentCache
+        return limits
     }
 }
 

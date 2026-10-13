@@ -478,7 +478,7 @@
       <h2 data-i18n="features.title">Small while they work. Open when they need you.</h2>
       <p class="sub" data-i18n="features.sub">Built for the moment an agent stops and waits while you are looking at something else.</p>
       <div class="grid">
-        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="8" cy="12" r="1.1" fill="currentColor"/></svg><h3 data-i18n="f1.t">Quiet until it matters</h3><p data-i18n="f1.d">Collapsed, the island is one creature and a few words. It opens by itself only when an agent is blocked on you. When a turn ends, a card comes down with what the agent said; a click on it goes to the session. Neither takes keyboard focus.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="8" cy="12" r="1.1" fill="currentColor"/></svg><h3 data-i18n="f1.t">Quiet until it matters</h3><p data-i18n="f1.d">Collapsed, the island is one creature and a few words. It opens by itself only when an agent is blocked on you. When a turn ends, a card comes down with what the agent said; a click on it goes to the session. Neither takes keyboard focus. What ended while the screen was locked is said once, in one card, when you are back.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 8.5h18"/><rect x="9" y="4" width="6" height="4.5" rx="1.6" fill="currentColor" stroke="none"/></svg><h3 data-i18n="f9.t">Moves with the menu bar</h3><p data-i18n="f9.d">Slide to a full-screen app and the island leaves with the desktop. Push the pointer to the top and it comes down together with the menu bar. A request for a decision can still drop in.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 11h5M11 8.5v5"/></svg><h3 data-i18n="f10.t">Finds your sessions</h3><p data-i18n="f10.d">Claude Code, Codex and ZCode sessions are listed from what the agents keep on disk anyway: desktop apps, sessions that were already open, agents you have not connected yet.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.2 9.8"/></svg><h3 data-i18n="f2.t">Decide in place</h3><p data-i18n="f2.d">Allow once, always allow a tool, allow everything for the session, deny, or hand the decision back to the agent. Nothing is decided for you. Switch the shortcuts on and ⌃⌥A allows, ⌃⌥D denies what the island is showing.</p></div>
@@ -581,6 +581,7 @@
           <li data-i18n="p4"><strong>Trimmed at the source, kept in memory.</strong> Tool output is dropped and long text in status events is shortened before it leaves the agent. Nothing from an event is written to disk; the usage database holds numbers and identifiers, never prompts or replies.</li>
           <li data-i18n="p7"><strong>Session logs are read, never changed.</strong> To list sessions and count tokens the app reads what Claude Code, Codex and ZCode keep on your disk. A title or a last reply is held in memory while its row is shown, and goes nowhere.</li>
           <li data-i18n="p5"><strong>A sign-in is read only if you ask for it.</strong> Switch on "Ask Anthropic" and the app sends the sign-in Claude Code keeps in your Keychain to api.anthropic.com, to ask for your limits; for ZCode's plan it sends a key you paste in to BigModel or Z.ai; for Codex, the ChatGPT sign-in Codex keeps on this Mac to chatgpt.com. One host each, nothing renewed or rewritten, only percentages kept. With all three switches off, no sign-in or key is ever read.</li>
+          <li data-i18n="p8"><strong>A line to your phone, if you ask for one.</strong> Through Bark or ntfy, set up by you: which agent, which project, what kind of moment, to the one server you chose. What is being asked for goes along only if you say so. Off by default, and then only while the screen is locked.</li>
           <li data-i18n="p6"><strong>Hooks you can audit.</strong> Every entry the installer writes contains <code>niko-bridge</code>. Search for it any time.</li>
         </ul>
         <pre aria-label="Where data lives"><span class="k">~/.niko-island/</span>
@@ -686,7 +687,7 @@ open "dist/Niko Island.app"</pre>
     "cr.turtle": "海龟", "cr.octopus": "章鱼", "cr.puffer": "河豚", "cr.island": "小岛", "cr.other": "其他代理",
     "features.title": "干活时小小一块，需要你时才展开。",
     "features.sub": "为这样的时刻而做：你正看着别处，代理却停下来等你。",
-    "f1.t": "平时安静，要紧时出现", "f1.d": "收起时，岛屿只有一只小生物和几个字。只有代理卡在等你时它才会自己展开。一轮结束时会落下一张卡片，写着代理最后说的话，点一下就回到那个会话。两者都不抢键盘焦点。",
+    "f1.t": "平时安静，要紧时出现", "f1.d": "收起时，岛屿只有一只小生物和几个字。只有代理卡在等你时它才会自己展开。一轮结束时会落下一张卡片，写着代理最后说的话，点一下就回到那个会话。两者都不抢键盘焦点。屏幕锁着时结束的会话，等你回来用一张卡片一次说完。",
     "f2.t": "就地决定", "f2.d": "允许一次、始终允许某个工具、本次会话全部允许、拒绝，或者把决定交还给代理。没有你的指示，什么都不会被批准。打开快捷键后，⌃⌥A 允许、⌃⌥D 拒绝岛屿正在显示的请求。",
     "f3.t": "用卡片回答问题", "f3.d": "代理让你做选择时，选项会变成大号卡片：单选多选都行，也可以自己输入别的答案。",
     "f4.t": "回到正确的窗口", "f4.d": "点一下会话行或通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位。桌面端的会话会把对应的应用带到前台，Codex 桌面端的会话会直接打开那一段对话。",
@@ -730,6 +731,7 @@ open "dist/Niko Island.app"</pre>
     "p7": "<strong>会话日志只读取，不修改。</strong>为了列出会话和统计 token，应用会读取 Claude Code、Codex 和 ZCode 保存在你磁盘上的记录。标题或最后一条回复只在该行显示期间留在内存里，不会发往任何地方。",
     "p5": "<strong>只有你要求时才会读取登录凭据。</strong>打开“向 Anthropic 查询”后，应用会把 Claude Code 存在钥匙串里的登录凭据发送到 api.anthropic.com 来查询额度；ZCode 的套餐则用你粘贴的密钥向智谱 BigModel 或 Z.ai 查询；Codex 则把它存在这台 Mac 上的 ChatGPT 登录凭据发送到 chatgpt.com。每项只发往一个主机，不续期、不改写，只保存百分比。三个开关都关闭时，任何登录凭据或密钥都不会被读取。",
     "p6": "<strong>钩子可审计。</strong>安装器写入的每一条都包含 <code>niko-bridge</code>，随时可以搜索。",
+    "p8": "<strong>需要的话，给手机发一行消息。</strong>通过你自己设置的 Bark 或 ntfy：哪个代理、哪个项目、发生了哪一类事，只发给你选的那一个服务器。被请求的具体内容只有你同意才会带上。默认关闭；打开后也只在屏幕锁定时发送。",
     "tree.bin": "桥接与状态栏启动脚本", "tree.run": "本地套接字，仅本人可访问", "tree.cache": "速率限制、可选的价格表",
     "tree.data": "SQLite 里的 token 计数", "tree.sounds": "你自己添加的声音（如果有）", "tree.logs": "已脱敏的诊断日志",
     "install.title": "大约一分钟即可用上",

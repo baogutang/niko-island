@@ -1,5 +1,61 @@
 # Changelog
 
+## [0.6.0] - 2026-10-13
+
+The rest of the list, and what running a real agent through it showed.
+
+### Added
+- **Back at the screen.** What finished while the screen was locked or asleep
+  is said once when you return: one card, a line per session, each a way to
+  that session. Nothing is said to an empty room and nothing is lost.
+- **A line to your phone (off by default).** Through a push service you set up
+  yourself, Bark or ntfy, on their servers or on one of yours. A line names the
+  agent, the project and the kind of moment; the command being asked for, or
+  the first line of a reply, goes along only if you switch that on. By default
+  lines go out only while the screen is locked or asleep. Settings → General.
+- **Quiet hours.** A stretch of the day, over midnight if you like, in which
+  nothing makes a sound and nothing is sent to a phone.
+- **The list by project or by agent**, under a heading each. Settings →
+  Sessions.
+- **Reply from the island (experimental, off by default).** A session that has
+  stopped gets a line to type a follow-up into; it is sent into the tmux pane,
+  iTerm2 session or Terminal tab the agent runs in, as if typed there, and
+  only after checking that the agent, not a shell, is waiting at that prompt.
+  Sessions in a desktop app have no such way in.
+- A row's menu: copy the last reply, show the folder in Finder, copy the
+  command that resumes the session.
+- **Claude Code's own cached limits** are a source too: the last answer Claude
+  Code fetched for itself and kept in `~/.claude.json`, shown with its age for
+  as long as its windows have not reset. No sign-in is read for it.
+
+### Changed
+- **Claude Code's task tools show as planning.** Current Claude Code keeps its
+  list with `TaskCreate` and `TaskUpdate` instead of `TodoWrite`; rows now say
+  "planning" with the step's name instead of "working TaskCreate".
+- **Asking Anthropic** no longer shows windows that the answer carries under
+  code names, reads the weekly entry of the newer list form (`weekly_all`),
+  and no longer drops a limit because it is not the one that bites right now.
+
+### Checked against the real thing
+- **A real Claude Code turn.** Claude Code 2.1.295 was run once, headless, with
+  a temporary hook file pointing at a development build. Its `Stop` event
+  carries the closing words (`last_assistant_message`); its tasks are one file
+  each under `~/.claude/tasks/<session id>/`; the card came down with the
+  agent's own sentence and its list at 1 of 3.
+- **The shape of Anthropic's answer** as Claude Code itself keeps it on disk,
+  which is where the three parser changes above come from.
+- **Both push formats** against a stand-in server on the same Mac.
+
+### Known limitations
+- **Replying has never been run against a real terminal.** The machine it was
+  built on has no tmux, and controlling Terminal or iTerm2 needs a consent
+  only the Mac's owner can give. What is covered by tests: which terminals
+  qualify, what has to be at the prompt, and how the text is quoted.
+- **No line has gone through the real Bark or ntfy service.**
+- **Claude limits for desktop-only use** still need a current Claude Code
+  sign-in. Reading it may make macOS ask for access to the Keychain item each
+  time Claude Code has replaced it.
+
 ## [0.5.0] - 2026-10-13
 
 The things 0.4.0 had put on the roadmap, built; and what two open-source

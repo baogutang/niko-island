@@ -66,34 +66,35 @@ to what turned up when somebody did.
 | Asking OpenAI for Codex limits and saved resets (opt-in) | Built, covered by tests, and answered live on the one machine tried |
 | Asking Anthropic: per-model weekly windows, extra usage, a sign-in past its date offered once | Built and covered by tests with a stand-in for the network. Still no live answer read: the one sign-in tried was turned down |
 
+## Released: 0.6.0
+
+| Area | State |
+|---|---|
+| The recap on return from a locked screen | Built and covered by tests; seen in the running app with a stand-in for the lock. A real lock was not tried |
+| A line to a phone through Bark or ntfy (opt-in) | Built and covered by tests; both formats reached a stand-in server on the same Mac. Not sent through the real services |
+| Quiet hours | Built and covered by tests with fixed times. Not watched across a real evening |
+| The list by project or by agent | Built, covered by tests, seen in the running app |
+| Reply from the island (experimental, opt-in) | Built with guards that are covered by tests. Never run against a real tmux, iTerm2 or Terminal |
+| Claude Code's own cached limits as a source; parser fixes from the real answer shape | Built and covered by tests; the parser was run on the real cached answer of one machine |
+| A real Claude Code turn through the card and the task bar | Done once, headless, with Claude Code 2.1.295 |
+
 ## Next
 
-1. **A live answer for the two remaining provider lookups.** Anthropic's with
-   a current Claude Code sign-in, BigModel / Z.ai's with a real key. Until
-   then both are written against documented formats only.
-2. **Claude limits for people who only use the desktop app.** Today that needs
-   a sign-in Claude Code has renewed in a terminal. Renewing it ourselves
-   would mean acting as Claude Code and rewriting its Keychain entry, which
-   can sign it out; that is a decision for the owner of the Mac, not a
-   default. (The open-source tools that read this sign-in do not renew it
-   either.)
-3. **Watch a live agent through the new parts**: a turn finishing into a card
-   with its own words, a real task list filling its bar, a real approval
-   given from the keyboard.
-4. **Drive the beta adapters against their live agents**, Codex and ZCode
-   first (they can approve), and move the ones that hold up to stable.
-   `TESTPLAN.md` section 10.
-5. **Try the island on a MacBook's own display** and with two displays. The
-   camera-housing layout has only been rendered, never seen on hardware.
-6. **Listen to the built-in sounds** and tune them by ear.
-7. **Group sessions** by project or by agent once there are many, and a
-   shortcut that jumps to the session that needs you.
-8. **Quiet hours** for sounds, beyond "quiet while the screen is locked".
-9. **Answer from the card**: type a follow-up to a finished turn without
-   leaving what you are doing. It needs a way into each agent's input that
-   does not exist for most of them yet.
-10. **Notarized builds** if the project gets a signing identity. Until then
-    releases stay ad-hoc signed.
+1. **Run the reply against real terminals** (tmux, iTerm2, Terminal) and take
+   the "experimental" off, or take the feature out.
+2. **A line through the real Bark and ntfy services**, with the owner's key.
+3. **A live answer for the Anthropic and BigModel / Z.ai lookups.**
+4. **Claude limits for people who only use the desktop app.** Renewing Claude
+   Code's sign-in ourselves would mean acting as Claude Code and rewriting its
+   Keychain entry; that stays a decision for the owner of the Mac.
+5. **A real approval, given from the island**, with an interactive Claude Code
+   session (a headless run does not ask), and the beta adapters against their
+   live agents. `TESTPLAN.md` section 10.
+6. **Try the island on a MacBook's own display** and with two displays.
+7. **Listen to the built-in sounds** and tune them by ear.
+8. **How full a session's context is**, on its row, once there is a reliable
+   way to know each model's window.
+9. **Notarized builds** if the project gets a signing identity.
 
 ## Planned, not started
 
@@ -105,7 +106,6 @@ to what turned up when somebody did.
 - Plan limits for more providers (Gemini, Kimi, MiniMax and others), asked
   the same way as the three there are: opt-in, the user's own sign-in or key,
   one host each.
-- Push to a phone through a user-configured relay (off by default).
 - Monitoring agents on remote machines over SSH.
 - Opening a new terminal window to re-attach a detached tmux session.
 - An in-app "new version available" check. It needs a network request that is
