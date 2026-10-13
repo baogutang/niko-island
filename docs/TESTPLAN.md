@@ -202,9 +202,14 @@ This is the first step that changes a real config. It is reversible.
 
 ## 7. Release artifact
 
-- ☐ Download the zip from the Releases page on another Mac, unzip, run
-  `xattr -cr "Niko Island.app"` (or: right-click → Open on macOS 14; System
-  Settings → Privacy & Security → Open Anyway on macOS 15+), confirm it launches.
+- ☐ Download the `.dmg` from the Releases page on another Mac **with a browser**
+  (so it carries the quarantine flag), open it, drag the app onto Applications,
+  run `xattr -cr "/Applications/Niko Island.app"` (or: right-click → Open on
+  macOS 14; System Settings → Privacy & Security → Open Anyway on macOS 15+),
+  confirm it launches. **(not automated: CI fetches files without the flag)**
+- ☐ The image shows the app, an Applications shortcut and "Read me first.txt",
+  and the note reads correctly in English and Chinese.
+- ☐ Repeat with the `.zip`.
 - ☐ Before clearing the flag, `niko-island doctor` reports the bridge as
   quarantined and Settings → Agents shows the same warning; after clearing,
   both are gone. **(not automated beyond the detection itself)**

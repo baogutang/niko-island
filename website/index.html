@@ -450,7 +450,6 @@
         <button type="button" data-show="done" aria-pressed="false" data-i18n="demo.tab4">Finished</button>
       </div>
       <p class="caption" data-i18n="demo.caption">A sketch of the island in your browser, with made-up sessions. Click it, or pick a state.</p>
-      <p class="fine" data-i18n="hero.note">The island is version 0.2.0. It is on the main branch and not released yet: the current download is 0.1.0, which has an earlier, simpler panel. <a href="#install">Build from source</a> to use the island today.</p>
     </div>
   </div>
 
@@ -585,14 +584,13 @@
       <p class="sub" data-i18n="install.sub">The app is ad-hoc signed because the project has no Apple Developer account, so macOS will not open a downloaded copy until you clear its quarantine flag once. After that it opens like any other app.</p>
       <div class="steps">
         <div class="step"><div>
-          <h3 data-i18n="s1.t">Download and unzip</h3>
-          <p><a href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="s1.d">Get the latest release from GitHub</a></p>
+          <h3 data-i18n="s1.t">Download the disk image</h3>
+          <p><a href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="s1.d">Get the latest .dmg from GitHub (a .zip is there too)</a></p>
         </div></div>
         <div class="step"><div>
-          <h3 data-i18n="s2.t">Move it to Applications and open it</h3>
-          <p data-i18n="s2.d">Clear the quarantine flag with the command below. Without a terminal: on macOS 14, right-click the app and choose Open; on macOS 15 or later, try to open it once, then use System Settings → Privacy &amp; Security → Open Anyway.</p>
-<pre>mv "Niko Island.app" /Applications/
-xattr -cr "/Applications/Niko Island.app"
+          <h3 data-i18n="s2.t">Drag it to Applications and open it</h3>
+          <p data-i18n="s2.d">Open the disk image and drag Niko Island onto Applications, then clear the quarantine flag with the command below. Without a terminal: on macOS 14, right-click the app and choose Open; on macOS 15 or later, try to open it once, then use System Settings → Privacy &amp; Security → Open Anyway.</p>
+<pre>xattr -cr "/Applications/Niko Island.app"
 open "/Applications/Niko Island.app"</pre>
         </div></div>
         <div class="step"><div>
@@ -610,7 +608,7 @@ open "/Applications/Niko Island.app"</pre>
         </div></div>
       </div>
       <h3 style="font: 750 19px var(--round); margin: 44px 0 8px" data-i18n="s5.t">Or build it yourself</h3>
-      <p class="sub" style="margin-bottom: 14px" data-i18n="s5.d">This is how to get the island today, before 0.2.0 is released. You need macOS 14 or later and Xcode 16 or later.</p>
+      <p class="sub" style="margin-bottom: 14px" data-i18n="s5.d">You need macOS 14 or later and Xcode 16 or later.</p>
 <pre>git clone https://github.com/baogutang/niko-island.git
 cd niko-island
 scripts/make-app.sh
@@ -657,7 +655,6 @@ open "dist/Niko Island.app"</pre>
     "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示终端里每个 AI 编程代理正在做什么，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
     "hero.fine": "macOS 14 及以上 · Apple 芯片与 Intel · MIT 许可",
-    "hero.note": "岛屿界面属于 0.2.0 版本，已在 main 分支上但尚未发布：目前能下载到的是 0.1.0，界面是早先那个更简单的面板。想现在就用上岛屿，请<a href=\"#install\">从源码构建</a>。",
     "demo.running": "正在运行 swift test", "demo.finished": "已完成 ✓", "demo.count": "3 个会话",
     "demo.r1": "修复不稳定的上传测试", "demo.r1a": "正在运行",
     "demo.r2": "重写安装指南", "demo.r2a": "已完成，等待你的指示",
@@ -714,12 +711,12 @@ open "dist/Niko Island.app"</pre>
     "tree.data": "SQLite 里的 token 计数", "tree.sounds": "你自己添加的声音（如果有）", "tree.logs": "已脱敏的诊断日志",
     "install.title": "大约一分钟即可用上",
     "install.sub": "因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名，所以在你清除一次隔离标记之前，macOS 不会打开下载来的副本。之后它就和其他应用一样打开。",
-    "s1.t": "下载并解压", "s1.d": "从 GitHub 获取最新版本",
-    "s2.t": "移到“应用程序”并打开", "s2.d": "用下面的命令清除隔离标记。不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15 及更新版本上，先尝试打开一次，再到“系统设置 → 隐私与安全性”里点击“仍要打开”。",
+    "s1.t": "下载磁盘映像", "s1.d": "从 GitHub 获取最新的 .dmg（也提供 .zip）",
+    "s2.t": "拖到“应用程序”并打开", "s2.d": "打开磁盘映像，把 Niko Island 拖到“应用程序”上，再用下面的命令清除隔离标记。不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15 及更新版本上，先尝试打开一次，再到“系统设置 → 隐私与安全性”里点击“仍要打开”。",
     "s3.t": "接入 Claude Code", "s3.d": "先看计划。在第二条命令之前不会改动任何东西。也可以在“设置”的“代理”页里完成。",
     "s3.c1": "# 查看将要改动的内容", "s3.c2": "# 执行（会在旁边保留一份配置备份）",
     "s4.t": "改主意了？", "s4.d": "卸载只会移除它自己的条目并恢复你的状态栏。你的代理照常工作。",
-    "s5.t": "或者自己构建", "s5.d": "在 0.2.0 发布之前，想现在就用上岛屿就走这条路。需要 macOS 14 及以上、Xcode 16 或更新版本。",
+    "s5.t": "或者自己构建", "s5.d": "需要 macOS 14 及以上、Xcode 16 或更新版本。",
     "compare.title": "开源，是有意为之",
     "compare.sub": "这件事已经有打磨精良的闭源应用在做。如果你更想读到代码，下面是如实的取舍。",
     "c.h": "典型的闭源方案",

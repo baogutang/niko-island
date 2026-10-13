@@ -14,7 +14,7 @@ today.
 | Usage from local transcripts, cost estimates, Claude rate limits | Works for Claude Code and Codex; OpenCode-family parsing is best effort |
 | Other agents (Codex, Cursor, Copilot, Gemini, Grok, Trae, Windsurf, Qwen, Kiro, Factory, OpenCode, MiMoCode) | Experimental, opt-in, status events only |
 
-## On `main`, not released: 0.2.0
+## Released: 0.2.0
 
 | Area | State |
 |---|---|
@@ -24,9 +24,10 @@ today.
 | Settings window (General, Island, Agents, Sounds, Usage, About) | Built; judged from rendered images |
 | Sounds: five moments, two generated sets, macOS sounds, user files, sound packs | Built and tested for format, selection and fallback. Nobody has listened to the generated sets yet |
 | Claude Code `StopFailure` hook | Wired; covered by installer and store tests |
+| Disk image (`.dmg`) next to the zip | Built and checked by the release workflow: it mounts, and the app inside passes the signature check |
 
-Releasing 0.2.0 is one tag away once sections 1 to 5 of `TESTPLAN.md` have been
-worked through by a person.
+0.2.0 went out before sections 1 to 5 of `TESTPLAN.md` had been worked through
+by a person. That is the first item below.
 
 ## Next
 

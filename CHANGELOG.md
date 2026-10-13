@@ -1,8 +1,8 @@
 # Changelog
 
-## [0.2.0] - Unreleased
+## [0.2.0] - 2026-10-13
 
-The island redesign. It is on `main` and has not been tagged or released.
+The island redesign.
 
 ### Changed
 - The floating panel is replaced by an island that hangs from the top centre
@@ -32,16 +32,21 @@ The island redesign. It is on `main` and has not been tagged or released.
 - A cue when a Claude rate-limit window passes 90%.
 - Island options: open on hover, open for a decision, the finished notice,
   stay visible while nothing is running.
+- Releases now carry a disk image (`.dmg`) next to the zip. Both hold the same
+  universal, ad-hoc signed app.
 
 ### Removed
 - The 0.1.0 panel and its tabs. The three per-event sound checkboxes became
   the Sounds page; their values are carried over.
 
-### Not verified yet
-- Hover, click-outside and the animations have not been tried by hand, nobody
-  has listened to the built-in sounds, and the layout for a display with a
-  camera housing exists only as renders. See "What was and was not verified"
-  in the README.
+### Known limitations
+- This release went out before anyone had worked through the hands-on
+  checklist: hover, click-outside and the animations have not been tried by
+  hand, nobody has listened to the built-in sounds, and the layout for a
+  display with a camera housing exists only as renders. See "What was and was
+  not verified" in the README, and please report what you find.
+- Still ad-hoc signed, not notarized: clear the quarantine flag once with
+  `xattr -cr "/Applications/Niko Island.app"`.
 
 ## [0.1.0] - 2026-10-12
 

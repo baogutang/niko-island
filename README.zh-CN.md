@@ -48,8 +48,6 @@
   <sub>Claude Code · Codex CLI · Cursor CLI · Copilot CLI · Gemini CLI · Grok CLI · OpenCode · MiMoCode · Trae · Windsurf · Qwen Code · Kiro · Factory</sub>
 </p>
 
-> **版本说明。** 图片展示的是 **0.2.0**，也就是重新设计后的岛屿界面。它已经在 `main` 分支上，但还没有发布；目前能下载到的仍是 0.1.0，界面是早先那个更简单的面板。想现在就试试岛屿，请[从源码构建](#build-from-source)。
-
 <a id="see-it-move"></a>
 ## 看它动起来
 
@@ -73,11 +71,10 @@
 
 ### 下载发布版
 
-1. 从 [Releases](https://github.com/baogutang/niko-island/releases/latest) 下载最新的 zip 并解压。
-2. 把应用移到“应用程序”并清除下载隔离标记。应用采用 ad-hoc 签名（项目没有 Apple 开发者账号），所以 macOS 不会直接打开下载来的副本：
+1. 从 [Releases](https://github.com/baogutang/niko-island/releases/latest) 下载最新的 `.dmg`，打开后把 **Niko Island** 拖到 **Applications**（应用程序）上。同一个应用也提供 `.zip`。
+2. 清除下载隔离标记。应用采用 ad-hoc 签名（项目没有 Apple 开发者账号），所以 macOS 不会直接打开下载来的副本：
 
    ```bash
-   mv "Niko Island.app" /Applications/
    xattr -cr "/Applications/Niko Island.app"
    open "/Applications/Niko Island.app"
    ```
@@ -296,7 +293,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 | 用量数字 | 约 1 GB 真实 Claude Code 会话记录的合计值，与独立重新统计的结果完全一致；Codex 会话与其自身的累计值相符 |
 | 岛屿窗口 | 启动了打包后的应用：窗口位于菜单栏之上、紧贴屏幕顶端，收起时布局正确，收到权限请求时会展开（`scripts/smoke-launch.sh`） |
 | 速度 | 冷启动到接收第一个事件不到一秒；每个钩子约 25 毫秒 |
-| 通用二进制（0.1.0） | 两种架构都能运行，其中 Intel 部分通过 Rosetta |
+| 通用二进制、`.dmg` 与 `.zip` | 两种架构都能运行，其中 Intel 部分通过 Rosetta；磁盘映像可以挂载，里面的应用通过签名校验 |
 
 | 尚未验证 | 原因 |
 |---|---|
@@ -305,6 +302,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 | 由真实的 Claude Code 会话驱动岛屿 | 端到端测试使用的是一个遵循 Claude Code 公开钩子约定的模拟代理。用真实会话确认，是 [docs/TESTPLAN.md](docs/TESTPLAN.md) 里的第一步 |
 | 点击通知或会话行跳回 Terminal.app、iTerm2 和 tmux | 需要有人在屏幕前操作；当时没有 iTerm2 |
 | 带摄像头挖孔的显示器 | 开发用的 Mac 没有刘海；那套布局目前只存在于渲染图里 |
+| 在另一台 Mac 上用浏览器下载并经过 Gatekeeper | 发布文件是在命令行里下载核对的，这种方式不会带上隔离标记 |
 | Intel 硬件、全新的 macOS 账户 | 没有条件 |
 | 任何一个实验性代理 | 见上表 |
 

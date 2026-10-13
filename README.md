@@ -48,8 +48,6 @@
   <sub>Claude Code · Codex CLI · Cursor CLI · Copilot CLI · Gemini CLI · Grok CLI · OpenCode · MiMoCode · Trae · Windsurf · Qwen Code · Kiro · Factory</sub>
 </p>
 
-> **Version note.** The pictures show **0.2.0**, the island redesign. It is on `main` and has not been released yet; the latest download is still 0.1.0, which has the earlier, simpler panel. [Build from source](#build-from-source) to try the island today.
-
 <a id="see-it-move"></a>
 ## See it move
 
@@ -73,11 +71,10 @@ On a display without a camera housing the island is a small tab on the menu bar 
 
 ### Download a release
 
-1. Get the latest zip from [Releases](https://github.com/baogutang/niko-island/releases/latest) and unzip it.
-2. Move the app to Applications and clear the download quarantine. The app is ad-hoc signed (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
+1. Get the latest `.dmg` from [Releases](https://github.com/baogutang/niko-island/releases/latest), open it and drag **Niko Island** onto **Applications**. A `.zip` with the same app is there too.
+2. Clear the download quarantine. The app is ad-hoc signed (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
 
    ```bash
-   mv "Niko Island.app" /Applications/
    xattr -cr "/Applications/Niko Island.app"
    open "/Applications/Niko Island.app"
    ```
@@ -296,7 +293,7 @@ Here is exactly how far the checking went.
 | Usage numbers | Totals for about 1 GB of real Claude Code transcripts match an independent recount exactly; Codex sessions are consistent with their own running totals |
 | The island window | The assembled app was launched: the window sits above the menu bar, flush with the top of the screen, lays out collapsed and opens for a permission request (`scripts/smoke-launch.sh`) |
 | Speed | Cold start to first event in under a second; about 25 ms per hook |
-| Universal build (0.1.0) | Both halves run, the Intel half under Rosetta |
+| Universal build, `.dmg` and `.zip` | Both halves run, the Intel half under Rosetta; the disk image mounts and the app inside passes the signature check |
 
 | Not verified yet | Why |
 |---|---|
@@ -305,6 +302,7 @@ Here is exactly how far the checking went.
 | A live Claude Code session driving the island | The end-to-end tests use a simulated agent that follows Claude Code's documented hook contract. Confirming it with a real session is the first step in [docs/TESTPLAN.md](docs/TESTPLAN.md) |
 | Notification and row click-through to Terminal.app, iTerm2 and tmux | Needs a person at the screen; iTerm2 was not available |
 | A display with a camera housing | Developed on a Mac without one; that layout exists only as renders |
+| A browser download going through Gatekeeper on another Mac | Release files are checked from the command line, which does not set the quarantine flag |
 | Intel hardware, a fresh macOS account | Not available |
 | Any of the experimental agents | See the table above |
 

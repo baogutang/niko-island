@@ -1,6 +1,6 @@
 name: release
 
-# Tag push (vX.Y.Z)  → GitHub Release with a universal, ad-hoc signed app.
+# Tag push (vX.Y.Z)  → GitHub Release with a universal, ad-hoc signed app (.dmg and .zip).
 # Manual dispatch    → refreshes the rolling "nightly" pre-release from the chosen ref.
 on:
   push:
@@ -45,7 +45,7 @@ jobs:
       - name: Build universal app (arm64 + x86_64), ad-hoc signed
         env:
           NIKO_VERSION: ${{ steps.version.outputs.version }}
-        run: scripts/make-app.sh --universal --zip
+        run: scripts/make-app.sh --universal --zip --dmg
       - name: Verify the artifact
         run: |
           APP="dist/Niko Island.app"
@@ -65,6 +65,16 @@ jobs:
           mkdir -p "$RUNNER_TEMP/unzipped"
           ditto -x -k dist/*.zip "$RUNNER_TEMP/unzipped"
           codesign --verify --deep --strict "$RUNNER_TEMP/unzipped/Niko Island.app"
+          # The disk image mounts and holds the same bundle next to an Applications shortcut.
+          hdiutil verify -quiet dist/*.dmg
+          mkdir -p "$RUNNER_TEMP/dmg"
+          hdiutil attach -nobrowse -readonly -quiet -mountpoint "$RUNNER_TEMP/dmg" dist/*.dmg
+          codesign --verify --deep --strict "$RUNNER_TEMP/dmg/Niko Island.app"
+          test "$(lipo -archs "$RUNNER_TEMP/dmg/Niko Island.app/Contents/MacOS/niko-island")" = "x86_64 arm64"
+          test "$(readlink "$RUNNER_TEMP/dmg/Applications")" = "/Applications"
+          test -s "$RUNNER_TEMP/dmg/Read me first.txt"
+          hdiutil detach -quiet "$RUNNER_TEMP/dmg"
+          test "$(wc -l < dist/SHA256SUMS | tr -d ' ')" = "2"
           (cd dist && shasum -a 256 -c SHA256SUMS)
       - name: Launch smoke test
         run: scripts/smoke-launch.sh
@@ -72,6 +82,7 @@ jobs:
         with:
           name: niko-island-${{ steps.version.outputs.version }}
           path: |
+            dist/*.dmg
             dist/*.zip
             dist/SHA256SUMS
           if-no-files-found: error
@@ -87,7 +98,7 @@ jobs:
             echo
             echo "### Install"
             echo
-            echo "Download the zip, unzip it, move **Niko Island.app** to Applications."
+            echo "Download the \`.dmg\`, open it and drag **Niko Island** onto **Applications** (the \`.zip\` holds the same app)."
             echo "The app is ad-hoc signed (no Apple Developer account), so clear the quarantine flag once:"
             echo "\`xattr -cr \"/Applications/Niko Island.app\"\`."
             echo "Without a terminal: on macOS 14 right-click the app → **Open**; on macOS 15+ open it once, then System Settings → Privacy & Security → **Open Anyway**."
@@ -105,9 +116,9 @@ jobs:
             # The tag was pushed again (for example after it was moved):
             # refresh the existing release in place instead of failing.
             gh release edit "$GITHUB_REF_NAME" --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md"
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip dist/SHA256SUMS --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
+            gh release create "$GITHUB_REF_NAME" dist/*.dmg dist/*.zip dist/SHA256SUMS \
               --title "$TITLE" \
               --notes-file "$RUNNER_TEMP/notes.md" \
               --verify-tag
@@ -118,7 +129,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete nightly --cleanup-tag --yes 2>/dev/null || true
-          gh release create nightly dist/*.zip dist/SHA256SUMS \
+          gh release create nightly dist/*.dmg dist/*.zip dist/SHA256SUMS \
             --prerelease \
             --target "$GITHUB_SHA" \
             --title "Niko Island nightly (${{ steps.version.outputs.version }})" \

@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-13T09:34:00+0800
-milestone: R2 done on main (island redesign, version 0.2.0, NOT tagged or released); waiting for the owner
+updated: 2026-10-13T10:05:00+0800
+milestone: R3 — release 0.2.0 with a disk image (owner asked for both on 2026-10-13)
 done: [M0, M1, M2, M3, M4, M5, M6, M7, R1, R2]
-next: "Nothing is owed. Open decisions for the owner are listed in HANDOFF.md (release 0.2.0 or not, naming the reference project in Acknowledgments, tuning the sounds by ear). If asked to release: date the CHANGELOG section, remove the README version notes and the website hero.note, tag v0.2.0 (must equal Version.swift), push the tag, watch release.yml with `gh run watch <id> --exit-status`."
+next: "R3: push main → wait for ci.yml (it now builds and mounts a dmg) → `git tag -a v0.2.0` + push the tag → `gh run watch <id> --exit-status` on release.yml → download the three assets with gh, check SHA256SUMS, mount the dmg, confirm releases/latest → v0.2.0 → write the release log here and in HANDOFF. If the release run fails: fix on main, move the tag (the publish step is idempotent)."
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -96,3 +96,8 @@ notes:
   - "R2 HONESTY: nobody has used the island by hand or listened to the sounds; the notch layout exists only as renders; 0.2.0 was built for arm64 only (no universal build yet). README, website, CHANGELOG, ROADMAP and HANDOFF all say so. README and website carry a version note (pictures are 0.2.0, the download is 0.1.0) that must be removed when 0.2.0 is released."
   - "R2 OPEN (owner): release 0.2.0?; name erha19/ping-island in Acknowledgments? (left generic because of the no-third-party-names rule); tune the cues by ear."
   - "R2 PUBLISH LOG 2026-10-13: cc66c0e pushed to main. ci.yml run 38331891116 green on macos-15 (250 tests, shellcheck, make-app, smoke: the island lays out and opens for a request on the runner too); pages.yml run 38331891440 green; the live site serves the new page and images (200). README checked on github.com: header, badges, hero and creature strip render. No tag, no release. The repo's About text on GitHub still describes the 0.1.0 panel — left for the owner (`gh repo edit --description`)."
+  - "OWNER REQUEST 2026-10-13: release 0.2.0, and asked why the release has no dmg. Answer: BUILD-PLAN only asked for a universal .app.zip + SHA256SUMS, so 0.1.0 had no dmg. Decision: add one for 0.2.0."
+  - "R3 DMG: scripts/make-app.sh --dmg → dist/Niko-Island-<version>-<arch>.dmg via hdiutil (UDZO, HFS+, volume name 'Niko Island', retry on 'Resource busy'); contents = the app, an Applications symlink, 'Read me first.txt' (EN + zh, the xattr step). No custom background/icon layout (needs Finder scripting, unreliable on CI). SHA256SUMS now lists exactly the artifacts that run produced (zip, dmg), no longer every *.zip lying in dist/. release.yml builds --zip --dmg, mounts the image, verifies the app inside, uploads dmg + zip + SHA256SUMS; ci.yml builds and mounts a host-arch dmg on every push so packaging breaks before a tag does."
+  - "R3 local check before tagging: universal 0.2.0 built; lipo = x86_64 arm64 for both binaries; hdiutil verify ok; image mounts read-only; app inside passes codesign --verify --deep --strict (adhoc) and --integrity-check; x86_64 slice runs under Rosetta; smoke-launch green on the universal bundle (cold start 620 ms)."
+  - "R3 docs for the release: CHANGELOG [0.2.0] - 2026-10-13 with a Known limitations section (released before the hands-on checklist was done); README/website version notes removed; install steps say dmg first, zip also; ROADMAP says 0.2.0 is released and unverified by hand."
+

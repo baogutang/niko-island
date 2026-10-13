@@ -4,7 +4,9 @@
 #   scripts/make-app.sh                 release build for the host architecture
 #   scripts/make-app.sh --universal     arm64 + x86_64, merged with lipo
 #   scripts/make-app.sh --debug         debug configuration
-#   scripts/make-app.sh --zip           also write dist/Niko-Island-<version>-<arch>.zip + SHA256SUMS
+#   scripts/make-app.sh --zip           also write dist/Niko-Island-<version>-<arch>.zip
+#   scripts/make-app.sh --dmg           also write dist/Niko-Island-<version>-<arch>.dmg
+#                                       (--zip and --dmg write SHA256SUMS for what they made)
 #   scripts/make-app.sh --out <dir>     output directory (default: dist)
 #   scripts/make-app.sh --skip-build    reuse existing .build products
 #
@@ -18,6 +20,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="release"
 UNIVERSAL=0
 MAKE_ZIP=0
+MAKE_DMG=0
 SKIP_BUILD=0
 OUT="$ROOT/dist"
 
@@ -27,9 +30,10 @@ while [ $# -gt 0 ]; do
         --debug) CONFIG="debug" ;;
         --release) CONFIG="release" ;;
         --zip) MAKE_ZIP=1 ;;
+        --dmg) MAKE_DMG=1 ;;
         --skip-build) SKIP_BUILD=1 ;;
         --out) shift; OUT="${1:?--out needs a directory}" ;;
-        -h|--help) sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "make-app.sh: unknown option '$1'" >&2; exit 64 ;;
     esac
     shift
@@ -166,11 +170,71 @@ codesign --verify --deep --strict "$APP"
 echo "==> $APP ($VERSION build $BUILD_NUMBER, $ARCH_LABEL)"
 lipo -archs "$APP/Contents/MacOS/niko-island"
 
+ARTIFACTS=()
+
 if [ "$MAKE_ZIP" -eq 1 ]; then
     ZIP_NAME="Niko-Island-$VERSION-$ARCH_LABEL.zip"
     rm -f "$OUT/$ZIP_NAME"
     ditto -c -k --sequesterRsrc --keepParent "$APP" "$OUT/$ZIP_NAME"
-    (cd "$OUT" && shasum -a 256 ./*.zip | sed 's|\./||' > SHA256SUMS)
+    ARTIFACTS+=("$ZIP_NAME")
     echo "==> $OUT/$ZIP_NAME"
+fi
+
+if [ "$MAKE_DMG" -eq 1 ]; then
+    # A plain disk image: the app, a shortcut to /Applications to drag it onto,
+    # and a note about the one step an ad-hoc signed app needs.
+    DMG_NAME="Niko-Island-$VERSION-$ARCH_LABEL.dmg"
+    DMG_ROOT="$STAGE/dmg"
+    mkdir -p "$DMG_ROOT"
+    ditto "$APP" "$DMG_ROOT/$APP_NAME.app"
+    ln -s /Applications "$DMG_ROOT/Applications"
+    cat > "$DMG_ROOT/Read me first.txt" <<'NOTE'
+Niko Island
+
+1. Drag "Niko Island" onto "Applications".
+2. The app is ad-hoc signed (this project has no Apple Developer account),
+   so macOS will not open a downloaded copy straight away. Clear the
+   download flag once, in Terminal:
+
+       xattr -cr "/Applications/Niko Island.app"
+
+   Without Terminal: on macOS 14, right-click the app and choose Open.
+   On macOS 15 or later, try to open it once, then go to
+   System Settings > Privacy & Security and click "Open Anyway".
+3. Open it from Applications, not from this window.
+
+------------------------------------------------------------
+
+1. 把 "Niko Island" 拖到 "Applications"（应用程序）上。
+2. 应用采用 ad-hoc 签名（本项目没有 Apple 开发者账号），所以 macOS
+   不会直接打开下载来的副本。在“终端”里执行一次：
+
+       xattr -cr "/Applications/Niko Island.app"
+
+   不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15
+   及更新版本上，先尝试打开一次，再到“系统设置 > 隐私与安全性”里点击
+   “仍要打开”。
+3. 请从“应用程序”里打开它，不要在这个窗口里直接运行。
+
+https://github.com/baogutang/niko-island
+NOTE
+    rm -f "$OUT/$DMG_NAME"
+    # hdiutil now and then answers "Resource busy" on shared runners; trying again clears it.
+    attempt=1
+    until hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_ROOT" -fs HFS+ -format UDZO \
+            -imagekey zlib-level=9 -ov -quiet "$OUT/$DMG_NAME"; do
+        if [ "$attempt" -ge 4 ]; then
+            echo "make-app.sh: hdiutil could not create the disk image" >&2
+            exit 1
+        fi
+        attempt=$((attempt + 1))
+        sleep 2
+    done
+    ARTIFACTS+=("$DMG_NAME")
+    echo "==> $OUT/$DMG_NAME"
+fi
+
+if [ "${#ARTIFACTS[@]}" -gt 0 ]; then
+    (cd "$OUT" && shasum -a 256 "${ARTIFACTS[@]}" > SHA256SUMS)
     cat "$OUT/SHA256SUMS"
 fi
