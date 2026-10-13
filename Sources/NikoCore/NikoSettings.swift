@@ -139,6 +139,18 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["showIslandWhenIdle"] = .bool(newValue) }
     }
 
+    /// What the island does in full-screen Spaces, where there is no menu bar.
+    public var fullScreenPolicy: FullScreenPolicy {
+        get { raw["fullScreenPolicy"]?.stringValue.flatMap(FullScreenPolicy.init(rawValue:)) ?? .followMenuBar }
+        set { raw["fullScreenPolicy"] = .string(newValue.rawValue) }
+    }
+
+    /// Bring the island in over a full-screen app when an agent needs a decision.
+    public var attentionBreaksFullScreen: Bool {
+        get { bool("attentionBreaksFullScreen", default: true) }
+        set { raw["attentionBreaksFullScreen"] = .bool(newValue) }
+    }
+
     public var admissionPolicy: AdmissionPolicy {
         AdmissionPolicy(deniedBundleIDs: Set(deniedBundleIDs), requireDeveloperEvidence: requireDeveloperEvidence)
     }
