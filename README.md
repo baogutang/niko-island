@@ -3,7 +3,7 @@
   Niko Island
 </h1>
 <p align="center">
-  <b>An island at the top of your screen for the AI coding agents in your terminals.</b><br>
+  <b>An island at the top of your screen for the AI agents that write your code.</b><br>
   <a href="https://baogutang.github.io/niko-island/">Website</a> •
   <a href="#see-it-move">Demo</a> •
   <a href="#install">Install</a> •
@@ -26,18 +26,19 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/island-sessions.png" width="760" alt="The island open on five sessions: each row has a pixel creature, the project and prompt, what the agent is doing, and chips for elapsed time, agent and terminal">
+  <img src="docs/images/island-sessions.png" width="760" alt="The island open on six sessions: each row has a pixel creature, the project and what the session is about, what the agent is doing, and chips for elapsed time, agent and the terminal or app it runs in">
 </p>
 
 <p align="center">
-  <sub>See every session at a glance, approve or answer from where you are, and jump back to the right terminal when you want to.</sub>
+  <sub>See every session at a glance, approve or answer from where you are, and jump back to the right window when you want to.</sub>
 </p>
 
 <p align="center">
   <img src="docs/images/mascots/starfish.gif" width="40" alt="Starfish" title="Claude Code">&nbsp;
-  <img src="docs/images/mascots/whale.gif" width="40" alt="Whale" title="Codex CLI">&nbsp;
-  <img src="docs/images/mascots/boat.gif" width="40" alt="Boat" title="Cursor CLI · Windsurf">&nbsp;
-  <img src="docs/images/mascots/gull.gif" width="40" alt="Gull" title="Copilot CLI">&nbsp;
+  <img src="docs/images/mascots/whale.gif" width="40" alt="Whale" title="Codex">&nbsp;
+  <img src="docs/images/mascots/crab.gif" width="40" alt="Crab" title="ZCode">&nbsp;
+  <img src="docs/images/mascots/boat.gif" width="40" alt="Boat" title="Cursor · Windsurf">&nbsp;
+  <img src="docs/images/mascots/gull.gif" width="40" alt="Gull" title="Copilot CLI · CodeBuddy">&nbsp;
   <img src="docs/images/mascots/jellyfish.gif" width="40" alt="Jellyfish" title="Gemini CLI · Qwen Code">&nbsp;
   <img src="docs/images/mascots/turtle.gif" width="40" alt="Turtle" title="OpenCode · MiMoCode">&nbsp;
   <img src="docs/images/mascots/octopus.gif" width="40" alt="Octopus" title="Trae · Kiro">&nbsp;
@@ -45,7 +46,7 @@
   <img src="docs/images/mascots/island.gif" width="40" alt="Island" title="Everything else">
 </p>
 <p align="center">
-  <sub>Claude Code · Codex CLI · Cursor CLI · Copilot CLI · Gemini CLI · Grok CLI · OpenCode · MiMoCode · Trae · Windsurf · Qwen Code · Kiro · Factory</sub>
+  <sub>Claude Code · Codex · ZCode · Cursor · Windsurf · Gemini CLI · Trae · Qwen Code · CodeBuddy · Factory · Grok CLI · OpenCode · MiMoCode · Copilot CLI · Kiro</sub>
 </p>
 
 <a id="see-it-move"></a>
@@ -64,14 +65,21 @@ On a display without a camera housing the island is a small tab on the menu bar 
   <img src="docs/images/plain/island-attention.png" width="400" alt="Collapsed island saying a session needs you, with a bell">
 </p>
 
-<sub>Every image on this page is rendered by the app's own view code with sample sessions (`scripts/make-assets.sh`). None is a capture of a real desktop yet.</sub>
+<sub>Every image on this page is rendered by the app's own view code with sample sessions (`scripts/make-assets.sh`). They are renders, not captures of somebody's desktop.</sub>
 
 <a id="install"></a>
 ## Install
 
 ### Download a release
 
-1. Get the latest `.dmg` from [Releases](https://github.com/baogutang/niko-island/releases/latest), open it and drag **Niko Island** onto **Applications**. A `.zip` with the same app is there too.
+1. Get the `.dmg` for your Mac from [Releases](https://github.com/baogutang/niko-island/releases/latest), open it and drag **Niko Island** onto **Applications**.
+
+   | Your Mac | Download |
+   |---|---|
+   | Apple silicon (M1 and later) | `Niko-Island-<version>-apple-silicon.dmg` |
+   | Intel | `Niko-Island-<version>-intel.dmg` |
+
+   Not sure which? Apple menu → **About This Mac**: "Chip: Apple M…" is Apple silicon, "Processor: … Intel …" is Intel. Each build is also there as a `.zip`. There is no universal build.
 2. Clear the download quarantine. The app is ad-hoc signed (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
 
    ```bash
@@ -81,16 +89,22 @@ On a display without a camera housing the island is a small tab on the menu bar 
 
    No terminal at hand? On macOS 14, right-click the app → **Open** → **Open**. On macOS 15 or later, try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The `xattr` command is the reliable route because it also clears the flag on the small helper that agent hooks run; if that flag is still set, **Settings → Agents** says so.
 
-3. Connect Claude Code. Look at the plan first, then apply it:
+3. Open it. The first launch greets you with a full-screen welcome that finds the agents on your Mac, shows which ones are running, and connects the ones you tick.
+
+   <p align="center">
+     <img src="docs/images/island-onboarding-agents.png" width="720" alt="The welcome screen listing the agents found on this Mac, each with a tick box, and a Connect button">
+   </p>
+
+   Prefer the terminal? Look at the plan first, then apply it:
 
    ```bash
-   "/Applications/Niko Island.app/Contents/MacOS/niko-island" install --dry-run
-   "/Applications/Niko Island.app/Contents/MacOS/niko-island" install
+   "/Applications/Niko Island.app/Contents/MacOS/niko-island" install --dry-run --recommended
+   "/Applications/Niko Island.app/Contents/MacOS/niko-island" install --recommended
    ```
 
-   Or click the gear on the island → **Agents** → **Connect**.
+   Plain `install` connects Claude Code only. Later on: the gear on the island → **Agents** → **Connect**.
 
-Start `claude` in any terminal and a creature shows up on the island. After installing, `~/.niko-island/bin/niko-island` is a shortcut to the same command line.
+Claude Code and Codex sessions show up as soon as the app runs, connected or not, because the app reads the session logs those agents keep on disk. Connecting adds live status from hooks and lets you approve from the island. After connecting, `~/.niko-island/bin/niko-island` is a shortcut to the same command line.
 
 <a id="build-from-source"></a>
 ### Build from source
@@ -101,31 +115,35 @@ Requires macOS 14+ and Xcode 16 or later (Swift 6).
 git clone https://github.com/baogutang/niko-island.git
 cd niko-island
 scripts/check.sh              # the whole test suite
-scripts/make-app.sh           # → dist/Niko Island.app, ad-hoc signed
+scripts/make-app.sh           # → dist/Niko Island.app for this Mac, ad-hoc signed
 scripts/smoke-launch.sh       # launches it against a throwaway directory
 open "dist/Niko Island.app"
+scripts/make-release.sh       # what a release ships: apple-silicon and intel, .dmg and .zip
 ```
 
 ## What is Niko Island?
 
-Coding agents spend most of their time working and a little of it waiting for you: a command to approve, a question to answer, a turn that has finished. Those moments are easy to miss when the agent lives in a terminal tab behind three other windows.
+Coding agents spend most of their time working and a little of it waiting for you: a command to approve, a question to answer, a turn that has finished. Those moments are easy to miss when the agent lives in a terminal tab or an app window behind three others.
 
-Niko Island keeps a small black island at the top of the screen, growing out of the camera housing on a MacBook and sitting on the menu bar anywhere else. It stays small while agents work, opens when one needs you, and lets you act right there.
+Niko Island keeps a small black island at the top of the screen, growing out of the camera housing on a MacBook and sitting on the menu bar anywhere else. It stays small while agents work, opens when one needs you, and lets you act right there. It behaves like a piece of the menu bar: where the menu bar goes, it goes.
 
 <a id="features"></a>
 ## Features
 
 - **Quiet until it matters.** Collapsed, the island shows one creature and a few words. It opens by itself only when an agent is blocked on you.
-- **Decide in place.** Allow once, always allow a tool, allow everything for the session, deny, or hand the decision back to the terminal. Nothing is approved unless you said so.
+- **Moves with the menu bar.** Slide to a full-screen app and the island leaves with the desktop instead of hanging over your work; push the pointer to the top of the screen and it comes down together with the menu bar. A request for a decision can still drop in. You choose: follow the menu bar, always show, or never show over full-screen apps.
+- **Finds your sessions by itself.** Claude Code and Codex sessions are listed from the agents' own session logs: sessions in the desktop apps, sessions that started before Niko Island did, and agents you have not connected yet.
+- **Decide in place.** Allow once, always allow a tool, allow everything for the session, deny, or hand the decision back to the agent. Nothing is approved unless you said so.
 - **Answer questions as tiles.** Multiple-choice questions become big option tiles, single or multi-select, with room to type something else.
-- **One creature per agent.** A starfish for Claude Code, a whale for Codex, a turtle for OpenCode: you can tell sessions apart before reading a word.
-- **Chips that orient you.** Every row carries how long, which agent, and which terminal (iTerm2, Terminal, Ghostty, WezTerm, VS Code, Cursor, tmux, …).
-- **Back to the right tab.** Click a row or a notification and the session's Terminal.app or iTerm2 tab comes forward, tmux panes included.
+- **One creature per agent.** A starfish for Claude Code, a whale for Codex, a crab for ZCode: you can tell sessions apart before reading a word. Give any agent a different creature if you like.
+- **Chips that orient you.** Every row carries how long, which agent, and where it runs (iTerm2, Terminal, Ghostty, WezTerm, VS Code, Cursor, tmux, a desktop app, …).
+- **Back to the right window.** Click a row or a notification and the session's Terminal.app or iTerm2 tab comes forward, tmux panes included; a desktop-app session brings its app forward.
+- **Usage per agent.** Switch between all agents, Claude Code, Codex and ZCode: the last five hours, today, seven days, and a counter you reset with a button. Five-hour and weekly limits are shown as Claude Code and Codex report them.
+- **Yours to shape.** Accent colour, width, row density, which chips, hover timing, which display, language, a global shortcut (⌃⌥I).
 - **Sounds you choose.** Five moments, two built-in sets generated by the app, macOS system sounds, your own files, or a sound pack. All off until you switch them on.
-- **Usage, locally.** Tokens and estimated cost per model for today and the last seven days, read from transcripts on your disk; Claude rate limits from the status line.
 - **An installer you can trust.** It scans first, backs up, verifies, rolls back on failure, and removes only what it added.
 - **Private by construction.** No telemetry, no account, one optional download that is off by default.
-- **English and 简体中文.**
+- **English and 简体中文**, switchable in Settings.
 
 <p align="center">
   <img src="docs/images/island-permission.png" width="400" alt="A permission request opened on the island with Allow once, Always allow Bash, Allow all and Deny">
@@ -137,9 +155,9 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 
 | Agent | Creature | Status | What you get | What connecting touches |
 |---|---|---|---|---|
-| **Claude Code** (terminal and desktop app) | starfish | Stable | Live status, approvals, questions, usage, rate limits | `~/.claude/settings.json` (hook entries + status line wrapper) |
-| Codex (CLI, IDE extension, desktop app) | whale | Beta | Live status, approvals, usage. Codex asks you to trust new hooks once | `~/.codex/hooks.json` |
-| ZCode | crab | Beta | Live status, approvals | `~/.zcode/cli/config.json` |
+| **Claude Code** (terminal and desktop app) | starfish | Stable | Live status, approvals, questions, usage, rate limits. Sessions are listed even when not connected | `~/.claude/settings.json` (hook entries + status line wrapper) |
+| Codex (CLI, IDE extension, desktop app) | whale | Beta | Live status, approvals, usage, limits. Sessions are listed even when not connected. Codex asks you to trust new hooks once (`/hooks`) | `~/.codex/hooks.json` |
+| ZCode | crab | Beta | Live status, approvals, usage. Sessions that are already open pick the hooks up when they restart | `~/.zcode/cli/config.json` |
 | Cursor | boat | Beta | Live status | `~/.cursor/hooks.json` |
 | Windsurf | boat | Beta | Live status | `~/.codeium/windsurf/hooks.json` |
 | Gemini CLI | jellyfish | Beta | Live status | `~/.gemini/settings.json` |
@@ -153,15 +171,27 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 | QwenWork, Kiro | jellyfish, octopus | Experimental | Live status | `~/.qwenwork/settings.json`, `~/.kiro/settings/cli.json` |
 | Kimi Code, Devin, Mistral Vibe, DeepSeek CLI, Pi / OhMyPi, OpenClaw, Amp | — | Planned | — | — |
 
-**Stable** means wired end to end and covered by tests. **Experimental** means the adapter follows the config location and format listed in [INTEGRATIONS.md](INTEGRATIONS.md) but has **not been validated against a live copy of that agent**. Experimental adapters are never installed by default:
+- **Stable** — wired end to end and covered by tests.
+- **Beta** — the adapter writes the format that agent's own hook reference describes, checked against config files from real installations and covered by tests. We have **not driven it end to end against the live agent** ourselves.
+- **Experimental** — follows the config location and format listed in [INTEGRATIONS.md](INTEGRATIONS.md), which nobody has validated yet.
+
+The welcome screen and `--recommended` offer stable and beta adapters. Experimental ones are installed only when you pick them:
 
 ```bash
+niko-island install                         # Claude Code only
+niko-island install --recommended           # every detected agent with a stable or beta adapter
 niko-island install --agents codex,cursor   # pick some
-niko-island install --all                   # every detected agent
+niko-island install --all                   # every detected agent, experimental ones included
 niko-island uninstall                       # always removes everything of ours
 ```
 
-Approving from the island works with Claude Code only for now. For the other agents the island shows status.
+Approving from the island works with Claude Code, and in beta with Codex and ZCode. For the other agents the island shows status.
+
+### Sessions without hooks
+
+Hooks only speak when something happens, so an idle session, a session that was already open, or an agent you have not connected would be invisible. Niko Island therefore also reads the session logs that Claude Code (`~/.claude/projects/`) and Codex (`~/.codex/sessions/`) write anyway: the session's title, what it is doing, its last reply, and Codex helper agents. That is how sessions of the desktop apps appear.
+
+These rows can be watched and jumped to. Approving from the island needs the agent to be connected, because only a hook can hold a request open. Switch it off in **Settings → Sessions**; the same page sets how long a quiet session stays listed.
 
 <a id="sounds"></a>
 ## Sounds
@@ -221,16 +251,31 @@ Work started looks for `task.acknowledge`, then `session.start`. Needs you uses 
 
 Click the gear on the island (or right-click the menu-bar icon) to open the settings window.
 
-- **General** — which moments raise a notification; open at login.
-- **Island** — open on hover, open by itself for a decision, the short "finished" notice, whether the island shows while nothing is running.
-- **Agents** — connect and remove agents.
+- **General** — language (English, 简体中文, or the same as macOS), the global shortcut ⌃⌥I, open at login, which moments raise a notification.
+- **Island** — *Look*: accent colour, which display, width, row density, how many sessions before the list scrolls, creatures or plain dots, which chips a row shows. *Opening and closing*: open on hover and how long the pointer has to rest, how soon it closes, open by itself for a decision, the "finished" notice and how long it stays, whether the island shows while nothing is running. *Full-screen apps*: follow the menu bar, always show, or never; whether a decision may come in over a full-screen app.
+- **Sessions** — find sessions from the agents' session logs; how long a quiet session stays listed.
+- **Agents** — what is on this Mac, what is running now, connect one or all of them, remove, and pick a creature per agent.
 - **Sounds** — see above.
-- **Usage** — today, the last seven days, per model, Claude rate limits; the opt-in price-list refresh.
-- **About** — version, a redacted diagnostics export, quit.
+- **Usage** — the numbers below, and the opt-in price-list refresh.
+- **About** — version, show the welcome again, a redacted diagnostics export, quit.
 
 <p align="center">
-  <img src="docs/images/island-usage.png" width="640" alt="Usage on the island: cost today and for seven days, a bar per day, models and rate-limit windows">
+  <img src="docs/images/island-settings-island.png" width="520" alt="The Island page of the settings window: look, opening and closing, full-screen apps">
 </p>
+
+<a id="usage"></a>
+## Usage
+
+Click the bars icon on the island.
+
+<p align="center">
+  <img src="docs/images/island-usage.png" width="640" alt="Usage on the island for one agent: five hours, today, seven days and since reset, the agent's own limits, a bar per day and a line per model">
+</p>
+
+- **Per agent.** *All*, or one of Claude Code, Codex, ZCode (and OpenCode, best effort) — whichever have written anything on this Mac.
+- **Four windows.** The last five hours, today, the last seven days, and *since reset*: press **Reset** and that counter starts from zero for that agent; the ✕ clears it. Nothing is deleted, it is only a marker in time.
+- **Limits, as the agents report them.** Claude Code's five-hour and weekly windows come from its status line; Codex's from the session files it writes. They are the agents' own figures, shown with the time they reset. An agent that reports nothing shows nothing.
+- **Where the numbers come from.** Token counts in the transcripts on your disk: `~/.claude/projects/`, `~/.codex/sessions/`, and ZCode's own local database (opened read-only). Cost is an estimate from public list prices.
 
 <a id="privacy"></a>
 ## Privacy
@@ -253,6 +298,8 @@ Short version: **no telemetry, no accounts, all local.** The long version, so yo
   ```
 
 - **Events are trimmed at the source and kept in memory.** The bridge drops tool output and shortens long text in status events. A permission request carries the command or file in question, so you can see what you are approving. None of this is written to disk; the usage database stores numbers and identifiers, never prompts or replies.
+- **Session logs are read, never changed, never copied.** To list sessions and count tokens the app reads the logs Claude Code and Codex keep in your home directory, and ZCode's local database, read-only. A session's title and last reply are held in memory while the row is on the island.
+- **Running agents are detected locally.** To tell you that an agent is running but not connected, the app looks at the names of your running apps and processes. The list goes nowhere.
 - **Local only, owner only.** Agents talk to the app over a unix socket; the app checks the caller's user id on every message. A loopback HTTP port (127.0.0.1, bearer token in an owner-only file) is opened only if you connect an agent that needs a plugin.
 - **Your credentials are never read**, stored or forwarded.
 - **Auditable hooks.** Every entry the installer writes contains the text `niko-bridge`. Search your config for it at any time.
@@ -270,17 +317,21 @@ There are polished closed-source apps in this space. If you would rather read th
 | Tracking | None, and you can verify that | You have to take their word |
 | Direction | Issues and pull requests | The vendor's roadmap |
 | Code signing | Ad-hoc: one extra step at first launch | Usually notarized |
-| Agent coverage today | One stable integration, the rest experimental | Often broader |
+| Agent coverage today | One stable integration, the rest in beta or experimental | Often broader |
 
 ## How it works
 
 ```
- agent hook ──▶ niko-bridge ──▶ unix socket ──▶ Niko Island
-      ▲                                              │
+ agent hook ──▶ niko-bridge ──▶ unix socket ──▶ Niko Island ◀── session logs on disk
+      ▲                                              │              (read-only)
       └──────── decision: allow / deny ◀─────────────┘
 ```
 
 Agents already know how to run a command at each step of their work. `niko-island install` registers a tiny native program, `niko-bridge`, as that command. It forwards a slimmed-down event to the app and, for a permission request, waits for your decision. If the app is not running, or anything at all goes wrong, the bridge exits successfully and the agent carries on as if it were not there.
+
+The second path needs no cooperation from the agent: every second or two the app looks at the tail of the session logs that changed, which is enough to know which sessions exist and what they are doing.
+
+Following the menu bar takes two windows. One belongs to your desktops and travels with them when you swipe; the other belongs to full-screen apps and is moved by exactly as much as that Space's menu bar is showing. The app never asks for Screen Recording or Accessibility permission to do this.
 
 Details for the curious: [SPEC.md](SPEC.md) · [PROTOCOLS.md](PROTOCOLS.md) · [INTEGRATIONS.md](INTEGRATIONS.md).
 
@@ -290,22 +341,23 @@ Here is exactly how far the checking went.
 
 | Verified | How |
 |---|---|
-| Protocol, bridge, installer, approvals, questions, usage engine, island state, sound synthesis and packs | About 250 automated tests, including end-to-end runs with the real bridge binary, fault injection and a 100-session soak |
-| Installer on a real-world config | Round trip on a private copy of a real `settings.json` that already carried another tool's hooks and a status line: nothing foreign changed, byte-identical after uninstall |
+| Protocol, bridge, installer, approvals, questions, usage engine, session discovery, menu-bar placement, sound synthesis and packs | About 290 automated tests, including end-to-end runs with the real bridge binary, fault injection and a 100-session soak |
+| The island on a real desktop | Tried on macOS 15 with an external display that has no camera housing: hover, click, the welcome, the settings pages and the usage view; sliding to a full-screen app and back, the menu bar coming down in full screen, and a request arriving over a full-screen app were recorded and checked frame by frame |
+| Sessions without hooks | Sessions of the Claude and Codex desktop apps, Codex helper agents included, appeared on the island with no hooks installed for them |
+| Installer on a real-world config | Round trip on a private copy of a real `settings.json` that already carried another tool's hooks and a status line: nothing foreign changed, byte-identical after uninstall. The per-agent formats were compared with config files of real installations of Codex, ZCode, Cursor, Windsurf, Gemini CLI and Trae |
 | Usage numbers | Totals for about 1 GB of real Claude Code transcripts match an independent recount exactly; Codex sessions are consistent with their own running totals |
-| The island window | The assembled app was launched: the window sits above the menu bar, flush with the top of the screen, lays out collapsed and opens for a permission request (`scripts/smoke-launch.sh`) |
 | Speed | Cold start to first event in under a second; about 25 ms per hook |
-| Universal build, `.dmg` and `.zip` | Both halves run, the Intel half under Rosetta; the disk image mounts and the app inside passes the signature check |
+| Both release builds | `scripts/make-release.sh` builds the Apple-silicon and the Intel app, checks architectures and signatures, unpacks the zips and mounts the disk images; the Intel app starts and passes the launch test under Rosetta |
 
 | Not verified yet | Why |
 |---|---|
-| How the island feels on a real desktop | The layout was judged from rendered images. Hover-to-open, click-outside-to-close and the animations have not been tried by hand |
+| A MacBook's built-in display, two displays at once, a menu bar set to hide on the desktop | Developed on one external display; the layout for a camera housing exists only as renders |
+| Approving a real agent's request from the island | Requests in the tests come from a simulated agent that follows the documented hook contract. With live agents, status has been seen; a real approval has not been clicked through. Section 10 of [docs/TESTPLAN.md](docs/TESTPLAN.md) |
+| Any beta adapter against its live agent | See the table above |
 | How the built-in sounds actually sound | They are generated in code and tested for format, length and level. Nobody has listened to them yet |
-| A live Claude Code session driving the island | The end-to-end tests use a simulated agent that follows Claude Code's documented hook contract. Confirming it with a real session is the first step in [docs/TESTPLAN.md](docs/TESTPLAN.md) |
 | Notification and row click-through to Terminal.app, iTerm2 and tmux | Needs a person at the screen; iTerm2 was not available |
-| A display with a camera housing | Developed on a Mac without one; that layout exists only as renders |
 | A browser download going through Gatekeeper on another Mac | Release files are checked from the command line, which does not set the quarantine flag |
-| Intel hardware, a fresh macOS account | Not available |
+| Intel hardware, a fresh macOS account | Not available; the Intel build has only run under Rosetta |
 | Any of the experimental agents | See the table above |
 
 If something in the second table bites you, please open an issue.
@@ -315,8 +367,17 @@ If something in the second table bites you, please open an issue.
 **macOS says the app "cannot be opened" or "is damaged".**
 The app is ad-hoc signed because the project has no Apple Developer account, so Gatekeeper does not recognise it. Run `xattr -cr "/Applications/Niko Island.app"` once. Without a terminal: on macOS 14, right-click the app → **Open** → **Open**; on macOS 15 or later, try to open it, then use **System Settings → Privacy & Security → Open Anyway**. The release page lists SHA-256 checksums if you want to verify the download first.
 
+**Which download do I need?**
+`apple-silicon` for a Mac with an M-series chip, `intel` for a Mac with an Intel processor (Apple menu → About This Mac tells you). The wrong one either does not start or runs slower under Rosetta.
+
 **The app runs but no creature appears.**
-Run `~/.niko-island/bin/niko-island doctor`. The usual cause is the quarantine flag still being set on the bundle, which stops hooks from starting the helper; `doctor` prints the exact `xattr` command to fix it.
+Claude Code and Codex sessions are found from their logs within a few seconds, so first check that **Settings → Sessions → Find sessions…** is on. For a connected agent that stays silent, run `~/.niko-island/bin/niko-island doctor`: the usual cause is the quarantine flag still being set on the bundle, which stops hooks from starting the helper, and `doctor` prints the exact `xattr` command to fix it. Codex also wants you to trust new hooks once (`/hooks`).
+
+**A session is listed but I cannot approve from the island.**
+That row came from a session log. Connect the agent (Settings → Agents) and restart the session: only a hook can hold a request open while you decide.
+
+**The island shows over my full-screen app / I want it there.**
+Settings → Island → Full-screen apps: *Follow the menu bar* (the default), *Always show*, or *Never*. Separately, choose whether a request for a decision may come in over a full-screen app.
 
 **How do I uninstall?**
 
@@ -331,7 +392,10 @@ Then drag the app to the Trash. Your agents keep working throughout. Even if you
 Run `niko-island install --dry-run` to see. It reads your config first, writes a `*.niko-backup-<timestamp>` copy next to it, adds its entries after yours, re-reads the result to verify, and restores the original if anything does not match. Invalid or unusual config files are left untouched.
 
 **The island is in my way.**
-Settings → Island: turn off "Open when the pointer rests on it" and it only opens when you click it or an agent needs you; turn off "Keep the island visible when nothing is running" and it disappears while idle. A click anywhere else puts it away, and that never decides a pending request.
+Settings → Island: turn off "Open when the pointer rests on it" (or make the pointer rest longer) and it only opens when you click it or an agent needs you; turn off "Keep the island visible when nothing is running" and it disappears while idle. A click anywhere else puts it away, and that never decides a pending request.
+
+**Does it read my conversations?**
+It reads the tail of the session logs on your disk to show a session's title, what it is doing and its last reply. That text is held in memory while the row is shown, is not written anywhere and does not leave your Mac. Switch it off in Settings → Sessions.
 
 **Will this slow my agent down?**
 Each hook starts one small native program that hands off an event and exits: about 25 ms per hook on an Apple-silicon Mac with the release build, whether or not the app is running. It only waits when you are being asked for a decision.
@@ -343,11 +407,11 @@ It approves further requests from that one session until the session ends, you c
 No. They are estimates from public list prices applied to the token counts in your local transcripts. Your plan or invoice may differ.
 
 **What is next?**
-See the [Roadmap](docs/ROADMAP.md). Trying the island by hand and validating the experimental adapters against live agents are first on the list.
+See the [Roadmap](docs/ROADMAP.md). Driving the beta adapters against their live agents and trying the island on a MacBook's own display are first on the list.
 
 ## Contributing
 
-Issues and pull requests are welcome, especially reports from people running the experimental agents: one confirmed config format moves an adapter from experimental to stable. The manual checklist for what tests cannot cover lives in [docs/TESTPLAN.md](docs/TESTPLAN.md).
+Issues and pull requests are welcome, especially reports from people running the beta and experimental agents: one confirmed round trip moves an adapter up a level. The manual checklist for what tests cannot cover lives in [docs/TESTPLAN.md](docs/TESTPLAN.md).
 
 ## Acknowledgments
 

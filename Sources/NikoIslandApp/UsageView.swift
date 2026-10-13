@@ -34,7 +34,7 @@ struct UsageView: View {
             } else {
                 tiles
                 if let since = current.resetAt {
-                    Text(L("Counting since %@ (%@).", since.formatted(date: .abbreviated, time: .shortened), sinceText(since)))
+                    Text(L("Counting since %@ (%@).", since.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localization.locale)), sinceText(since)))
                         .font(Theme.body(11)).foregroundStyle(Theme.tertiary)
                 }
                 if current.id == "all" { allLimits } else if !current.limits.isEmpty { limits(current) }

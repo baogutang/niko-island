@@ -22,6 +22,11 @@ final class OnboardingWindowController {
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         panel.appearance = NSAppearance(named: .darkAqua)
         let view = OnboardingView(model: model, metrics: IslandMetrics(screen: screen)) { [weak self] in self?.close() }
+        // Escape is "Skip": the welcome goes away and does not come back by itself.
+        panel.onEscape = { [weak self, weak model] in
+            model?.settings.onboardingDone = true
+            self?.close()
+        }
         panel.contentView = NSHostingView(rootView: view)
         panel.setFrame(screen.frame, display: true)
         self.panel = panel
@@ -45,6 +50,9 @@ final class OnboardingWindowController {
 }
 
 final class OnboardingPanel: NSPanel {
+    var onEscape: (() -> Void)?
+
+    override func cancelOperation(_ sender: Any?) { onEscape?() }
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
     override func constrainFrameRect(_ frameRect: NSRect, to screen: NSScreen?) -> NSRect { frameRect }

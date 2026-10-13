@@ -219,8 +219,10 @@ enum PreviewRenderer {
                      mascotFrame: Int = 0, model: AppModel? = nil) -> AnyView {
         let model = model ?? demoModel(scene)
         if scene.isSettings {
-            let heights: [Scene: CGFloat] = [.settingsSounds: 760, .settingsAgents: 660, .settingsIsland: 1180]
-            return AnyView(SettingsRootView(model: model).frame(width: 860, height: heights[scene] ?? 520)
+            // A page is drawn at its full height; the long agent list is cut off below the fold.
+            let page = SettingsRootView(model: model).frame(width: 860).fixedSize(horizontal: false, vertical: true)
+            let framed = scene == .settingsAgents ? AnyView(page.frame(height: 700, alignment: .top).clipped()) : AnyView(page)
+            return AnyView(framed
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .environment(\.isStaticPreview, true))
         }
@@ -249,7 +251,8 @@ enum PreviewRenderer {
     }
 
     static func render(_ scene: Scene, to url: URL, scale: CGFloat = 1.5, metrics: IslandMetrics = .notched) -> Bool {
-        guard let image = cgImage(of: view(for: scene, metrics: metrics), scale: scale) else { return false }
+        // The welcome screens are a whole display with a star field: at 1.5× they weigh 2 MB each.
+        guard let image = cgImage(of: view(for: scene, metrics: metrics), scale: scene.isOnboarding ? 1 : scale) else { return false }
         return writePNG(image, to: url)
     }
 

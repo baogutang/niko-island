@@ -1,5 +1,73 @@
 # Changelog
 
+## [0.3.0] - 2026-10-13
+
+The island learns to follow the menu bar, finds sessions on its own, and
+gets a welcome, a lot more settings and usage per agent.
+
+### Fixed
+- **The island stayed on screen over full-screen apps, and blinked when you
+  came back.** It is now two windows: one that belongs to your desktops and
+  slides away with them, and one that belongs to full-screen apps and comes
+  down together with the menu bar when you push the pointer to the top of the
+  screen. Nothing pops in after the slide has finished.
+- **"No agents running" while agents were running.** A session used to exist
+  only after one of its hooks had fired, so sessions in the Claude and Codex
+  desktop apps, and anything started before the app, were invisible. See
+  *Sessions without hooks* below.
+- A phantom agent called "startup" could appear: the session-start payload of
+  some agents has a field named `source`, which was mistaken for the agent's
+  name.
+- Codex, Cursor, Windsurf, Gemini CLI and Trae were wired with the wrong
+  config shape. Each now gets the format its own hook reference describes.
+
+### Added
+- **Sessions without hooks.** The app reads the session logs Claude Code and
+  Codex keep on disk, so their sessions are listed whether or not the agent is
+  connected: what the session is called, what it is doing, the last reply, and
+  Codex helper agents. These rows can be watched and jumped to; approving from
+  the island still needs the agent to be connected. Can be switched off.
+- **A welcome on first launch**: a full-screen introduction that finds the
+  agents on your Mac, shows which are running, and connects the ones you tick.
+- **ZCode**, and approvals for Codex and ZCode (beta). CodeBuddy, Factory,
+  Grok CLI, Qwen Code and Trae moved from experimental to beta.
+- **Running agents are detected.** If an agent's app or CLI is running but not
+  connected, the empty island and Settings → Agents say so, with one
+  **Connect all** button.
+- **Usage per agent**: switch between all agents, Claude Code, Codex and
+  ZCode. Each shows the last five hours, today, seven days, and a counter you
+  can reset with a button. Codex limits (five-hour and weekly) are read from
+  its own session files; ZCode usage from its own database, read-only.
+- **Settings**: accent colour, island width, row density, how many sessions
+  before the list scrolls, which chips a row shows, creatures on or off and
+  which creature each agent gets, which display the island lives on, hover
+  delays, how long the "finished" notice stays, what to do over full-screen
+  apps, how long a quiet session stays listed, language (English / 简体中文 /
+  same as macOS), and a global shortcut (⌃⌥I) that opens the island.
+- `niko-island install --recommended` connects every detected agent with a
+  stable or beta adapter.
+- A Codex or ZCode row says what the agent still needs from you (Codex asks
+  you to trust new hooks with `/hooks`).
+
+### Changed
+- **Downloads are per architecture**: `apple-silicon` for M-series Macs,
+  `intel` for Intel Macs, each as `.dmg` and `.zip`. There is no universal
+  build any more; each app is about half the size.
+- A row found in a desktop app says "Desktop" instead of repeating the
+  agent's name, and clicking it brings that app forward.
+
+### Known limitations
+- The menu-bar following was worked out and checked on one setup: macOS 15
+  with an external display that has no camera housing. A MacBook's built-in
+  display, two displays at once, and a menu bar set to hide on the desktop
+  have not been tried.
+- Beta adapters follow each agent's published hook reference and the config
+  files found on a real machine, and are covered by tests. Apart from Claude
+  Code, none has been driven end to end against the live agent by us.
+- The Intel build has only been run under Rosetta.
+- Still ad-hoc signed, not notarized: clear the quarantine flag once with
+  `xattr -cr "/Applications/Niko Island.app"`.
+
 ## [0.2.0] - 2026-10-13
 
 The island redesign.

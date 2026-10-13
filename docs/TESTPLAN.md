@@ -1,21 +1,24 @@
 # Manual test plan
 
 Automated tests (`scripts/check.sh`) cover the protocol, the bridge, the
-installer, the sound engine and the app model end to end. This page lists what
-still needs a human with a screen and ears: the island window, sounds,
-notifications, and real terminals. Everything here can be done without touching
-your real agent configuration until step 6.
+installer, session discovery, the menu-bar placement rules, the sound engine
+and the app model end to end. This page lists what still needs a human with a
+screen and ears: the island window, full-screen apps, sounds, notifications,
+and real agents. Nothing here touches your real agent configuration until
+section 10.
 
-Legend: ☐ = check by hand. Items marked **(not automated)** have no test at all
-behind them yet. As of 0.2.0 nobody has worked through sections 1 to 5 by hand:
-the island was judged from rendered images and a scripted launch only.
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0, on one setup: macOS
+15 with an external display that has no camera housing. A ☑ says nothing about
+a MacBook's own display or two displays at once. Items marked **(not
+automated)** have no test at all behind them.
 
 ## 0. Build
 
 ```bash
 scripts/check.sh                 # everything green
-scripts/make-app.sh              # dist/Niko Island.app (ad-hoc signed)
+scripts/make-app.sh              # dist/Niko Island.app for this Mac (ad-hoc signed)
 scripts/smoke-launch.sh          # launches against a throwaway directory
+scripts/make-release.sh          # both release packages, built and verified
 ```
 
 ## 1. The island window
@@ -23,8 +26,13 @@ scripts/smoke-launch.sh          # launches against a throwaway directory
 Launch with a throwaway runtime directory so nothing of yours is used:
 
 ```bash
-NIKO_ISLAND_HOME=/private/tmp/nk-manual/ni "dist/Niko Island.app/Contents/MacOS/niko-island"
+NIKO_ISLAND_HOME=/private/tmp/nk-manual/ni "dist/Niko Island.app/Contents/MacOS/niko-island" -NikoOnboardingDisabled YES
 ```
+
+(`-NikoOnboardingDisabled YES` skips the welcome, which section 3 looks at. The
+app still lists your real Claude Code and Codex sessions, because it reads
+their session logs; switch that off in Settings → Sessions for an empty
+island.)
 
 - ☐ A small black tab hangs from the top centre of the display, flush with the
   top edge and in front of the menu bar (on the display with a camera housing
@@ -33,26 +41,105 @@ NIKO_ISLAND_HOME=/private/tmp/nk-manual/ni "dist/Niko Island.app/Contents/MacOS/
 - ☐ On a display with a camera housing the tab wraps around it, with the
   creature on one side and the text on the other. **(not automated; never seen
   on real hardware)**
-- ☐ Rest the pointer on the tab: it opens with a spring, without stealing
+- ☑ Rest the pointer on the tab: it opens with a spring, without stealing
   keyboard focus from the app you were typing in. Move away: it closes after a
   moment. **(not automated)**
-- ☐ Click the tab, or the menu-bar icon: it opens and stays open while the
+- ☑ Click the tab, or the menu-bar icon: it opens and stays open while the
   pointer is elsewhere. Click anywhere outside: it closes. **(not automated)**
+- ☐ Press ⌃⌥I from any app: the island opens; press it again: it closes.
+  **(not automated)**
 - ☐ While the island is closed, clicks and drags just below the tab reach the
   window underneath (the transparent part of the island's window lets them
   through). **(not automated)**
 - ☐ Right-click the menu-bar icon: "Settings…", "Open Releases Page",
   "Quit Niko Island".
 - ☐ Open with no sessions: "No agents running yet." and a "Connect an agent…"
-  button that opens Settings → Agents.
+  button that opens Settings → Agents. If an agent's app or CLI is running but
+  not connected, the empty island names it instead and offers to connect it.
 - ☐ The header has three buttons: usage, sound on/off, settings. Usage switches
   the island to the usage view and back.
 - ☐ Switch macOS to 简体中文 (or launch with `-AppleLanguages "(zh-Hans)"`): all
   island and settings text is Chinese.
 - ☐ Plug in a second display, change the primary display, change resolution:
-  the island re-centres on the right display each time. **(not automated)**
+  the island re-centres on the right display each time. Settings → Island →
+  Display moves it to the display you pick. **(not automated)**
 
-## 2. Sessions and approvals with a fake agent
+## 2. Menu bar and full-screen apps **(placement rules are tested; the windows are not)**
+
+The island is two windows: one that lives on your desktops and one that lives
+in full-screen Spaces. Launch with `NIKO_ISLAND_DEBUG=1` to see a line
+`island placement surface=… lift=… bar=…` whenever the placement changes.
+
+- ☑ Put an app in full screen (green button), then swipe between it and the
+  desktop: the island travels with the desktop, edge to edge, like the menu
+  bar. It does not stay behind over the full-screen app, and nothing pops in
+  after the slide has finished.
+- ☑ In the full-screen app, push the pointer to the top of the screen: the
+  island comes down together with the menu bar, and goes back up with it.
+- ☑ Swipe back to the desktop: the island arrives with the desktop. It does
+  not disappear first and come back afterwards.
+- ☑ With a full-screen app in front, send the `PermissionRequest` from section
+  5: the island drops in over the app, and leaves again once decided.
+- ☐ Settings → Island → Full-screen apps → **Always show**: the island stays
+  at the top of a full-screen app. **Never**: it is not shown there at all,
+  not even for a request, if "Come in over a full-screen app…" is off.
+- ☐ Mission Control (three-finger swipe up): the island stays where it is and
+  does not turn into a window thumbnail.
+- ☐ System Settings → Control Centre → "Automatically hide and show the menu
+  bar" set to *Always* or *On Desktop Only*: on the desktop the island follows
+  the menu bar up and down. **(never tried)**
+- ☐ The same setting at *Never*: in a full-screen app the menu bar stays, and
+  so does the island. **(never tried)**
+- ☐ A MacBook's built-in display with a camera housing. **(never tried)**
+- ☐ Two displays, one of them showing a full-screen app: the island on the
+  other display is not affected. **(never tried)**
+
+## 3. The welcome
+
+Start once more with a fresh throwaway directory and without
+`-NikoOnboardingDisabled`:
+
+```bash
+NIKO_ISLAND_HOME=/private/tmp/nk-welcome/ni "dist/Niko Island.app/Contents/MacOS/niko-island"
+```
+
+- ☑ A full-screen welcome covers the display: night sky, sea, the creatures,
+  and a small island at the top that says hello. On a large display the
+  content is scaled up, not lost in the middle.
+- ☑ "Get started" → the agents found on this Mac, with *running now* next to
+  the ones whose app or CLI is running, and a tick on every stable or beta
+  adapter. Experimental ones are listed without a tick.
+- ☐ **Not now** and **Skip** leave every config untouched (check with
+  `niko-island status`).
+- ☐ **Connect n agents** writes the hooks (in this throwaway launch they point
+  into `/private/tmp`, so run `niko-island uninstall` afterwards, or do this
+  step with the installed app in section 10).
+- ☐ The remaining pages: a short tour with a demo island, a few preferences
+  (colour, sounds, full-screen apps), done. The welcome does not come back at the next
+  launch; Settings → About → "Show it again" brings it back.
+- ☐ Escape closes it at any point.
+
+## 4. Sessions without hooks
+
+Uses your real session logs, read-only. Nothing needs to be connected.
+
+- ☑ With the Claude desktop app's Code tab or `claude` in a terminal open on a
+  session: a row appears within a few seconds, titled like the session, with
+  what it last did.
+- ☑ With the Codex desktop app or `codex` open: the same, with a whale; a
+  session that started helper agents shows "n helpers".
+- ☑ A row found in a desktop app carries a "Desktop" chip. ☐ Clicking it
+  brings that app forward.
+- ☐ A session nobody has touched for longer than Settings → Sessions → "Keep a
+  quiet session listed for" drops off the list.
+- ☐ Dismiss a row (right-click → Dismiss): it stays away until that session
+  does something new.
+- ☐ Settings → Sessions → switch off "Find sessions by reading the agents' own
+  session logs": only sessions that fire hooks remain.
+- ☐ Such a row never shows Allow / Deny: there is nothing to answer until the
+  agent is connected.
+
+## 5. Sessions and approvals with a fake agent
 
 In another terminal, drive the bundled bridge by hand:
 
@@ -63,8 +150,8 @@ echo '{"hook_event_name":"UserPromptSubmit","session_id":"t1","cwd":"'$PWD'","pr
 echo '{"hook_event_name":"PreToolUse","session_id":"t1","cwd":"'$PWD'","tool_name":"Bash","tool_input":{"command":"make test"}}' | "$B" --source claude
 ```
 
-- ☐ The collapsed tab shows a starfish and "running make test".
-- ☐ Open the island: one row with the starfish, the project name, "try the
+- ☑ The collapsed tab shows a starfish and "running make test".
+- ☑ Open the island: one row with the starfish, the project name, "try the
   island", the activity line, and chips for elapsed time and "Claude Code" (plus
   the terminal's name when the bridge was started from a terminal it knows).
 
@@ -72,7 +159,7 @@ echo '{"hook_event_name":"PreToolUse","session_id":"t1","cwd":"'$PWD'","tool_nam
 echo '{"hook_event_name":"PermissionRequest","session_id":"t1","cwd":"'$PWD'","tool_name":"Bash","tool_input":{"command":"git push"}}' | "$B" --source claude
 ```
 
-- ☐ The island opens by itself with the request on top: the command in a box
+- ☑ The island opens by itself with the request on top: the command in a box
   and Allow once / Always allow Bash / Allow all / Deny.
 - ☐ **Allow once** → the command above prints `{"hookSpecificOutput":…"behavior":"allow"…}`
   and the island closes again (it opened for the request, so it leaves with it).
@@ -115,19 +202,37 @@ echo '{"hook_event_name":"StopFailure","session_id":"t1","cwd":"'$PWD'","error":
   seconds, then returns to its usual text.
 - ☐ After `StopFailure`, the row reads "hit an error" with the message.
 
-## 3. Sounds **(not automated beyond synthesis and settings)**
+## 6. Usage
+
+Click the bars icon in the island's header.
+
+- ☑ A row of pills: All, then one per agent that has written anything on this
+  Mac (Claude Code, Codex, ZCode, …). The tiles, the chart and the model list
+  follow the pill.
+- ☑ Four tiles: 5 hours, Today, 7 days, Since reset.
+- ☐ Press **Reset** on one agent: its "Since reset" tile starts at zero, a line
+  says since when, and the other agents are unaffected. ✕ clears the marker.
+  Quit and reopen: the marker is still there.
+- ☐ Claude Code: a 5-hour and a weekly limit bar appear once a connected
+  session has drawn its status line. Codex: both bars appear from its session
+  files, with the plan name. An agent that reports no limits shows none.
+- ☐ Compare today's total for Claude Code with `niko-island usage`.
+- ☐ Set the language to 简体中文: the date in "Counting since…" is written in
+  Chinese; in English it is written in English, whatever the Mac's region.
+
+## 7. Sounds **(not automated beyond synthesis and settings)**
 
 Settings → Sounds. Nobody has listened to the built-in sets yet, so this section
 is also a listening test: note anything harsh, too long or too quiet.
 
-- ☐ "Play sounds" is off on first launch and nothing in section 2 made a sound.
+- ☐ "Play sounds" is off on first launch and nothing in section 5 made a sound.
 - ☐ Switch it on. The play button next to each of the five moments plays it.
   "Work started" is the only moment that is off.
 - ☐ Island set: soft mallet tones, each under about a second. 8-bit set: short
   square-wave arpeggios. Both sit at a similar loudness.
 - ☐ The volume slider changes the level of the next preview.
 - ☐ macOS: each moment gets a menu of system sounds, and previews play them.
-- ☐ Repeat the `PermissionRequest` and `Stop` commands from section 2: "Needs
+- ☐ Repeat the `PermissionRequest` and `Stop` commands from section 5: "Needs
   you" and "Finished" play. Several events in quick succession do not stack into
   noise (cues are spaced at least a second and a half apart).
 - ☐ Click the speaker button in the island's header: sounds stop; click again:
@@ -140,10 +245,18 @@ is also a listening test: note anything harsh, too long or too quiet.
   `~/.niko-island/sounds/packs/`: it appears by its display name and its sounds
   play for the matching moments.
 
-## 4. Settings window
+## 8. Settings window
 
-- ☐ The gear on the island and "Settings…" in the menu both open one window
-  with General, Island, Agents, Sounds, Usage, About in a sidebar.
+- ☑ The gear on the island and "Settings…" in the menu both open one window
+  with General, Island, Sessions, Agents, Sounds, Usage, About in a sidebar.
+- ☐ General → Language: switching between English, 简体中文 and "Same as macOS"
+  changes the window and the island at once, without a restart.
+- ☐ Island → Look: each colour, width, row density and chip switch changes the
+  island straight away; "Pixel creatures" off turns them into coloured dots.
+- ☐ Island → the two hover delays and "How long the notice stays" do what they
+  say.
+- ☐ Agents → pick a different creature for an agent: its rows change.
+- ☐ Agents → "Connect all" appears when a detected agent is not connected.
 - ☐ Island → switch off "Open when the pointer rests on it": hovering no longer
   opens it, clicking still does.
 - ☐ Island → switch off "Open by itself when an agent needs a decision": a
@@ -154,7 +267,7 @@ is also a listening test: note anything harsh, too long or too quiet.
   the bundled app, ideally in /Applications). **(not automated)**
 - ☐ About → "Export diagnostics" writes a report and shows its path.
 
-## 5. Notifications and jump-back **(not automated)**
+## 9. Notifications and jump-back **(not automated)**
 
 Needs the bundled app (not `swift run`) and notification permission.
 
@@ -172,7 +285,7 @@ Needs the bundled app (not `swift run`) and notification permission.
 - ☐ From another host (VS Code terminal, Ghostty, …) → the app is brought
   forward (tab selection is not supported there), and the row's chip names it.
 
-## 6. Real agent (Claude Code)
+## 10. Real agents
 
 This is the first step that changes a real config. It is reversible.
 
@@ -193,6 +306,24 @@ This is the first step that changes a real config. It is reversible.
 - ☐ The usage view shows today's tokens after a turn.
 - ☐ Quit Niko Island, keep using `claude`: no errors, no delays.
 
+Codex and ZCode (beta). **None of this has been done with the live agents.**
+
+```bash
+"dist/Niko Island.app/Contents/MacOS/niko-island" install --dry-run --agents codex,zcode
+"dist/Niko Island.app/Contents/MacOS/niko-island" install --agents codex,zcode
+```
+
+- ☐ `~/.codex/hooks.json` and `~/.zcode/cli/config.json` gained `niko-bridge`
+  entries next to whatever was there; backups sit beside them.
+- ☐ Codex: type `/hooks` and trust the new entries. Start a turn: the row
+  follows it. Trigger an approval: decide on the island; Codex continues.
+- ☐ ZCode: start a new session (open ones keep their old hooks). The row
+  follows it; an approval can be decided on the island.
+- ☐ With the app not running, both agents behave exactly as before.
+- ☐ Any other beta agent you use (Cursor, Windsurf, Gemini CLI, Trae, Qwen
+  Code, CodeBuddy, Factory, Grok CLI): after `install --agents <id>` its
+  sessions show up with live status, and the agent shows no hook errors.
+
 ```bash
 "dist/Niko Island.app/Contents/MacOS/niko-island" uninstall
 ```
@@ -200,9 +331,10 @@ This is the first step that changes a real config. It is reversible.
 - ☐ `diff` against the backup shows `settings.json` is back to what it was.
 - ☐ `claude` still works. Delete the app; it still works.
 
-## 7. Release artifact
+## 11. Release artifact
 
-- ☐ Download the `.dmg` from the Releases page on another Mac **with a browser**
+- ☐ Download the `.dmg` for that Mac (`apple-silicon` or `intel`) from the
+  Releases page on another Mac **with a browser**
   (so it carries the quarantine flag), open it, drag the app onto Applications,
   run `xattr -cr "/Applications/Niko Island.app"` (or: right-click → Open on
   macOS 14; System Settings → Privacy & Security → Open Anyway on macOS 15+),
@@ -213,5 +345,8 @@ This is the first step that changes a real config. It is reversible.
 - ☐ Before clearing the flag, `niko-island doctor` reports the bridge as
   quarantined and Settings → Agents shows the same warning; after clearing,
   both are gone. **(not automated beyond the detection itself)**
-- ☐ `lipo -archs "Niko Island.app/Contents/MacOS/niko-island"` → `x86_64 arm64`.
+- ☐ `lipo -archs "Niko Island.app/Contents/MacOS/niko-island"` → `arm64` for
+  the apple-silicon download, `x86_64` for the intel one. Never both.
+- ☐ The intel download on a real Intel Mac. **(never tried: it has only run
+  under Rosetta)**
 - ☐ `shasum -a 256 -c SHA256SUMS` passes.

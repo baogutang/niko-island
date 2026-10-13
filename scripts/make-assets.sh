@@ -27,7 +27,7 @@ cp "$WORK/AppIcon.iconset/icon_256x256.png" "$ROOT/docs/images/icon.png"
 
 mkdir -p "$ROOT/website/mascots"
 cp "$WORK/AppIcon.iconset/icon_128x128@2x.png" "$ROOT/website/icon.png"
-for image in island-sessions island-question island-usage island-settings-sounds; do
+for image in island-sessions island-question island-usage island-settings-sounds island-settings-island island-onboarding island-onboarding-agents; do
     cp "$ROOT/docs/images/$image.png" "$ROOT/website/$image.png"
 done
 cp "$ROOT/docs/images/island-demo.gif" "$ROOT/website/island-demo.gif"

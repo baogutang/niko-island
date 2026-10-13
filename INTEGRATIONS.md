@@ -27,6 +27,38 @@ Ship v1 with the first three; the rest are additive and follow the same pattern.
 | OpenClaw | `.openclaw/` plugin dir | JS plugin | |
 | Factory / Droid / Amp / custom | `.factory/settings.json`, `.dsh`, `.amp` | settings-style hooks | treat via generic settings-adapter |
 
+## As implemented in 0.3.0
+
+The table above is the plan this project started from. Where the agents' own
+hook references turned out to say something else, the adapters follow the
+reference; `HookDialect` in `Sources/NikoCore/Installer/HookMerge.swift` and
+`AgentRegistry` are the source of truth. "Groups" is Claude's shape (see the
+next section); "flat" is a plain list of entries per event.
+
+| Agent | File | Shape | Notes |
+|---|---|---|---|
+| Claude Code | `.claude/settings.json` → `hooks` | groups, `matcher: "*"`, timeout in seconds | 12 events; status line wrapper |
+| Codex | `.codex/hooks.json` → `hooks` | groups without a matcher | a permission reply carries the decision only (no `updatedInput`, no `interrupt`); Codex runs a new hook after the user trusts it with `/hooks` |
+| ZCode | `.zcode/cli/config.json` → `hooks.events`, with `hooks.enabled: true` | groups, `matcher: ".*"`, `timeoutMs`, `async: false` | read when a session starts |
+| Cursor | `.cursor/hooks.json`, `version: 1` | flat, entries are `{ "command": …, "timeout": … }` | observing events only (`beforeSubmitPrompt`, `afterFileEdit`, `stop`, …); nothing that could block the agent |
+| Windsurf | `.codeium/windsurf/hooks.json` | flat, `show_output: false`, no timeout | `pre_` / `post_` events; payload names the event in `agent_action_name` |
+| Gemini CLI | `.gemini/settings.json` → `hooks` | groups, timeout in milliseconds, entries carry a `name` | `BeforeAgent`, `AfterAgent`, `BeforeTool`, `AfterTool`, …; 0.2.0's plugin directory is removed on install |
+| Trae | `.trae/hooks.json` (+ `.trae-cn/`), `version: 1` | groups | |
+| Qwen Code, CodeBuddy, Factory | `<dir>/settings.json` → `hooks` | groups | |
+| Grok CLI, Copilot CLI | `<dir>/hooks/niko.json` | a file of our own, groups | |
+| OpenCode, MiMoCode | `.config/<name>/plugins/niko.js` | JS plugin → loopback HTTP | |
+
+Event names are translated to the canonical (Claude) names by
+`EventDialect.normalize`; the original name is kept in `native_event`. The
+adapter's identity travels in `_niko.source`, never in a top-level `source`
+field, because some agents use that name for something else (a session start
+reports `"source": "startup"`).
+
+Sessions of Claude Code and Codex are also read from their session logs
+(`.claude/projects/<project>/<session>.jsonl`,
+`.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`), which needs no registration at
+all. See `Sources/NikoCore/Scout/`.
+
 ## Generic settings-adapter pattern
 
 Most settings-JSON agents share this shape; one adapter covers them:

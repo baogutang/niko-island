@@ -321,13 +321,13 @@ struct SessionsPane: View {
                          : L("Start an agent and it will show up here."))
                 } else {
                     Text(L("%@ open, with nothing happening in the last %lld minutes.",
-                           ListFormatter.localizedString(byJoining: names), model.settings.sessionRetentionMinutes))
+                           Localization.list(names), model.settings.sessionRetentionMinutes))
                 }
             }
             .font(Theme.body(12.5)).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             if !unconnected.isEmpty {
-                Button(L("Connect %@…", ListFormatter.localizedString(byJoining: unconnected.map { AgentRegistry.displayName(for: $0) }))) {
+                Button(L("Connect %@…", Localization.list(unconnected.map { AgentRegistry.displayName(for: $0) }))) {
                     model.settingsPage = "agents"
                     model.onOpenSettings?()
                 }

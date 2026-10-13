@@ -1,30 +1,105 @@
 # HANDOFF — niko-island
 
-更新于 2026-10-13。这份文档给接手的人看：现在是什么状态、第二轮改了什么、哪些地方还
-不能相信、以及 5 分钟验收顺序。第一晚（0.1.0）的记录保留在文末。
+更新于 2026-10-13。这份文档给接手的人看：现在是什么状态、第三轮改了什么、哪些地方还
+不能相信、以及 5 分钟验收顺序。前两轮（0.1.0、0.2.0）的记录保留在后面。
 
 ## 现状
 
 | | |
 |---|---|
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
-| 已发布 | **v0.2.0 — 岛屿界面重做**：`Niko-Island-0.2.0-universal.dmg`、`.zip`、`SHA256SUMS`（按你的要求于 2026-10-13 发布） |
-| 旧版本 | v0.1.0（面板界面，只有 zip） |
-| 官网 | https://baogutang.github.io/niko-island/（已换成新设计） |
-| 测试 | 250 个，本机与 CI（macos-15）均通过；`scripts/smoke-launch.sh` 在本机与 CI 上均通过 |
-| CI | `ci.yml`、`pages.yml`、`release.yml`（v0.2.0）全部绿色 |
-| 发布核对 | dmg 与 zip 重新下载后校验和与 GitHub 记录一致；dmg 可挂载，内含应用签名有效、`x86_64 arm64`、版本 0.2.0。`SHA256SUMS` 文件本身因网络超时没能下载下来，用下载到的两个文件重建后与发布的摘要完全一致 |
+| 本轮版本 | **v0.3.0 — 跟随菜单栏、自动发现会话、欢迎引导、按代理的用量**（2026-10-13，按你的要求发布） |
+| 发布产物 | 每种架构一份，不再有 universal：`Niko-Island-0.3.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.3.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
+| 旧版本 | v0.2.0（岛屿界面，universal dmg + zip）、v0.1.0（面板界面，只有 zip） |
+| 官网 | https://baogutang.github.io/niko-island/ |
+| 测试 | 292 个，本机通过；`scripts/smoke-launch.sh` 对两个架构的应用都通过（Intel 版在 Rosetta 下） |
 
-**最重要的两句实话：**
+**最重要的三句实话：**
 
-1. 新界面**没有任何人动手用过**。我只看过由应用自身视图代码渲染出的图片，以及脚本启动
-   真实 `.app` 后量到的窗口位置和尺寸。悬停展开、点击外部收起、弹簧动画的手感都是未知数。
-2. 内置音效**没有任何人听过**。它们由代码合成，测试只覆盖了格式、时长、音量和选择逻辑。
+1. 这一轮的界面改动**是在你的真实桌面上看过的**（macOS 15、一块无刘海的外接显示器）：
+   菜单栏跟随是录屏后逐帧核对的，欢迎引导、设置页、用量页都是对着运行中的应用截图看的。
+   但**只有这一种环境**：MacBook 自带的刘海屏、双显示器、桌面上自动隐藏的菜单栏都没试过。
+2. **测试版适配器没有一个用真实的代理跑通过。** Codex、ZCode、Cursor、Windsurf、Gemini CLI、
+   Trae 等写入的是各家官方钩子文档描述的格式，并且和你机器上已有的配置文件对照过，但我没有
+   替你点“接入”（那会改你的真实配置），所以“接入后钩子真的触发、审批真的生效”还是未知数。
+   请按 TESTPLAN 第 10 节自己点一次。
+3. 内置音效**仍然没有任何人听过**。
 
-另外，0.1.0 留下的那条仍然成立：所有端到端测试用的是“模拟代理 + 真实桥接程序”，**没有
-一次是真实的 Claude Code 会话**（issue #1）。
+## 第三轮（0.3.0）做了什么
 
-## 第二轮做了什么
+起因是你装上 0.2.0 之后提的六条：和参考项目有差距；Codex / Claude / ZCode 桌面端开着却显示
+“还没有正在运行的代理”；没有全屏欢迎引导；设置项太少、首次启动应自动识别代理；外接无刘海
+显示器上岛屿不跟随菜单栏进出全屏；以及找 bug。中途又加了两条：不要 universal 包；用量要
+能按代理切换，带 5 小时 / 周窗口和重置按钮。
+
+**菜单栏跟随（第 5 条，花时间最多）。** 先在你的桌面上做实验，弄清了窗口服务器的真实
+行为，再动手：
+
+- 桌面与全屏空间之间滑动时，窗口服务器会把每个窗口连同桌面一起平移；“加入所有空间”的面板
+  会在滑动结束后突然出现在全屏空间里，除非标了 `.fullScreenNone`。
+- 每个空间有自己的菜单栏窗口（属主 Window Server、layer 24、与屏幕同宽）。它隐藏时不在
+  “屏幕上的窗口”列表里，出现时从 y=-68 滑到 0。读这个列表**不需要屏幕录制权限**。
+- `activeSpaceDidChange` 通知在滑动结束 0.2–0.5 秒后才到，所以不能靠它。
+
+于是岛屿变成两个窗口：桌面面板（`.fullScreenNone`，随桌面滑走、滑回）和全屏面板
+（`.fullScreenAuxiliary`，位置 = 当前空间菜单栏露出的高度）。平时每秒查 4 次，菜单栏在动时
+提到 120 Hz 跟着走。规则在 `Sources/NikoCore/MenuBarFollow.swift`（纯函数，有测试），窗口
+在 `IslandWindowController.swift`。设置里可选：跟随菜单栏 / 始终显示 / 从不；以及“需要你
+决定时是否压到全屏应用上面”。
+
+**不靠钩子发现会话（第 2 条的根因）。** 以前会话只有在钩子触发之后才存在，所以桌面端里
+开着的会话、应用启动前就在的会话、没接入的代理全都看不见。现在 `TranscriptScout` 每 1.5 秒
+看一眼 Claude Code（`~/.claude/projects/`）和 Codex（`~/.codex/sessions/`）会话日志的末尾，
+得到标题、当前动作、最后一条回复、Codex 的辅助代理。这些行可以看、可以跳转；审批仍然需要
+接入（只有钩子能把请求挂起来）。另外修了一个真 bug：部分代理的 SessionStart 里有个叫
+`source` 的字段（值是 `startup`），被当成了代理名，于是出现一个叫 “startup” 的幽灵代理。
+
+**运行中代理的识别。** 看正在运行的应用和进程名（不发往任何地方）；空状态和“设置 → 代理”
+会说出“谁开着但没接入”，并给一个“全部接入”。
+
+**欢迎引导（第 3、4 条）。** 首次启动全屏：夜空、海面、会动的小生物；第二页列出本机找到
+的代理、哪些正在运行，默认勾选稳定和测试版适配器，一键接入；之后是演示、几项偏好。Esc 或
+“跳过”不改任何东西。**你从 0.2.0 升级后第一次打开也会看到它**（0.2.0 的设置里没有“已看过”
+这个标记）。“设置 → 关于 → 再看一遍”可以重放。
+
+**适配器按各家的真实格式重写。** 0.2.0 把 Claude 的格式套给了所有代理，这是错的。现在每个
+代理一种“方言”（`HookDialect`）：Codex（`~/.codex/hooks.json`，审批回复不能带多余字段，新钩子
+要在 Codex 里 `/hooks` 信任一次）、ZCode（`~/.zcode/cli/config.json`，毫秒超时）、Cursor /
+Windsurf（扁平条目）、Gemini CLI（BeforeTool / AfterTool 等事件名）、Trae、Qwen、CodeBuddy、
+Factory、Grok。Codex 与 ZCode 支持在岛上审批（测试版）。
+
+**设置（第 4 条）。** 新增“会话”页；“岛屿”页分成外观（强调色、显示器、宽度、行距、滚动前
+行数、小生物开关、三种小标签）、展开与收起（两个悬停延时、完成提示时长等）、全屏应用；
+“通用”页有语言（English / 简体中文 / 跟随 macOS）和全局快捷键 ⌃⌥I；“代理”页可以给每个
+代理换小生物。
+
+**按代理的用量。** 用量视图顶部可切换 全部 / Claude Code / Codex / ZCode；四个格子：5 小时、
+今天、7 天、重置以来（“重置”按钮只是记一个时间点，不删数据，✕ 取消）。Codex 的 5 小时 /
+每周额度从它自己的会话文件里读（`token_count.rate_limits`），ZCode 的用量从它自己的数据库
+只读读取。
+
+**打包。** `scripts/make-release.sh` 分别构建 arm64 和 x86_64，各出 dmg + zip，合并一份
+`SHA256SUMS`，并逐一验证（架构、签名、zip 解压、dmg 挂载）。CI 和发布工作流都跑它，并对
+两个应用各跑一次启动冒烟测试（Intel 版在 Rosetta 下）。`make-app.sh` 不再有 `--universal`。
+
+**顺手修的小问题。** 语言固定为英文而系统区域是中文时，“Counting since…”里的日期和代理
+名单的连接词会混进中文——现在日期和列表都跟着界面语言走。设置页的文档配图以前顶部被裁掉。
+
+### 这一轮我自己拍板的决定
+
+- **没有在你的真实配置上点“接入”。** 测试用的开发版运行在临时目录里，它写入的钩子会指向
+  那个临时目录；所以只做了 `install --dry-run --recommended`（计划正确：11 个代理各改对了
+  文件），真正的接入留给你用正式安装的 0.3.0 来做。
+- **测试版适配器默认会被欢迎引导勾选**，实验性的不会。理由：测试版写的是官方文档里的格式，
+  而且任何故障下桥接程序都静默成功；但它们没被真实代理验证过，所以文档里到处写着这一点。
+- **会话发现默认开启。** 它只读日志末尾、内容只留在内存里；README 的隐私一节和“设置 → 会话”
+  都写明了，可以一键关掉。
+- **截图范围。** 在你桌面上验证时，截图只截应用自己的窗口或岛屿所在的那一条，没有截你的
+  其他窗口；公开文档里没有任何你的真实用量数字或配置内容。
+- **没做的**（已写进路线图）：完成后带回复内容的卡片、Kimi / Devin / Mistral Vibe 等 TOML
+  配置的适配器、从 ZCode 数据库发现会话、主题、SSH 远程。
+
+## 第二轮（0.2.0）做了什么
 
 你的要求是两件事：重写 git 历史；参考 erha19/ping-island 重做 UI、UX、设计、README、官网
 和音效。
@@ -55,7 +130,7 @@
   里试听（与应用同一套音符，有测试保证两边一致）。文字全部原创。
 - **Claude Code 的 `StopFailure` 钩子**已接入（共 12 个事件）。
 
-## 这一轮我自己拍板的决定
+### 第二轮拍板的决定
 
 - **参考的是结构和交互，不是素材。** 没有复制参考项目的任何图标、图形、音频、代码或文案。
   小生物是我自己设计的海岛主题，音效是用几个音符现场合成的。
@@ -76,25 +151,29 @@
 
 | 项目 | 状态 |
 |---|---|
-| 岛屿的手感（悬停、点击外部、动画、透明区域点击穿透） | **未验证。** 只有渲染图和脚本量到的窗口位置（收起 `y=0`、展开 `w=640`） |
+| 任何一个测试版适配器配合真实代理（含 Codex、ZCode 的审批） | **未验证。** 格式对照过文档和你机器上的配置文件；没有真正接入过 |
+| 在岛上批准真实代理发来的请求 | **未验证。** 看到过真实会话的状态；审批只用模拟请求走过 |
+| MacBook 自带的刘海屏、双显示器、桌面上自动隐藏的菜单栏、全屏下菜单栏常驻 | 未验证。菜单栏跟随只在一块外接无刘海显示器上逐帧核对过 |
 | 内置音效好不好听 | **未验证。** 没人听过 |
-| 带摄像头挖孔的屏幕 | 未验证。开发机没有刘海，那套布局只存在于渲染图里 |
-| 多显示器、切换主屏幕、改分辨率后的位置 | 未验证 |
-| 真实 Claude Code 会话 | 未验证（原因见文末） |
-| 点击通知 / 会话行跳回终端 | 未验证；本机没有 iTerm2 |
-| 登录时启动（`SMAppService`） | 未验证，只在打包后的应用里可用 |
-| 用浏览器下载 dmg 后经过 Gatekeeper 的完整流程 | 未验证。发布文件是用命令行下载核对的，不带隔离标记；dmg 本身验证过可挂载、内含应用签名有效、双架构可运行 |
-| 所有实验性适配器、Intel 硬件、全新账户 | 未验证 |
-| 你真实的 `~/.claude/settings.json` | **从未被修改** |
+| 欢迎引导里点“接入”之后的整条链路 | 未验证（它调用的安装器有测试；我没在真实配置上点过） |
+| 设置里的每一个开关 | 页面都对着运行中的应用看过；不是每个开关都手动拨过 |
+| 用量页的“重置”按钮手感 | 逻辑有测试；没在界面上点过 |
+| 点击通知 / 会话行跳回终端或桌面端 | 未验证；本机没有 iTerm2 |
+| 登录时启动（`SMAppService`）、全局快捷键 ⌃⌥I 与其他应用冲突的情况 | 未验证 |
+| 用浏览器下载 dmg 后经过 Gatekeeper 的完整流程 | 未验证。发布文件是用命令行下载核对的，不带隔离标记 |
+| Intel 硬件、全新账户、实验性适配器 | 未验证。Intel 版只在 Rosetta 下运行过 |
 
 本机没有 `shellcheck`，lint 只在 CI 里跑。
 
 ## 需要你决定的事
 
-1. **0.2.0 已发布。** 以后发版的步骤：改 `Sources/NikoCore/Version.swift`，在
-   `CHANGELOG.md` 加上 `## [<版本>] - <日期>` 一节（发布说明取自这一节），推送 `main` 并等
-   CI 变绿，然后打与版本号一致的标签并推送；`release.yml` 会构建通用二进制，生成 dmg、zip
-   和校验和并发布。
+1. **发版步骤。** 改 `Sources/NikoCore/Version.swift`，在 `CHANGELOG.md` 加上
+   `## [<版本>] - <日期>` 一节（发布说明取自这一节），推送 `main` 并等 CI 变绿，然后打与
+   版本号一致的标签并推送；`release.yml` 会运行 `scripts/make-release.sh`，分别构建
+   Apple 芯片版和 Intel 版，各生成 dmg、zip，加一份校验和并发布。
+   **升级到 0.3.0 之后请做两件事**：在欢迎引导或“设置 → 代理”里接入你在用的代理
+   （Codex 还要在它里面输入 `/hooks` 信任一次；ZCode 要重开会话），然后各触发一次审批，
+   看岛上能不能批。哪个不行就告诉我是哪个代理、表现是什么。
 2. **致谢里是否点名参考项目。** 新设计的布局思路来自 erha19/ping-island（Apache-2.0）。
    点名致谢是开源里的常规做法，但你之前的要求是不使用第三方产品名，所以我没有擅自加。
    想加的话在两份 README 的“致谢 / Acknowledgments”一节补一句即可。
@@ -106,59 +185,36 @@
 5. **INTEGRATIONS.md 的两处疑点**（issue #4）和**你机器上已有其他工具的钩子**（两者会同时
    收到审批请求，Claude Code 如何合并我没有验证）依然有效，见文末。
 
-## 5 分钟验收（0.2.0）
+## 5 分钟验收（0.3.0）
 
-如果 0.1.0 正在运行，先退出它（两个实例会抢同一个套接字）。下面的命令用的是从源码构建的
-`dist/` 路径；如果你是从 Releases 下载 dmg 安装的，把 `dist/Niko Island.app` 换成
-`/Applications/Niko Island.app` 即可（记得先执行一次 `xattr -cr`）。
+用正式安装的应用来做（`/Applications/Niko Island.app`，Apple 芯片的 Mac 下载
+`apple-silicon` 那个 dmg，装好后执行一次 `xattr -cr "/Applications/Niko Island.app"`）。
+如果旧版本正在运行，先退出它。
 
-1. **1 分钟 — 构建并打开。**
+1. **1 分钟 — 欢迎引导。** 打开应用：应该出现全屏的欢迎页。点“开始”，第二页应该列出你
+   机器上的代理，Claude、Codex、ZCode 旁边标着“正在运行”。勾选你要的，点“接入”。
+   （不想现在接入就点“暂不接入”，什么都不会改。）
+2. **1 分钟 — 会话自己出现。** 不用做任何事：Claude 桌面端、Codex 桌面端里开着的会话应该
+   在几秒内出现在岛上，带“桌面端”小标签。
+3. **1 分钟 — 菜单栏跟随。** 把任意应用切到全屏，再在它和桌面之间来回滑：岛屿应该像
+   菜单栏一样随桌面滑走、滑回，全屏里不出现；把指针顶到屏幕最上沿，岛屿随菜单栏一起落下。
+4. **1 分钟 — 用量。** 点岛上的柱状图图标：顶部可以切 全部 / Claude Code / Codex / ZCode；
+   点“重置”，“重置以来”从零开始。
+5. **1 分钟 — 审批（这一步我没替你做过）。** 在已接入的代理里触发一次需要批准的操作，
+   在岛上点“允许一次”。Codex 需要先 `/hooks` 信任；ZCode 需要新开会话。
+6. **想撤回：** `~/.niko-island/bin/niko-island uninstall`，所有带 `niko-bridge` 的条目都会
+   被移除，你的代理照常工作。
 
-   ```bash
-   cd niko-island
-   scripts/make-app.sh && open "dist/Niko Island.app"
-   ```
-
-   屏幕顶部正中应出现一枚黑色小标签，紧贴屏幕上沿、盖在菜单栏上。把指针停上去：它应该
-   弹开；移开后收起。点击它或菜单栏图标：保持展开；点击别处：收起。
-2. **1 分钟 — 不改任何配置，用假事件走一遍审批。**
-
-   ```bash
-   B="dist/Niko Island.app/Contents/Helpers/niko-bridge"
-   echo '{"hook_event_name":"UserPromptSubmit","session_id":"demo","cwd":"'$PWD'","prompt":"试试小岛"}' | "$B" --source claude
-   echo '{"hook_event_name":"PermissionRequest","session_id":"demo","cwd":"'$PWD'","tool_name":"Bash","tool_input":{"command":"git push"}}' | "$B" --source claude
-   ```
-
-   岛屿应自己展开并显示这条命令；点“允许一次”，终端里打印出含 `"behavior":"allow"` 的
-   JSON，岛屿随之收起。
-3. **1 分钟 — 听音效。** 点岛屿上的齿轮 → 音效 → 打开“播放音效”，逐个点试听按钮，
-   “岛屿”和“8-bit”两套都听一遍。
-4. **1.5 分钟 — 接入真实的 Claude Code（issue #1）。**
-
-   ```bash
-   "dist/Niko Island.app/Contents/MacOS/niko-island" install --dry-run
-   "dist/Niko Island.app/Contents/MacOS/niko-island" install
-   ```
-
-   在某个项目里启动 `claude`：岛屿上应出现一只海星并随操作变化；触发一次权限请求，在岛屿
-   上决定。没有反应就运行 `~/.niko-island/bin/niko-island doctor`。
-5. **30 秒 — 卸载并确认还原。**
-
-   ```bash
-   ~/.niko-island/bin/niko-island uninstall
-   diff ~/.claude/settings.json "$(ls ~/.claude/settings.json.niko-backup-* | head -n 1)" && echo identical
-   ```
-
-完整的手测清单（含音效、设置窗口、通知）见 [docs/TESTPLAN.md](docs/TESTPLAN.md)；路线图见
-[docs/ROADMAP.md](docs/ROADMAP.md)。
+完整的手测清单见 [docs/TESTPLAN.md](docs/TESTPLAN.md)（☑ 是这一轮在你桌面上看过的，☐ 是
+还没人做过的）；路线图见 [docs/ROADMAP.md](docs/ROADMAP.md)。
 
 ## 测试怎么跑
 
 ```bash
-scripts/check.sh                     # 全部 250 个测试，失败时非零退出
+scripts/check.sh                     # 全部 292 个测试，失败时非零退出
 scripts/check.sh --filter Installer  # 只跑一部分
 scripts/make-app.sh                  # → dist/Niko Island.app（本机架构，ad-hoc 签名）
-scripts/make-app.sh --universal --zip --dmg   # 发布工作流用的就是这一条
+scripts/make-release.sh              # 发布工作流用的就是这一条：两种架构的 dmg + zip，并逐一验证
 scripts/smoke-launch.sh              # 启动真实 .app：冷启动、岛屿位置与展开、退出时放行
 scripts/make-assets.sh               # 重新生成图标与 docs/website 配图、GIF、小生物
 ```
@@ -166,7 +222,10 @@ scripts/make-assets.sh               # 重新生成图标与 docs/website 配图
 测试从不触碰真实的 `~/.claude` 或 `~/.niko-island`：一律使用 `/private/tmp/nk-*` 下的临时
 目录（`--home` 与 `NIKO_ISLAND_HOME`）。排查集成问题用 `niko-island doctor` 和
 `niko-island internal listen 60`（无界面监听，只打印事件名和字段名）。调试岛屿窗口时可设
-`NIKO_ISLAND_DEBUG=1`，应用会打印岛屿的位置和尺寸。
+`NIKO_ISLAND_DEBUG=1`，应用会打印岛屿的位置、尺寸，以及每次位置变化时的
+`island placement surface=… lift=… bar=…`。`niko-island internal scout` 打印从会话日志里
+发现了哪些会话。启动参数 `-NikoOnboardingDisabled YES` 跳过欢迎引导，
+`-NikoOpenSettings <页>`、`-NikoOpenIsland sessions|usage` 直接打开对应界面（截图用）。
 
 ---
 

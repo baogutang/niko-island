@@ -6,7 +6,7 @@ import Carbon.HIToolbox
 @MainActor
 final class Hotkey {
     static let shared = Hotkey()
-    static let display = "⌃⌥I"
+    nonisolated static let display = "⌃⌥I"
 
     var action: (() -> Void)?
     private var hotKey: EventHotKeyRef?

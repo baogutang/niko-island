@@ -16,6 +16,23 @@ enum Localization {
         }
     }
 
+    /// Dates are written in the language the strings are in, keeping the user's
+    /// own region and clock settings. Without this a pinned language (or a Mac
+    /// whose language and region differ) mixes two languages in one sentence.
+    static var locale: Locale {
+        let language = bundle.preferredLocalizations.first ?? "en"
+        var components = Locale.Components(locale: .current)
+        components.languageComponents = Locale.Language.Components(identifier: language)
+        return Locale(components: components)
+    }
+
+    /// "A, B and C" in the language the strings are in.
+    static func list(_ items: [String]) -> String {
+        let formatter = ListFormatter()
+        formatter.locale = locale
+        return formatter.string(from: items) ?? items.joined(separator: ", ")
+    }
+
     static func string(_ key: String) -> String {
         bundle.localizedString(forKey: key, value: key, table: nil)
     }

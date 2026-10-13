@@ -26,29 +26,45 @@ today.
 | Claude Code `StopFailure` hook | Wired; covered by installer and store tests |
 | Disk image (`.dmg`) next to the zip | Built and checked by the release workflow: it mounts, and the app inside passes the signature check |
 
-0.2.0 went out before sections 1 to 5 of `TESTPLAN.md` had been worked through
-by a person. That is the first item below.
+0.2.0 went out before anyone had tried the island by hand. 0.3.0 is the answer
+to what turned up when somebody did.
+
+## Released: 0.3.0
+
+| Area | State |
+|---|---|
+| Following the menu bar across desktops and full-screen apps | Built as two windows plus placement rules that are covered by tests. Checked by hand, frame by frame, on macOS 15 with one external display without a camera housing. Not tried: a MacBook's own display, two displays, a menu bar that hides on the desktop |
+| Sessions from the agents' own session logs (Claude Code, Codex) | Built and covered by parser, scout and merge tests; seen working with the Claude and Codex desktop apps |
+| Welcome on first launch, with agent detection and one-click connect | Built; looked at in the running app. Connecting from it uses the same installer as the command line |
+| Adapters per agent format: Codex, ZCode, Cursor, Windsurf, Gemini CLI, Trae, Qwen Code, CodeBuddy, Factory, Grok CLI | Beta: each writes what the agent's own hook reference describes and is covered by installer and bridge tests. None has been driven against the live agent by us |
+| Approvals for Codex and ZCode | Beta, same caveat |
+| Usage per agent: five hours, today, seven days, a resettable counter; Codex limits; ZCode usage | Built and covered by tests; the view was looked at in the running app |
+| Settings: look, timing, display, full-screen policy, session retention, language, global shortcut, creature per agent | Built; the pages were looked at in the running app, not every switch was flipped by hand |
+| One package per architecture (Apple silicon, Intel) | Built and verified by `scripts/make-release.sh`; the Intel app has only run under Rosetta |
 
 ## Next
 
-1. **Try the island by hand** (`TESTPLAN.md`), tune the timings and the sounds
-   by ear, and replace the rendered pictures in the README with real captures.
-2. **Check the layout on a display with a camera housing.** It has only been
-   rendered, never seen on hardware.
-3. **Validate the experimental adapters against live agents**, one at a time,
-   and promote the ones that hold up to the default install. Until an agent's
-   hook format is confirmed, its adapter stays opt-in.
-4. **Approvals for more agents.** Each agent has its own decision contract;
-   they are added only after being verified.
-5. **Notarized builds** if the project gets a signing identity. Until then
+1. **Drive the beta adapters against their live agents**, Codex and ZCode
+   first (they can approve), and move the ones that hold up to stable.
+   `TESTPLAN.md` section 10.
+2. **Try the island on a MacBook's own display** and with two displays. The
+   camera-housing layout has only been rendered, never seen on hardware.
+3. **Click a real approval through** from the island with a live Claude Code
+   session, and work through the rest of `TESTPLAN.md`.
+4. **Listen to the built-in sounds** and tune them by ear.
+5. **ZCode sessions without hooks**, from its local database, the way Claude
+   Code and Codex sessions are found today.
+6. **A finished-turn card**: the last reply and a way to answer, right on the
+   island, instead of only a notice.
+7. **Notarized builds** if the project gets a signing identity. Until then
    releases stay ad-hoc signed.
-6. **Onboarding window** for first launch (today the empty state and
-   Settings → Agents do this job).
 
 ## Planned, not started
 
-- Adapters for Kimi Code, DeepSeek CLI, Droid, Pi / OhMyPi, OpenClaw, Amp.
-- Choosing which display the island lives on.
+- Adapters for Kimi Code, Devin, Mistral Vibe, DeepSeek CLI, Pi / OhMyPi,
+  OpenClaw, Amp. Several of these configure hooks in TOML, which the installer
+  does not write yet.
+- Themes beyond the accent colour.
 - Sounds that respect Focus modes.
 - Usage numbers from vendors' own APIs, with the user's own credentials, sent
   directly to the vendor and only when switched on.

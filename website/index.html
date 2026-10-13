@@ -4,11 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Niko Island — an island for your AI coding agents</title>
-<meta name="description" content="Free, open-source macOS app that hangs a small island from the top of your screen: see what every AI coding agent in your terminals is doing, approve and answer on the spot. No telemetry, no account, everything local.">
+<meta name="description" content="Free, open-source macOS app that hangs a small island from the top of your screen: see what every AI coding agent on your Mac is doing, approve and answer on the spot. It moves with the menu bar and finds your sessions by itself. No telemetry, no account, everything local.">
 <meta name="theme-color" content="#07080b">
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="Niko Island">
-<meta property="og:description" content="An island at the top of your screen for the AI coding agents in your terminals.">
+<meta property="og:description" content="An island at the top of your screen for the AI agents that write your code.">
 <meta property="og:image" content="https://baogutang.github.io/niko-island/island-sessions.png">
 <style>
   :root {
@@ -213,7 +213,7 @@
   .center .sub { margin-left: auto; margin-right: auto; }
 
   /* Creatures */
-  .creatures { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)); gap: 12px; }
+  .creatures { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 900px) { .creatures { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   @media (max-width: 520px) { .creatures { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .creature { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 8px 14px; text-align: center; min-width: 0; }
@@ -269,6 +269,7 @@
   .chip.plain { padding-left: 14px; color: var(--muted); }
   .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
   .dot.stable { background: var(--mint); }
+  .dot.beta { background: var(--sky); }
   .dot.experimental { background: var(--amber); }
   .dot.planned { background: var(--faint); }
   .legend { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 13.5px; margin-top: 18px; }
@@ -346,7 +347,7 @@
     <div class="wrap">
       <div class="kicker" data-i18n="hero.kicker">Free · open source · no telemetry</div>
       <h1 data-i18n="hero.title">Your agents work. <em>The island keeps watch.</em></h1>
-      <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent in your terminals is doing, opens when one needs you, and lets you approve or answer on the spot.</p>
+      <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent on your Mac is doing, moves with the menu bar, opens when one needs you, and lets you approve or answer on the spot.</p>
       <div class="cta">
         <a class="button primary" href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="hero.download">Download for macOS</a>
         <a class="button ghost" href="https://github.com/baogutang/niko-island" data-i18n="hero.github">View on GitHub</a>
@@ -456,12 +457,13 @@
   <section id="creatures">
     <div class="wrap center">
       <h2 data-i18n="creatures.title">One creature per agent</h2>
-      <p class="sub" data-i18n="creatures.sub">Each agent gets its own pixel creature, drawn in code, so you can tell sessions apart before you read a word.</p>
+      <p class="sub" data-i18n="creatures.sub">Each agent gets its own pixel creature, drawn in code, so you can tell sessions apart before you read a word. Swap them around in Settings if you like.</p>
       <div class="creatures">
         <div class="creature"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt="Starfish" data-i18n-alt="cr.starfish"><b data-i18n="cr.starfish">Starfish</b><span>Claude Code</span></div>
-        <div class="creature"><img class="pixel" src="mascots/whale.gif" width="56" height="56" alt="Whale" data-i18n-alt="cr.whale"><b data-i18n="cr.whale">Whale</b><span>Codex CLI</span></div>
-        <div class="creature"><img class="pixel" src="mascots/boat.gif" width="56" height="56" alt="Boat" data-i18n-alt="cr.boat"><b data-i18n="cr.boat">Boat</b><span>Cursor CLI · Windsurf</span></div>
-        <div class="creature"><img class="pixel" src="mascots/gull.gif" width="56" height="56" alt="Gull" data-i18n-alt="cr.gull"><b data-i18n="cr.gull">Gull</b><span>Copilot CLI</span></div>
+        <div class="creature"><img class="pixel" src="mascots/whale.gif" width="56" height="56" alt="Whale" data-i18n-alt="cr.whale"><b data-i18n="cr.whale">Whale</b><span>Codex</span></div>
+        <div class="creature"><img class="pixel" src="mascots/crab.gif" width="56" height="56" alt="Crab" data-i18n-alt="cr.crab"><b data-i18n="cr.crab">Crab</b><span>ZCode</span></div>
+        <div class="creature"><img class="pixel" src="mascots/boat.gif" width="56" height="56" alt="Boat" data-i18n-alt="cr.boat"><b data-i18n="cr.boat">Boat</b><span>Cursor · Windsurf</span></div>
+        <div class="creature"><img class="pixel" src="mascots/gull.gif" width="56" height="56" alt="Gull" data-i18n-alt="cr.gull"><b data-i18n="cr.gull">Gull</b><span>Copilot CLI · CodeBuddy</span></div>
         <div class="creature"><img class="pixel" src="mascots/jellyfish.gif" width="56" height="56" alt="Jellyfish" data-i18n-alt="cr.jellyfish"><b data-i18n="cr.jellyfish">Jellyfish</b><span>Gemini CLI · Qwen Code</span></div>
         <div class="creature"><img class="pixel" src="mascots/turtle.gif" width="56" height="56" alt="Turtle" data-i18n-alt="cr.turtle"><b data-i18n="cr.turtle">Turtle</b><span>OpenCode · MiMoCode</span></div>
         <div class="creature"><img class="pixel" src="mascots/octopus.gif" width="56" height="56" alt="Octopus" data-i18n-alt="cr.octopus"><b data-i18n="cr.octopus">Octopus</b><span>Trae · Kiro</span></div>
@@ -477,28 +479,36 @@
       <p class="sub" data-i18n="features.sub">Built for the moment an agent stops and waits while you are looking at something else.</p>
       <div class="grid">
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="8" width="18" height="8" rx="4"/><circle cx="8" cy="12" r="1.1" fill="currentColor"/></svg><h3 data-i18n="f1.t">Quiet until it matters</h3><p data-i18n="f1.d">Collapsed, the island is one creature and a few words. It opens by itself only when an agent is blocked on you, and never takes keyboard focus.</p></div>
-        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.2 9.8"/></svg><h3 data-i18n="f2.t">Decide in place</h3><p data-i18n="f2.d">Allow once, always allow a tool, allow everything for the session, deny, or hand the decision back to the terminal. Nothing is decided for you.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 8.5h18"/><rect x="9" y="4" width="6" height="4.5" rx="1.6" fill="currentColor" stroke="none"/></svg><h3 data-i18n="f9.t">Moves with the menu bar</h3><p data-i18n="f9.d">Slide to a full-screen app and the island leaves with the desktop. Push the pointer to the top and it comes down together with the menu bar. A request for a decision can still drop in.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/><path d="M8.5 11h5M11 8.5v5"/></svg><h3 data-i18n="f10.t">Finds your sessions</h3><p data-i18n="f10.d">Claude Code and Codex sessions are listed from the agents' own session logs: desktop apps, sessions that were already open, agents you have not connected yet.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.8 2.8L16.2 9.8"/></svg><h3 data-i18n="f2.t">Decide in place</h3><p data-i18n="f2.d">Allow once, always allow a tool, allow everything for the session, deny, or hand the decision back to the agent. Nothing is decided for you.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="2"/><rect x="13.5" y="3.5" width="7" height="7" rx="2"/><rect x="3.5" y="13.5" width="7" height="7" rx="2"/><rect x="13.5" y="13.5" width="7" height="7" rx="2"/></svg><h3 data-i18n="f3.t">Questions as tiles</h3><p data-i18n="f3.d">When an agent asks you to choose, its options become big tiles: single or multiple choice, with room to type something else.</p></div>
-        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M13 4h7v7M20 4l-9 9"/></svg><h3 data-i18n="f4.t">Back to the right tab</h3><p data-i18n="f4.d">Click a row or a notification and that session's Terminal.app or iTerm2 tab comes to the front, tmux panes included.</p></div>
-        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 10v1M15 10v1M9 15h6"/></svg><h3 data-i18n="f5.t">Chips that orient you</h3><p data-i18n="f5.d">Every row says how long, which agent and which terminal, next to what the agent is doing right now.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 5H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3"/><path d="M13 4h7v7M20 4l-9 9"/></svg><h3 data-i18n="f4.t">Back to the right window</h3><p data-i18n="f4.d">Click a row or a notification and that session's Terminal.app or iTerm2 tab comes to the front, tmux panes included. A desktop-app session brings its app forward.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M9 10v1M15 10v1M9 15h6"/></svg><h3 data-i18n="f5.t">Chips that orient you</h3><p data-i18n="f5.d">Every row says how long, which agent and where it runs, next to what the agent is doing right now.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><h3 data-i18n="f11.t">Yours to shape</h3><p data-i18n="f11.d">Accent colour, width, row density, which chips, hover timing, which display, language, and a global shortcut (⌃⌥I) that opens the island from anywhere.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.2 5.2L20 9l-4.3 3.9L17 19l-5-3-5 3 1.3-6.1L4 9l5.8-.8z"/></svg><h3 data-i18n="f12.t">A welcome that sets things up</h3><p data-i18n="f12.d">The first launch finds the agents on your Mac, shows which are running, and connects the ones you tick. Every change is backed up and can be taken out again.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l4 3.5v-11L7 10H4z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5M17.5 7a7 7 0 0 1 0 10"/></svg><h3 data-i18n="f6.t">Sounds you choose</h3><p data-i18n="f6.d">Five moments, two built-in sets, macOS sounds, your own files or a sound pack. Everything is off until you switch it on.</p></div>
-        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M10 20V5M15 20v-7M20 20V8"/></svg><h3 data-i18n="f7.t">Usage, locally</h3><p data-i18n="f7.d">Tokens and estimated cost per model for today and the last seven days, read from the transcripts already on your disk.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M10 20V5M15 20v-7M20 20V8"/></svg><h3 data-i18n="f7.t">Usage per agent</h3><p data-i18n="f7.d">Claude Code, Codex, ZCode or all of them: the last five hours, today, seven days, and a counter you reset with a button. Read from files already on your disk.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.4-2.9 7.9-7 9.5-4.1-1.6-7-5.1-7-9.5V6l7-3z"/><path d="M9 12l2.2 2.2L15 10.4"/></svg><h3 data-i18n="f8.t">An installer you can trust</h3><p data-i18n="f8.d">It scans first, backs up, verifies and rolls back on failure. Uninstalling removes only what it added, and your agents keep working.</p></div>
       </div>
 
       <div class="show">
-        <img src="island-sessions.png" width="1290" height="640" loading="lazy" alt="The island open on five sessions with creatures, prompts, activity and chips" data-i18n-alt="show1.alt">
-        <div><h3 data-i18n="show1.t">Every session, one glance</h3><p data-i18n="show1.d">Flat rows, no chrome: the project, what you asked for, what the agent is doing this second. The ones waiting for you carry a bell.</p></div>
+        <img src="island-sessions.png" width="1290" height="782" loading="lazy" alt="The island open on six sessions with creatures, titles, activity and chips" data-i18n-alt="show1.alt">
+        <div><h3 data-i18n="show1.t">Every session, one glance</h3><p data-i18n="show1.d">Flat rows, no chrome: the project, what the session is about, what the agent is doing this second, its last reply. The ones waiting for you carry a bell.</p></div>
       </div>
       <div class="show flip">
         <img src="island-question.png" width="1290" height="1140" loading="lazy" alt="A question from an agent shown as four option tiles" data-i18n-alt="show2.alt">
         <div><h3 data-i18n="show2.t">Answer without going back</h3><p data-i18n="show2.d">A request stays on the island until you decide or the agent withdraws it. Clicking elsewhere puts the island away; it never answers for you.</p></div>
       </div>
       <div class="show">
-        <img src="island-usage.png" width="1290" height="652" loading="lazy" alt="Usage on the island: cost today and over seven days, models and rate-limit windows" data-i18n-alt="show3.alt">
-        <div><h3 data-i18n="show3.t">Know what today cost</h3><p data-i18n="show3.d">Per-model tokens and an estimate from public list prices, plus Claude's rate-limit windows. Counted on your Mac from files that are already there.</p></div>
+        <img src="island-usage.png" width="1290" height="689" loading="lazy" alt="Usage on the island for one agent: five hours, today, seven days and since reset, the agent's limits and its models" data-i18n-alt="show3.alt">
+        <div><h3 data-i18n="show3.t">Know what each agent cost</h3><p data-i18n="show3.d">Pick an agent: five hours, today, seven days, and a counter that starts over when you press Reset. Five-hour and weekly limits appear as Claude Code and Codex report them. Counted on your Mac from files that are already there.</p></div>
       </div>
-      <p class="caption" data-i18n="show.caption">These pictures are rendered by the app's own view code with sample sessions. None is a capture of a real desktop yet.</p>
+      <div class="show flip">
+        <img src="island-onboarding-agents.png" width="1440" height="900" loading="lazy" alt="The welcome screen listing the agents found on this Mac with tick boxes and a Connect button" data-i18n-alt="show4.alt">
+        <div><h3 data-i18n="show4.t">Set up before you finish your coffee</h3><p data-i18n="show4.d">The welcome looks for the agents you have, tells you which ones are running right now, and connects the ones you tick. Skip it and nothing is touched.</p></div>
+      </div>
+      <p class="caption" data-i18n="show.caption">These pictures are rendered by the app's own view code with sample sessions. They are renders, not captures of somebody's desktop.</p>
     </div>
   </section>
 
@@ -523,31 +533,36 @@
   <section id="agents">
     <div class="wrap">
       <h2 data-i18n="agents.title">Works with the agents you run</h2>
-      <p class="sub" data-i18n="agents.sub">Claude Code is supported end to end. The others are experimental: you switch them on yourself, and the island shows their status.</p>
+      <p class="sub" data-i18n="agents.sub">Claude Code is supported end to end. Codex and ZCode can be approved from the island too, in beta; the others show their status. Claude Code and Codex sessions are listed even before you connect anything.</p>
       <div class="agents">
         <span class="chip"><img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt=""><span class="dot stable"></span>Claude Code</span>
-        <span class="chip"><img class="pixel" src="mascots/whale.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Codex CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Cursor CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/gull.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Copilot CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Gemini CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Grok CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/whale.gif" width="22" height="22" alt=""><span class="dot beta"></span>Codex</span>
+        <span class="chip"><img class="pixel" src="mascots/crab.gif" width="22" height="22" alt=""><span class="dot beta"></span>ZCode</span>
+        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot beta"></span>Cursor</span>
+        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot beta"></span>Windsurf</span>
+        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot beta"></span>Gemini CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/octopus.gif" width="22" height="22" alt=""><span class="dot beta"></span>Trae</span>
+        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot beta"></span>Qwen Code</span>
+        <span class="chip"><img class="pixel" src="mascots/gull.gif" width="22" height="22" alt=""><span class="dot beta"></span>CodeBuddy</span>
+        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot beta"></span>Factory</span>
+        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot beta"></span>Grok CLI</span>
         <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot experimental"></span>OpenCode</span>
         <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot experimental"></span>MiMoCode</span>
-        <span class="chip"><img class="pixel" src="mascots/octopus.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Trae</span>
-        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Windsurf</span>
-        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Qwen Code</span>
+        <span class="chip"><img class="pixel" src="mascots/gull.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Copilot CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot experimental"></span>QwenWork</span>
         <span class="chip"><img class="pixel" src="mascots/octopus.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Kiro</span>
-        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Factory</span>
         <span class="chip plain"><span class="dot planned"></span>Kimi Code</span>
+        <span class="chip plain"><span class="dot planned"></span>Devin</span>
+        <span class="chip plain"><span class="dot planned"></span>Mistral Vibe</span>
         <span class="chip plain"><span class="dot planned"></span>DeepSeek CLI</span>
-        <span class="chip plain"><span class="dot planned"></span>Droid</span>
         <span class="chip plain"><span class="dot planned"></span>Pi</span>
         <span class="chip plain"><span class="dot planned"></span>OpenClaw</span>
         <span class="chip plain"><span class="dot planned"></span>Amp</span>
       </div>
       <div class="legend">
-        <span><span class="dot stable"></span><span data-i18n="legend.stable">Stable: tested end to end against the documented hook contract</span></span>
-        <span><span class="dot experimental"></span><span data-i18n="legend.experimental">Experimental: opt-in, not yet validated against the live agent</span></span>
+        <span><span class="dot stable"></span><span data-i18n="legend.stable">Stable: wired end to end and covered by tests</span></span>
+        <span><span class="dot beta"></span><span data-i18n="legend.beta">Beta: writes the format the agent's own hook reference describes; we have not driven it against the live agent yet</span></span>
+        <span><span class="dot experimental"></span><span data-i18n="legend.experimental">Experimental: installed only when you pick it; format not validated yet</span></span>
         <span><span class="dot planned"></span><span data-i18n="legend.planned">Planned</span></span>
       </div>
       <p class="fine" style="margin: 18px 0 0" data-i18n="agents.status">The README lists exactly <a href="https://github.com/baogutang/niko-island#what-was-and-was-not-verified">what was and was not verified</a>, including the hands-on checks still to do.</p>
@@ -564,6 +579,7 @@
           <li data-i18n="p2"><strong>One optional download, off by default:</strong> a public list of model prices for the cost estimates. That is the only network code in the project.</li>
           <li data-i18n="p3"><strong>Owner-only local channel.</strong> Agents reach the app through a socket in a private directory, and the app checks who is calling on every message.</li>
           <li data-i18n="p4"><strong>Trimmed at the source, kept in memory.</strong> Tool output is dropped and long text in status events is shortened before it leaves the agent. Nothing from an event is written to disk; the usage database holds numbers and identifiers, never prompts or replies.</li>
+          <li data-i18n="p7"><strong>Session logs are read, never changed.</strong> To list sessions and count tokens the app reads the logs Claude Code and Codex keep on your disk. A title or a last reply is held in memory while its row is shown, and goes nowhere.</li>
           <li data-i18n="p5"><strong>Your credentials are never read.</strong> No keys, no tokens, no proxying.</li>
           <li data-i18n="p6"><strong>Hooks you can audit.</strong> Every entry the installer writes contains <code>niko-bridge</code>. Search for it any time.</li>
         </ul>
@@ -584,8 +600,8 @@
       <p class="sub" data-i18n="install.sub">The app is ad-hoc signed because the project has no Apple Developer account, so macOS will not open a downloaded copy until you clear its quarantine flag once. After that it opens like any other app.</p>
       <div class="steps">
         <div class="step"><div>
-          <h3 data-i18n="s1.t">Download the disk image</h3>
-          <p><a href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="s1.d">Get the latest .dmg from GitHub (a .zip is there too)</a></p>
+          <h3 data-i18n="s1.t">Download the build for your Mac</h3>
+          <p><a href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="s1.d">Get the .dmg from GitHub</a><span data-i18n="s1.e">: <b>apple-silicon</b> for a Mac with an M-series chip, <b>intel</b> for a Mac with an Intel processor. Apple menu → About This Mac tells you which. A .zip of each is there too.</span></p>
         </div></div>
         <div class="step"><div>
           <h3 data-i18n="s2.t">Drag it to Applications and open it</h3>
@@ -594,12 +610,12 @@
 open "/Applications/Niko Island.app"</pre>
         </div></div>
         <div class="step"><div>
-          <h3 data-i18n="s3.t">Connect Claude Code</h3>
-          <p data-i18n="s3.d">Look at the plan first. Nothing changes until the second command. You can also do this from the Agents page in Settings.</p>
+          <h3 data-i18n="s3.t">Let the welcome connect your agents</h3>
+          <p data-i18n="s3.d">The first launch finds the agents on your Mac and connects the ones you tick; the Agents page in Settings does the same later. Prefer the terminal? Look at the plan first: nothing changes until the second command.</p>
 <pre><span class="c" data-i18n="s3.c1"># show what would change</span>
-"/Applications/Niko Island.app/Contents/MacOS/niko-island" install --dry-run
-<span class="c" data-i18n="s3.c2"># apply it (a backup of your config is kept next to it)</span>
-"/Applications/Niko Island.app/Contents/MacOS/niko-island" install</pre>
+"/Applications/Niko Island.app/Contents/MacOS/niko-island" install --dry-run --recommended
+<span class="c" data-i18n="s3.c2"># apply it (a backup of each config is kept next to it)</span>
+"/Applications/Niko Island.app/Contents/MacOS/niko-island" install --recommended</pre>
         </div></div>
         <div class="step"><div>
           <h3 data-i18n="s4.t">Changed your mind?</h3>
@@ -630,7 +646,7 @@ open "dist/Niko Island.app"</pre>
             <tr><td data-i18n="c.r4">Tracking</td><td data-i18n="c.r4a">None, and you can verify it</td><td data-i18n="c.r4b">You take their word for it</td></tr>
             <tr><td data-i18n="c.r5">Direction</td><td data-i18n="c.r5a">Issues and pull requests</td><td data-i18n="c.r5b">The vendor's roadmap</td></tr>
             <tr><td data-i18n="c.r6">Code signing</td><td data-i18n="c.r6a">Ad-hoc: one extra step at first launch</td><td data-i18n="c.r6b">Usually notarized</td></tr>
-            <tr><td data-i18n="c.r7">Agent coverage today</td><td data-i18n="c.r7a">One stable integration, the rest experimental</td><td data-i18n="c.r7b">Often broader</td></tr>
+            <tr><td data-i18n="c.r7">Agent coverage today</td><td data-i18n="c.r7a">One stable integration, the rest in beta or experimental</td><td data-i18n="c.r7b">Often broader</td></tr>
           </tbody>
         </table>
       </div>
@@ -652,7 +668,7 @@ open "dist/Niko Island.app"</pre>
     "nav.features": "功能", "nav.agents": "代理", "nav.sounds": "音效", "nav.privacy": "隐私", "nav.install": "安装",
     "hero.kicker": "免费 · 开源 · 无遥测",
     "hero.title": "代理干活，<em>小岛放哨。</em>",
-    "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示终端里每个 AI 编程代理正在做什么，有代理需要你时自动展开，让你当场批准或回答。",
+    "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示这台 Mac 上每个 AI 编程代理正在做什么，跟着菜单栏一起走，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
     "hero.fine": "macOS 14 及以上 · Apple 芯片与 Intel · MIT 许可",
     "demo.running": "正在运行 swift test", "demo.finished": "已完成 ✓", "demo.count": "3 个会话",
@@ -665,26 +681,32 @@ open "dist/Niko Island.app"</pre>
     "demo.tab1": "工作中", "demo.tab2": "需要你", "demo.tab3": "全部会话", "demo.tab4": "已完成",
     "demo.caption": "这是岛屿在浏览器里的示意，会话内容是虚构的。点它一下，或者选一个状态。",
     "creatures.title": "每个代理一只小生物",
-    "creatures.sub": "每个代理都有自己的像素小生物，全部用代码画成，不用读字就能分清会话。",
-    "cr.starfish": "海星", "cr.whale": "鲸鱼", "cr.boat": "小船", "cr.gull": "海鸥", "cr.jellyfish": "水母",
+    "creatures.sub": "每个代理都有自己的像素小生物，全部用代码画成，不用读字就能分清会话。想换的话，可以在设置里调换。",
+    "cr.starfish": "海星", "cr.whale": "鲸鱼", "cr.crab": "螃蟹", "cr.boat": "小船", "cr.gull": "海鸥", "cr.jellyfish": "水母",
     "cr.turtle": "海龟", "cr.octopus": "章鱼", "cr.puffer": "河豚", "cr.island": "小岛", "cr.other": "其他代理",
     "features.title": "干活时小小一块，需要你时才展开。",
     "features.sub": "为这样的时刻而做：你正看着别处，代理却停下来等你。",
     "f1.t": "平时安静，要紧时出现", "f1.d": "收起时，岛屿只有一只小生物和几个字。只有代理卡在等你时它才会自己展开，而且从不抢走键盘焦点。",
-    "f2.t": "就地决定", "f2.d": "允许一次、始终允许某个工具、本次会话全部允许、拒绝，或者把决定交还给终端。没有你的指示，什么都不会被批准。",
+    "f2.t": "就地决定", "f2.d": "允许一次、始终允许某个工具、本次会话全部允许、拒绝，或者把决定交还给代理。没有你的指示，什么都不会被批准。",
     "f3.t": "用卡片回答问题", "f3.d": "代理让你做选择时，选项会变成大号卡片：单选多选都行，也可以自己输入别的答案。",
-    "f4.t": "回到正确的标签页", "f4.d": "点一下会话行或通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位。",
-    "f5.t": "帮你定位的小标签", "f5.d": "每一行都写着时长、代理和所在终端，旁边是代理此刻正在做的事。",
+    "f4.t": "回到正确的窗口", "f4.d": "点一下会话行或通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位。桌面端的会话会把对应的应用带到前台。",
+    "f5.t": "帮你定位的小标签", "f5.d": "每一行都写着时长、代理和它在哪里运行，旁边是代理此刻正在做的事。",
     "f6.t": "音效由你决定", "f6.d": "五个时刻，两套内置音效，也可以用 macOS 系统声音、自己的文件或音效包。默认全部关闭。",
-    "f7.t": "本地的用量统计", "f7.d": "今天和最近七天每个模型的 token 数与估算费用，直接读取磁盘上已有的会话记录。",
+    "f7.t": "按代理分开的用量", "f7.d": "Claude Code、Codex、ZCode，或者全部：最近 5 小时、今天、7 天，以及一个可以一键重置的计数器。直接读取磁盘上已有的文件。",
+    "f9.t": "跟着菜单栏走", "f9.d": "滑到全屏应用时，岛屿会随桌面一起滑走。把指针推到屏幕顶端，它会和菜单栏一起落下来。需要你做决定的请求仍然可以出现。",
+    "f10.t": "自己找到你的会话", "f10.d": "直接从代理自己的会话日志里列出 Claude Code 和 Codex 的会话：桌面端、早就开着的会话、还没接入的代理。",
+    "f11.t": "按你的习惯来", "f11.d": "强调色、宽度、行距、显示哪些标签、悬停时间、放在哪块显示器、语言，还有一个随时打开岛屿的全局快捷键（⌃⌥I）。",
+    "f12.t": "替你把事情配好的欢迎引导", "f12.d": "首次启动会找出这台 Mac 上的代理，标出哪些正在运行，并接入你勾选的那些。每一处改动都有备份，也都能撤回。",
     "f8.t": "可以放心的安装器", "f8.d": "先扫描、再备份、写后校验、失败回滚。卸载时只删除它自己加的内容，你的代理照常工作。",
-    "show1.alt": "展开的岛屿上有五个会话，带小生物、提示词、当前动作和小标签",
-    "show1.t": "所有会话，一眼看全", "show1.d": "扁平的行，没有多余装饰：项目、你提的需求、代理这一秒在做什么。等你处理的那几个带着铃铛。",
+    "show1.alt": "展开的岛屿上有六个会话，带小生物、标题、当前动作和小标签",
+    "show1.t": "所有会话，一眼看全", "show1.d": "扁平的行，没有多余装饰：项目、会话在做什么事、代理这一秒在干什么、它的最后一条回复。等你处理的那几个带着铃铛。",
     "show2.alt": "代理的提问以四张选项卡片呈现",
     "show2.t": "不用回去也能回答", "show2.d": "请求会一直留在岛屿上，直到你做出决定或代理自己撤回。点击别处只会把岛屿收起，绝不会替你作答。",
-    "show3.alt": "岛屿上的用量：今天与七天的费用、各模型与速率限制窗口",
-    "show3.t": "今天花了多少，心里有数", "show3.d": "按模型统计的 token 数，加上按公开标价估算的费用，还有 Claude 的速率限制窗口。全部在你的 Mac 上，用已有的文件算出来。",
-    "show.caption": "这些图片由应用自身的界面代码配合示例会话渲染而成，目前还没有一张是真实桌面的截图。",
+    "show3.alt": "岛屿上某一个代理的用量：5 小时、今天、7 天和重置以来，代理的额度和各个模型",
+    "show3.t": "每个代理花了多少，心里有数", "show3.d": "选一个代理：最近 5 小时、今天、7 天，还有一个点一下“重置”就从头算起的计数器。5 小时和每周额度按 Claude Code 与 Codex 自己报告的显示。全部在你的 Mac 上，用已有的文件算出来。",
+    "show4.alt": "欢迎引导列出了这台 Mac 上找到的代理，带勾选框和“接入”按钮",
+    "show4.t": "一杯咖啡还没喝完就配好了", "show4.d": "欢迎引导会找出你装了哪些代理，告诉你此刻哪些正在运行，并接入你勾选的那些。跳过的话，什么都不会动。",
+    "show.caption": "这些图片由应用自身的界面代码配合示例会话渲染而成。它们是渲染图，不是谁的桌面截图。",
     "snd.title": "不用看，听就知道",
     "snd.sub": "五个时刻可以发出声音。两套内置音效只是应用现场合成的几个音符，安装包里不带任何音频文件。下面的按钮在你的浏览器里运行同一套配方。",
     "snd.started.t": "开始工作", "snd.started.d": "代理接下了你的提示词。",
@@ -696,8 +718,8 @@ open "dist/Niko Island.app"</pre>
     "snd.note": "音效默认关闭。想换别的？可以为每个时刻挑一个 macOS 系统声音，把自己的文件放进 <code>~/.niko-island/sounds/</code>，或者添加一个带 <code>openpeon.json</code> 清单的音效包文件夹。",
     "snd.alt": "设置窗口的音效页",
     "agents.title": "配合你正在用的代理",
-    "agents.sub": "Claude Code 已端到端支持。其余为实验性：由你自己开启，岛屿显示它们的状态。",
-    "legend.stable": "稳定：按公开的钩子约定完成端到端测试", "legend.experimental": "实验性：需手动开启，尚未在真实代理上验证", "legend.planned": "计划中",
+    "agents.sub": "Claude Code 已端到端支持。测试版的 Codex 和 ZCode 也可以在岛屿上审批；其余代理显示状态。Claude Code 和 Codex 的会话在你接入任何东西之前就会列出来。",
+    "legend.stable": "稳定：端到端打通并有测试覆盖", "legend.beta": "测试版：写入的是该代理官方钩子文档描述的格式；我们还没有用真实的代理跑通", "legend.experimental": "实验性：只有你点名时才安装；格式尚未验证", "legend.planned": "计划中",
     "agents.status": "README 里如实列出了<a href=\"https://github.com/baogutang/niko-island/blob/main/README.zh-CN.md\">哪些已经验证、哪些还没有</a>，包括仍需人工完成的检查。",
     "privacy.title": "无遥测。无账号。全部在本地。",
     "privacy.sub": "一个夹在你和代理之间的工具，应该很容易被核查。下面是它对你的数据所做的全部事情。",
@@ -705,16 +727,17 @@ open "dist/Niko Island.app"</pre>
     "p2": "<strong>只有一项可选下载，默认关闭：</strong>用于费用估算的公开模型价格表。这是整个项目里唯一的联网代码。",
     "p3": "<strong>仅本人可用的本地通道。</strong>代理通过私有目录里的套接字连接应用，应用会对每条消息核对调用者身份。",
     "p4": "<strong>在源头裁剪，只留在内存里。</strong>事件离开代理之前，工具输出会被丢弃，状态事件里的长文本会被截短。事件内容不会写入磁盘；用量数据库只保存数字和标识符，绝不保存提示词或回复。",
+    "p7": "<strong>会话日志只读取，不修改。</strong>为了列出会话和统计 token，应用会读取 Claude Code 和 Codex 保存在你磁盘上的日志。标题或最后一条回复只在该行显示期间留在内存里，不会发往任何地方。",
     "p5": "<strong>绝不读取你的凭据。</strong>不碰密钥、不碰令牌、不做代理转发。",
     "p6": "<strong>钩子可审计。</strong>安装器写入的每一条都包含 <code>niko-bridge</code>，随时可以搜索。",
     "tree.bin": "桥接与状态栏启动脚本", "tree.run": "本地套接字，仅本人可访问", "tree.cache": "速率限制、可选的价格表",
     "tree.data": "SQLite 里的 token 计数", "tree.sounds": "你自己添加的声音（如果有）", "tree.logs": "已脱敏的诊断日志",
     "install.title": "大约一分钟即可用上",
     "install.sub": "因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名，所以在你清除一次隔离标记之前，macOS 不会打开下载来的副本。之后它就和其他应用一样打开。",
-    "s1.t": "下载磁盘映像", "s1.d": "从 GitHub 获取最新的 .dmg（也提供 .zip）",
+    "s1.t": "下载适合你这台 Mac 的版本", "s1.d": "从 GitHub 获取 .dmg", "s1.e": "：M 系列芯片的 Mac 选 <b>apple-silicon</b>，Intel 处理器的 Mac 选 <b>intel</b>。苹果菜单 → 关于本机可以看到是哪一种。两种也都提供 .zip。",
     "s2.t": "拖到“应用程序”并打开", "s2.d": "打开磁盘映像，把 Niko Island 拖到“应用程序”上，再用下面的命令清除隔离标记。不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15 及更新版本上，先尝试打开一次，再到“系统设置 → 隐私与安全性”里点击“仍要打开”。",
-    "s3.t": "接入 Claude Code", "s3.d": "先看计划。在第二条命令之前不会改动任何东西。也可以在“设置”的“代理”页里完成。",
-    "s3.c1": "# 查看将要改动的内容", "s3.c2": "# 执行（会在旁边保留一份配置备份）",
+    "s3.t": "让欢迎引导替你接入代理", "s3.d": "首次启动会找出这台 Mac 上的代理，并接入你勾选的那些；之后在“设置”的“代理”页里也能做同样的事。更喜欢终端？先看计划：在第二条命令之前不会改动任何东西。",
+    "s3.c1": "# 查看将要改动的内容", "s3.c2": "# 执行（每份配置旁边都会保留一份备份）",
     "s4.t": "改主意了？", "s4.d": "卸载只会移除它自己的条目并恢复你的状态栏。你的代理照常工作。",
     "s5.t": "或者自己构建", "s5.d": "需要 macOS 14 及以上、Xcode 16 或更新版本。",
     "compare.title": "开源，是有意为之",
@@ -726,7 +749,7 @@ open "dist/Niko Island.app"</pre>
     "c.r4": "追踪", "c.r4a": "没有，并且可以自己验证", "c.r4b": "只能相信对方的说法",
     "c.r5": "发展方向", "c.r5a": "Issue 与 Pull Request", "c.r5b": "厂商的路线图",
     "c.r6": "代码签名", "c.r6a": "ad-hoc：首次启动多一步", "c.r6b": "通常已公证",
-    "c.r7": "目前的代理覆盖", "c.r7a": "一个稳定集成，其余为实验性", "c.r7b": "往往更广",
+    "c.r7": "目前的代理覆盖", "c.r7a": "一个稳定集成，其余为测试版或实验性", "c.r7b": "往往更广",
     "foot.license": "基于 MIT 许可发布。", "foot.roadmap": "路线图", "foot.issues": "问题反馈",
     "foot.disclaimer": "Niko Island 是独立项目，与任何 AI 厂商均无隶属、认可或赞助关系。产品名称仅用于说明本应用可以配合哪些工具使用。",
     "foot.nocookies": "本页面不从别处加载任何脚本，不设置 Cookie，也不统计访问量。"

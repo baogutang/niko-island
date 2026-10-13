@@ -80,7 +80,7 @@ final class DocsTests: XCTestCase {
     func testCommandsShownInDocsExist() throws {
         let help = NikoCLI.usage
         let docs = try ["README.md", "README.zh-CN.md", "docs/TESTPLAN.md", "website/index.html"].map(read).joined()
-        for flag in ["--dry-run", "--purge", "--agents", "--all"] {
+        for flag in ["--dry-run", "--purge", "--agents", "--all", "--recommended"] {
             XCTAssertTrue(help.contains(flag), "documented flag \(flag) is not in the CLI help")
             XCTAssertTrue(docs.contains(flag) || flag == "--all", flag)
         }
@@ -152,6 +152,58 @@ final class DocsTests: XCTestCase {
         for constant in ["0.004", "0.28", "0.08", "7.5", "0.012", "0.55", "0.5 / peak"] {
             XCTAssertTrue(html.contains(constant), "synth constant \(constant)")
         }
+    }
+
+    /// Releases ship one package per architecture and no universal build; the
+    /// pages that tell people what to download have to say the same thing the
+    /// build scripts do.
+    func testDownloadsArePerArchitecture() throws {
+        let release = try read("scripts/make-release.sh")
+        let makeApp = try read("scripts/make-app.sh")
+        for label in ["apple-silicon", "intel"] {
+            XCTAssertTrue(makeApp.contains("ARCH_LABEL=\"\(label)\""), label)
+            XCTAssertTrue(release.contains("\"\(label):"), label)
+            for page in ["README.md", "README.zh-CN.md", "website/index.html"] {
+                XCTAssertTrue(try read(page).contains(label), "\(page) does not say which download is \(label)")
+            }
+        }
+        XCTAssertFalse(makeApp.contains("--universal"), "no universal build")
+        for workflow in [".github/workflows/release.yml", ".github/workflows/ci.yml"] {
+            let text = try read(workflow)
+            XCTAssertTrue(text.contains("scripts/make-release.sh"), workflow)
+            XCTAssertFalse(text.contains("--universal"), workflow)
+        }
+        XCTAssertTrue(try read(".github/workflows/release.yml").contains("dist/release/SHA256SUMS"))
+    }
+
+    /// What the READMEs say about the new parts of 0.3.0 is what the code does.
+    func testReadmesDescribeDiscoveryAndUsageAsTheyAre() throws {
+        XCTAssertTrue(NikoSettings().discoverSessions, "the READMEs say sessions are found without connecting anything")
+        XCTAssertEqual(NikoSettings().fullScreenPolicy, .followMenuBar, "the READMEs call following the menu bar the default")
+        XCTAssertEqual(Hotkey.display, "⌃⌥I")
+        XCTAssertTrue(AgentRegistry.all.filter(\.approvals).map(\.id).sorted() == ["claude", "codex", "zcode"],
+                      "the READMEs name the agents that can be approved from the island")
+        for readme in ["README.md", "README.zh-CN.md"] {
+            let text = try read(readme)
+            for needle in ["~/.claude/projects/", "~/.codex/sessions/", Hotkey.display, "--recommended",
+                           "docs/images/island-onboarding-agents.png", "docs/images/island-settings-island.png", "docs/images/mascots/crab.gif"] {
+                XCTAssertTrue(text.contains(needle), "\(readme): \(needle)")
+            }
+        }
+    }
+
+    func testDatesAndListsFollowTheInterfaceLanguage() {
+        // Outside an app bundle the strings are English, so dates and lists must be too,
+        // whatever region this Mac is set to.
+        Localization.use(language: "system")
+        XCTAssertEqual(Localization.locale.language.languageCode?.identifier, "en")
+        let list = Localization.list(["Codex", "ZCode", "Cursor"])
+        XCTAssertTrue(list.contains("and"), list)
+        XCTAssertEqual(Localization.list(["Codex"]), "Codex")
+        let date = Date(timeIntervalSince1970: 1_791_000_000)
+        let text = date.formatted(Date.FormatStyle(date: .abbreviated, time: .omitted).locale(Localization.locale))
+        XCTAssertTrue(text.contains("2026"), text)
+        XCTAssertNil(text.range(of: "\\p{Han}", options: .regularExpression), text)
     }
 
     func testLicenseAndNotices() throws {
