@@ -27,8 +27,25 @@ public struct Session: Identifiable, Sendable, Equatable {
     /// The most recent prompt (the row shows it when it differs from the first).
     public var lastPrompt: String?
     public var toolCalls = 0
+    /// Where the session's state comes from.
+    public var origin: Origin = .hooks
+    /// The app the session lives in, when known from its transcript.
+    public var host: SessionHost?
+    /// A name the agent or the user gave the session.
+    public var customTitle: String?
+    /// The last thing the agent said.
+    public var lastReply: String?
+    /// Sub-agents currently working for this session.
+    public var subagents = 0
 
     public var source: String { key.source }
+
+    public enum Origin: String, Sendable {
+        /// Live events from the agent's hooks.
+        case hooks
+        /// Read from the transcript the agent writes; nothing can be decided for it.
+        case transcript
+    }
 }
 
 /// Pure reducer from canonical events to session state. No UI, no clocks of its own.
@@ -42,6 +59,8 @@ public struct SessionStore: Sendable {
         case started(SessionKey)
         /// The turn ended in an error.
         case failed(SessionKey)
+        /// A session known only from its transcript is waiting for an answer in its own app.
+        case attention(SessionKey)
     }
 
     public static let idleExpiry: TimeInterval = 12 * 3600
@@ -84,6 +103,7 @@ public struct SessionStore: Sendable {
             terminal: event.terminal, ancestors: evidence?.ancestors ?? [], firstPrompt: nil)
         let previousPhase = session.phase
 
+        session.origin = .hooks                      // live events take over from the transcript
         session.lastEventAt = now
         if let cwd = event.cwd, cwd != session.cwd {
             session.cwd = cwd
@@ -176,6 +196,94 @@ public struct SessionStore: Sendable {
     }
 
     public mutating func remove(_ key: SessionKey) { sessions[key] = nil }
+
+    /// Folds what the transcripts on disk say into the session list.
+    ///
+    /// A session that hooks are reporting keeps its own state and only gains
+    /// details (a title, the last reply, where it lives). A session nobody
+    /// announced is created from its transcript, follows it, and goes away
+    /// when the transcript leaves the scout's window. `live` is false for the
+    /// first reading after launch, when nothing that is found is news.
+    @discardableResult
+    public mutating func merge(_ snapshots: [TranscriptSnapshot], dismissed: Set<SessionKey> = [], live: Bool = true,
+                               now: Date = Date()) -> [Change] {
+        var changes: [Change] = []
+        var seen: Set<SessionKey> = []
+        var helpers: [String: Int] = [:]
+        for snapshot in snapshots where snapshot.isSubagent && snapshot.phase == .working {
+            if let parent = snapshot.parentID { helpers[parent, default: 0] += 1 }
+        }
+
+        for snapshot in snapshots where !snapshot.isSubagent && !dismissed.contains(snapshot.key) {
+            let key = snapshot.key
+            seen.insert(key)
+            let subagents = helpers[key.sessionID] ?? 0
+
+            guard var session = sessions[key] else {
+                let since = snapshot.phaseSince ?? snapshot.updatedAt
+                var session = Session(
+                    key: key, cwd: snapshot.cwd, transcriptPath: snapshot.path,
+                    title: AutoNamer.title(cwd: snapshot.cwd, prompt: snapshot.firstPrompt, source: key.source),
+                    startedAt: since, lastEventAt: snapshot.updatedAt, phaseSince: since,
+                    activity: snapshot.activity, phase: snapshot.phase,
+                    terminal: TerminalContext(), ancestors: [], firstPrompt: snapshot.firstPrompt)
+                session.lastPrompt = snapshot.lastPrompt
+                session.origin = .transcript
+                session.host = snapshot.host
+                session.customTitle = snapshot.title
+                session.lastReply = snapshot.lastReply
+                session.subagents = subagents
+                sessions[key] = session
+                changes.append(.updated(key))
+                continue
+            }
+
+            let before = session
+            session.host = session.host ?? snapshot.host
+            session.customTitle = snapshot.title ?? session.customTitle
+            session.lastReply = snapshot.lastReply ?? session.lastReply
+            session.transcriptPath = session.transcriptPath ?? snapshot.path
+            session.subagents = subagents
+            if session.firstPrompt == nil, let prompt = snapshot.firstPrompt {
+                session.firstPrompt = prompt
+                session.title = AutoNamer.title(cwd: session.cwd ?? snapshot.cwd, prompt: prompt, source: key.source)
+            }
+            if session.origin == .hooks {
+                session.lastPrompt = session.lastPrompt ?? snapshot.lastPrompt
+                if session != before {
+                    sessions[key] = session
+                    changes.append(.updated(key))
+                }
+                continue
+            }
+
+            session.cwd = snapshot.cwd ?? session.cwd
+            session.lastPrompt = snapshot.lastPrompt ?? session.lastPrompt
+            session.activity = snapshot.activity
+            session.lastEventAt = snapshot.updatedAt
+            if session.phase != snapshot.phase {
+                session.phase = snapshot.phase
+                session.phaseSince = snapshot.phaseSince ?? snapshot.updatedAt
+            }
+            guard session != before else { continue }
+            sessions[key] = session
+            guard live, session.phase != before.phase else {
+                changes.append(.updated(key))
+                continue
+            }
+            switch session.phase {
+            case .waiting: changes.append(.becameIdle(key))
+            case .needsAttention: changes.append(.attention(key))
+            case .working: changes.append(before.lastPrompt != session.lastPrompt ? .started(key) : .updated(key))
+            }
+        }
+
+        for (key, session) in sessions where session.origin == .transcript && !seen.contains(key) {
+            sessions[key] = nil
+            changes.append(.ended(key))
+        }
+        return changes
+    }
 }
 
 /// Session auto-naming (SPEC v3): project name plus a few keywords from the first prompt.

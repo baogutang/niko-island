@@ -116,6 +116,11 @@ public final class AppModel: ObservableObject {
     private var toastTask: Task<Void, Never>?
     private var lastPlayed: [SoundEvent: Date] = [:]
     var usageEngine: UsageEngine?
+    private var scout: TranscriptScout?
+    private var scoutPrimed = false
+    /// Sessions the user dismissed, and when; a transcript must not bring them
+    /// back until it has something new to say.
+    private var dismissedAt: [SessionKey: Date] = [:]
 
     public init(paths: NikoPaths, home: URL = NikoPaths.userHome(), log: NikoLog = .shared) {
         self.paths = paths
@@ -129,7 +134,7 @@ public final class AppModel: ObservableObject {
     // MARK: Lifecycle
 
     @discardableResult
-    public func start(usage: Bool = true) -> Bool {
+    public func start(usage: Bool = true, scout: Bool? = nil) -> Bool {
         do {
             try SecureDirectory.ensureTree(paths)
         } catch {
@@ -176,8 +181,40 @@ public final class AppModel: ObservableObject {
         pruneTimer = timer
 
         if usage { startUsageEngine() }
+        if scout ?? usage { startScout() }
         refreshMaintenance()
         return true
+    }
+
+    // MARK: Sessions found on disk
+
+    /// Hooks only speak when something happens. The transcripts say what is
+    /// there right now: idle sessions, sessions started before the app, and
+    /// agents that are not connected at all.
+    private func startScout() {
+        guard scout == nil, settings.discoverSessions else { return }
+        var options = TranscriptScout.Options()
+        options.window = settings.sessionRetention
+        let scout = TranscriptScout(home: home, options: options) { [weak self] snapshots in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { self?.mergeTranscripts(snapshots) }
+            }
+        }
+        self.scout = scout
+        scout.start()
+    }
+
+    func mergeTranscripts(_ snapshots: [TranscriptSnapshot], now: Date = Date()) {
+        let dismissed = Set(snapshots.compactMap { snapshot -> SessionKey? in
+            guard let when = dismissedAt[snapshot.key] else { return nil }
+            return snapshot.updatedAt <= when ? snapshot.key : nil
+        })
+        dismissedAt = dismissedAt.filter { dismissed.contains($0.key) }
+        let changes = store.merge(snapshots, dismissed: dismissed, live: scoutPrimed, now: now)
+        scoutPrimed = true
+        guard !changes.isEmpty else { return }
+        for change in changes { react(to: change) }
+        publish()
     }
 
     public func stop() {
@@ -186,6 +223,8 @@ public final class AppModel: ObservableObject {
         toastTask?.cancel()
         usageEngine?.stop()
         usageEngine = nil
+        scout?.stop()
+        scout = nil
         httpServer?.stop()
         httpServer = nil
         // Closing the socket releases every waiting bridge: it sees EOF, prints
@@ -283,6 +322,10 @@ public final class AppModel: ObservableObject {
             }
         }
 
+        react(to: change)
+    }
+
+    private func react(to change: SessionStore.Change) {
         switch change {
         case .ended(let key):
             grants.revoke(key)
@@ -302,10 +345,17 @@ public final class AppModel: ObservableObject {
         case .started(let key):
             notifier?.clear(session: key)
             play(.started)
+        case .attention(let key):
+            // Known only from its transcript: it can be shown and jumped to, not answered here.
+            if let session = store[key] {
+                announce(.question, session: session, body: L("Waiting for you in %@", session.host?.name ?? AgentRegistry.displayName(for: key.source)))
+            }
+            play(.attention)
         case .updated(let key):
             if store[key]?.phase == .working { notifier?.clear(session: key) }
         }
     }
+
 
     private func announce(_ kind: NikoSettings.EventKind, session: Session, body: String) {
         guard settings.notificationsEnabled(for: kind) else { return }
@@ -449,6 +499,7 @@ public final class AppModel: ObservableObject {
     public func dismiss(_ key: SessionKey) {
         guard !pending.contains(where: { $0.sessionKey == key }) else { return }
         store.remove(key)
+        dismissedAt[key] = Date()
         grants.revoke(key)
         hub.forget(session: key)
         publish()

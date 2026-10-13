@@ -101,6 +101,16 @@
         }
       }
     },
+    "%lld helpers": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个子代理"
+          }
+        }
+      }
+    },
     "%lld sessions": {
       "localizations": {
         "zh-Hans": {
@@ -1397,6 +1407,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量"
+          }
+        }
+      }
+    },
+    "Waiting for you in %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在 %@ 里等你"
           }
         }
       }

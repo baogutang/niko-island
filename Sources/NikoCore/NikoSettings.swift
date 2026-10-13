@@ -139,6 +139,22 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["showIslandWhenIdle"] = .bool(newValue) }
     }
 
+    /// Find sessions from the transcripts agents write, not only from hooks.
+    public var discoverSessions: Bool {
+        get { bool("discoverSessions", default: true) }
+        set { raw["discoverSessions"] = .bool(newValue) }
+    }
+
+    /// Minutes a quiet session stays listed when it is known only from its transcript.
+    public static let retentionChoices = [10, 30, 120, 480]
+
+    public var sessionRetentionMinutes: Int {
+        get { min(24 * 60, max(2, raw["sessionRetentionMinutes"]?.intValue ?? 30)) }
+        set { raw["sessionRetentionMinutes"] = .int(newValue) }
+    }
+
+    public var sessionRetention: TimeInterval { TimeInterval(sessionRetentionMinutes) * 60 }
+
     /// What the island does in full-screen Spaces, where there is no menu bar.
     public var fullScreenPolicy: FullScreenPolicy {
         get { raw["fullScreenPolicy"]?.stringValue.flatMap(FullScreenPolicy.init(rawValue:)) ?? .followMenuBar }

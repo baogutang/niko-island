@@ -21,10 +21,14 @@ enum TerminalJumper {
                 // The first use triggers the system's Automation consent prompt.
                 selected = run("/usr/bin/osascript", ["-e", script])?.contains("found") ?? false
             }
-            guard !selected, let bundleID = target.bundleID else { return }
+            // No tab to select (an IDE, a desktop app, another emulator): bring the app forward.
+            guard !selected, let bundleID = target.bundleID ?? session.host?.bundleID else { return }
             DispatchQueue.main.async {
-                NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first?
-                    .activate(options: [.activateAllWindows])
+                if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+                    running.activate(options: [.activateAllWindows])
+                } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {
+                    NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+                }
             }
         }
     }
@@ -33,7 +37,7 @@ enum TerminalJumper {
     @MainActor
     static func isFrontmost(_ session: Session) -> Bool {
         guard let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier else { return false }
-        return JumpTarget(terminal: session.terminal, ancestors: session.ancestors).bundleID == front
+        return session.hostBundleID == front
     }
 
     private static func run(_ executable: String, _ arguments: [String]) -> String? {

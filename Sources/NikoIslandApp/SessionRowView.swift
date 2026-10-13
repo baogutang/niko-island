@@ -7,16 +7,25 @@ extension Session {
         AutoNamer.projectName(cwd: cwd) ?? AgentRegistry.displayName(for: source)
     }
 
-    /// The headline of a row: what the user asked for, in their own words.
+    /// The headline of a row: the session's own name, else what the user
+    /// asked for, in their own words.
     var headline: String {
+        if let name = customTitle.map({ Activity.oneLine($0, limit: 72) }), !name.isEmpty { return name }
         if let prompt = firstPrompt.map({ Activity.oneLine($0, limit: 72) }), !prompt.isEmpty { return prompt }
         return L("New session")
     }
 
-    /// The latest prompt, when the conversation has moved on from the first one.
+    /// The latest prompt, when the headline does not already say it.
     var followUp: String? {
-        guard let last = lastPrompt, let first = firstPrompt, last != first else { return nil }
+        guard let last = lastPrompt else { return nil }
         let line = Activity.oneLine(last, limit: 96)
+        return line.isEmpty || line == headline || Activity.oneLine(last, limit: 72) == headline ? nil : line
+    }
+
+    /// What the agent said last, shown once it has stopped.
+    var replyLine: String? {
+        guard phase == .waiting, let reply = lastReply else { return nil }
+        let line = Activity.oneLine(reply, limit: 120)
         return line.isEmpty ? nil : line
     }
 }
@@ -53,6 +62,10 @@ struct SessionRowView: View {
                         .font(Theme.body(12)).foregroundStyle(Theme.tertiary).lineLimit(1)
                 }
                 activityLine
+                if let reply = session.replyLine {
+                    Text(reply)
+                        .font(Theme.body(12)).foregroundStyle(Theme.secondary).lineLimit(1).truncationMode(.tail)
+                }
                 if model.grantedSessions.contains(session.key) { grantLine }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -61,6 +74,7 @@ struct SessionRowView: View {
                 Chip(text: elapsedText(since: session.phaseSince, now: now))
                 Chip(text: AgentRegistry.displayName(for: session.source), tint: AgentTint.color(for: session.source))
                 if let host = session.hostName { Chip(text: host) }
+                if session.subagents > 0 { Chip(text: L("%lld helpers", session.subagents), tint: Theme.sky) }
                 if session.phase == .needsAttention { BellBadge() }
             }
             .padding(.top, 1)

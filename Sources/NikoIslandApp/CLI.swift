@@ -307,6 +307,29 @@ public enum NikoCLI {
                 return 64
             }
             return dumpScripts(to: URL(fileURLWithPath: directory))
+        case "scout":
+            // What the transcripts on disk say right now. Text is shown as lengths
+            // unless --text is given, so the output can go into a bug report.
+            let showText = args.flag("--text")
+            let minutes = args.positional().flatMap(Double.init) ?? 30
+            var options = TranscriptScout.Options()
+            options.window = minutes * 60
+            let scout = TranscriptScout(home: URL(fileURLWithPath: NSHomeDirectory()), options: options) { _ in }
+            let started = Date()
+            let snapshots = scout.scanOnce()
+            func show(_ text: String?) -> String {
+                guard let text else { return "-" }
+                return showText ? "\"\(Activity.oneLine(text, limit: 60))\"" : "\(text.count) chars"
+            }
+            for snapshot in snapshots {
+                print("\(snapshot.key.source)\t\(snapshot.key.sessionID.prefix(8))\t\(snapshot.phase.rawValue)\t\(snapshot.activity.verb)"
+                      + "\tage=\(Int(Date().timeIntervalSince(snapshot.updatedAt)))s\thost=\(snapshot.host?.name ?? "-")"
+                      + "\tsubagent=\(snapshot.isSubagent)\tproject=\(AutoNamer.projectName(cwd: snapshot.cwd) ?? "-")"
+                      + "\ttitle=\(show(snapshot.title))\tprompt=\(show(snapshot.lastPrompt))\treply=\(show(snapshot.lastReply))"
+                      + "\tdetail=\(show(snapshot.activity.detail))")
+            }
+            print("\(snapshots.count) session(s) active in the last \(Int(minutes)) min, scanned in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
+            return 0
         case "listen":
             // Headless ingress for checking an integration: prints one line per
             // admitted event (names and keys only, never values) and makes no decisions.

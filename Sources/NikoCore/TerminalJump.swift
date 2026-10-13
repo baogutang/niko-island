@@ -84,7 +84,12 @@ public struct JumpTarget: Sendable, Equatable {
 extension Session {
     /// The terminal (or IDE) this session lives in, as shown on its row.
     public var hostName: String? {
-        JumpTarget(terminal: terminal, ancestors: ancestors).hostName(termProgram: terminal.termProgram)
+        JumpTarget(terminal: terminal, ancestors: ancestors).hostName(termProgram: terminal.termProgram) ?? host?.name
+    }
+
+    /// Bundle id of the app to bring forward for this session.
+    public var hostBundleID: String? {
+        JumpTarget(terminal: terminal, ancestors: ancestors).bundleID ?? host?.bundleID
     }
 }
 
