@@ -7,8 +7,8 @@ screen and ears: the island window, full-screen apps, sounds, notifications,
 and real agents. Nothing here touches your real agent configuration until
 section 10.
 
-Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0, on one setup: macOS
-15 with an external display that has no camera housing. A ☑ says nothing about
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 or 0.4.0, on one
+setup: macOS 15 with an external display that has no camera housing. A ☑ says nothing about
 a MacBook's own display or two displays at once. Items marked **(not
 automated)** have no test at all behind them.
 
@@ -103,9 +103,17 @@ Start once more with a fresh throwaway directory and without
 NIKO_ISLAND_HOME=/private/tmp/nk-welcome/ni "dist/Niko Island.app/Contents/MacOS/niko-island"
 ```
 
-- ☑ A full-screen welcome covers the display: night sky, sea, the creatures,
-  and a small island at the top that says hello. On a large display the
-  content is scaled up, not lost in the middle.
+- ☑ A full-screen welcome covers the display: night sky with an aurora, sea,
+  the creatures, and a small island at the top that says hello. The name
+  arrives letter by letter and the creatures hop in one after another.
+- ☑ On a large display the content is larger **and sharp**: look at the small
+  type at the display's own resolution (0.3.0 magnified a small layout, which
+  made it soft).
+- ☐ Creatures crossing the scene face the way they move (in 0.3.0 the whale
+  swam backwards). Move the pointer: stars and water shift a little, and
+  specks in the water light up near it.
+- ☐ A ring of light runs out from the island as it lands; connecting agents
+  and reaching the last page throw confetti from the island.
 - ☑ "Get started" → the agents found on this Mac, with *running now* next to
   the ones whose app or CLI is running, and a tick on every stable or beta
   adapter. Experimental ones are listed without a tick.
@@ -128,6 +136,10 @@ Uses your real session logs, read-only. Nothing needs to be connected.
   what it last did.
 - ☑ With the Codex desktop app or `codex` open: the same, with a whale; a
   session that started helper agents shows "n helpers".
+- ☑ With the ZCode desktop app open on a session, including one that was open
+  before ZCode was connected: a row with a crab, the session's title, what it
+  last did and its last reply. A session started without a project shows no
+  project name rather than ZCode's scratch folder.
 - ☑ A row found in a desktop app carries a "Desktop" chip. ☐ Clicking it
   brings that app forward.
 - ☐ A session nobody has touched for longer than Settings → Sessions → "Keep a
@@ -202,23 +214,51 @@ echo '{"hook_event_name":"StopFailure","session_id":"t1","cwd":"'$PWD'","error":
   seconds, then returns to its usual text.
 - ☐ After `StopFailure`, the row reads "hit an error" with the message.
 
-## 6. Usage
+## 6. Usage and limits
 
 Click the bars icon in the island's header.
 
 - ☑ A row of pills: All, then one per agent that has written anything on this
   Mac (Claude Code, Codex, ZCode, …). The tiles, the chart and the model list
   follow the pill.
-- ☑ Four tiles: 5 hours, Today, 7 days, Since reset.
-- ☐ Press **Reset** on one agent: its "Since reset" tile starts at zero, a line
-  says since when, and the other agents are unaffected. ✕ clears the marker.
-  Quit and reopen: the marker is still there.
-- ☐ Claude Code: a 5-hour and a weekly limit bar appear once a connected
-  session has drawn its status line. Codex: both bars appear from its session
-  files, with the plan name. An agent that reports no limits shows none.
+- ☑ Four tiles: 5 hours, Today, 7 days, 30 days. A model with no list price
+  (GLM on a Coding Plan) shows its tokens, not "$0.00".
+- ☑ ZCode: a line saying its limits are kept on its servers, "Show them…"
+  (opens Settings → Usage) and "Reset in ZCode…". ☐ That button brings ZCode
+  to the front and does nothing else.
+- ☐ Codex: the windows it reports appear with the plan name, from its session
+  files.
+- ☐ Claude Code in a terminal: a 5-hour and a weekly bar appear once a
+  connected session has drawn its status line.
+- ☐ Claude Code turned away at a limit (the transcript gets a "usage limit
+  reached" entry): the row says "hit its limit" and the usage view shows that
+  window full, with the time it opens again. It disappears at that time.
 - ☐ Compare today's total for Claude Code with `niko-island usage`.
-- ☐ Set the language to 简体中文: the date in "Counting since…" is written in
-  Chinese; in English it is written in English, whatever the Mac's region.
+
+Asking the provider (Settings → Usage → "Limits the provider keeps"). Both
+switches are off on a fresh install; **check that first**, and that nothing is
+asked while they are off (no `provider-limits.json` appears in
+`~/.niko-island/cache/`).
+
+- ☐ **Ask Anthropic**, with Claude Code signed in and used in a terminal
+  recently: within a few seconds the Claude tab shows a 5-hour and a weekly
+  percentage, "asked just now". macOS may ask for access to "Claude
+  Code-credentials"; "Deny" turns into a line saying so, and is not asked
+  again until you press "Check now". **(the answer path has only been
+  exercised with the format Claude Code caches, never with a live answer)**
+- ☑ The same switch with a sign-in that has run out (desktop app only): the
+  note says the sign-in has run out; nothing is sent. *(checked with the
+  hidden `niko-island internal limits claude`, which prints states and
+  percentages only)*
+- ☐ **Ask BigModel / Z.ai**: paste a key of your Coding Plan, Save. The key
+  field turns into "A key is saved in your Keychain"; the ZCode tab shows the
+  plan's 5-hour and weekly percentages. "Remove" deletes the key and switches
+  the lookup off. A wrong key says "The key was not accepted."
+  **(never run against the live service)**
+- ☐ With either switch on, quit and reopen: the last answer is shown at once,
+  then replaced.
+- ☐ `~/.niko-island/cache/provider-limits.json` holds percentages and times;
+  search it for your key or sign-in: nothing.
 
 ## 7. Sounds **(not automated beyond synthesis and settings)**
 
@@ -254,7 +294,12 @@ is also a listening test: note anything harsh, too long or too quiet.
 - ☐ Island → Look: each colour, width, row density and chip switch changes the
   island straight away; "Pixel creatures" off turns them into coloured dots.
 - ☐ Island → the two hover delays and "How long the notice stays" do what they
-  say.
+  say. With the default ("Short") the island is gone about a sixth of a second
+  after the pointer has left it.
+- ☐ Island → Text size: Small, Regular and Large change the type in the island
+  at once; nothing is clipped at Large with the Compact width.
+- ☐ Island → "How fast it opens and closes": Calm, Standard, Brisk. Closing is
+  always a little quicker than opening.
 - ☐ Agents → pick a different creature for an agent: its rows change.
 - ☐ Agents → "Connect all" appears when a detected agent is not connected.
 - ☐ Island → switch off "Open when the pointer rests on it": hovering no longer

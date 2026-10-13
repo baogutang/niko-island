@@ -192,6 +192,29 @@ final class DocsTests: XCTestCase {
         }
     }
 
+    /// What the pages promise about sign-ins and the network is what the code does.
+    func testPrivacyClaimsMatchTheCode() throws {
+        XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say both lookups are off until switched on")
+        XCTAssertFalse(NikoSettings().glmLimitsLookup)
+        XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai"])
+        for page in ["README.md", "README.zh-CN.md"] {
+            let text = try read(page)
+            for host in ProviderLimitsClient.hosts { XCTAssertTrue(text.contains("`\(host)`"), "\(page) names \(host)") }
+            XCTAssertTrue(text.contains("~/.zcode/cli/db/"), "\(page): where ZCode sessions are read from")
+            // The unconditional promise of 0.3.0 would no longer be true.
+            XCTAssertFalse(text.contains("Your credentials are never read"), page)
+            XCTAssertFalse(text.contains("绝不读取、保存或转发你的凭据"), page)
+            XCTAssertFalse(text.contains("only network code in the project"), page)
+        }
+        let site = try read("website/index.html")
+        XCTAssertTrue(site.contains("api.anthropic.com"))
+        XCTAssertFalse(site.contains("Your credentials are never read."))
+        // The reset the usage view offers is a way to the agent's own app, and only where there is one.
+        XCTAssertEqual(AgentRegistry.all.filter(\.quotaResetInApp).map(\.displayName), ["ZCode"])
+        XCTAssertTrue(try read("README.md").contains("Reset in ZCode…"))
+        XCTAssertTrue(try read("README.zh-CN.md").contains("去 ZCode 重置…"))
+    }
+
     func testDatesAndListsFollowTheInterfaceLanguage() {
         // Outside an app bundle the strings are English, so dates and lists must be too,
         // whatever region this Mac is set to.

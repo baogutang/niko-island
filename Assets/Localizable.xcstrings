@@ -3101,6 +3101,16 @@
         }
       }
     },
+    "tokens, no list price": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "tokens，暂无标价"
+          }
+        }
+      }
+    },
     "waiting for you": {
       "localizations": {
         "zh-Hans": {

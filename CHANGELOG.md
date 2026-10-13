@@ -1,5 +1,70 @@
 # Changelog
 
+## [0.4.0] - 2026-10-13
+
+What turned up when 0.3.0 was used for an afternoon.
+
+### Fixed
+- **ZCode sessions were missing.** ZCode takes its hooks when a session
+  starts, so a session that was already open never spoke to the island, and
+  nothing else was looking. ZCode sessions are now read from ZCode's own
+  session database, the way Claude Code and Codex sessions are read from
+  their logs: the title, what it is doing, the last reply, helper agents, and
+  whether it lives in the desktop app.
+- **The welcome was soft on large displays.** It was laid out for a small
+  screen and magnified. It is now laid out at the size of the display it is
+  on, so type and creatures are drawn sharp.
+- **A whale swam backwards** in the welcome. Creatures now face the way they
+  are going.
+- The "Reset" button in the usage view did not do what its name said: it only
+  started a local counter. It is gone. See *Limits* below for what a reset
+  really is.
+- A model without a list price (GLM on a Coding Plan, for one) showed as
+  "$0.00". It now shows its tokens.
+
+### Added
+- **Limits, from whoever knows them.** For each agent the usage view shows
+  the plan's windows (five hours, weekly) with the time they reset:
+  - Codex: from its session files, as before.
+  - Claude Code: from its status line; and when Claude Code is turned away
+    because a window is full, that is read from its transcript, so "limit
+    reached, resets in 1 h 20 min" shows even for the desktop app.
+  - **Ask the provider (off by default).** Two switches in Settings → Usage.
+    *Anthropic*: reads the sign-in Claude Code keeps in your Keychain and asks
+    api.anthropic.com. *BigModel / Z.ai* (the GLM Coding Plan that ZCode draws
+    on): asks with a key you paste in, which is kept in your Keychain. Each
+    talks to one host only; percentages and reset times are all that is kept.
+- **"Reset in ZCode…"** A quota reset is something ZCode's own app spends
+  (its reset cards). The usage view offers a button that brings ZCode forward
+  for agents that have such a thing, and never spends one itself.
+- A **30-day** figure next to five hours, today and seven days.
+- **Text size** (small, regular, large) and **how fast the island opens and
+  closes** (calm, standard, brisk) in Settings → Island.
+- The welcome's entrance: an aurora, a ripple running out from the island as
+  it lands, the name arriving letter by letter, stars and water that react to
+  the pointer, and confetti when agents are connected.
+
+### Changed
+- Type inside the island is lighter and a little smaller.
+- The island closes sooner after the pointer leaves (150 ms instead of 450),
+  and closing is quicker than opening.
+
+### Known limitations
+- **Claude limits for desktop-only use.** Asking Anthropic needs a current
+  Claude Code sign-in. Claude Code renews it when it runs in a terminal; the
+  desktop app does not. With a sign-in that has run out, the usage view says
+  so and shows only what the transcripts tell (a window that is full). Niko
+  Island does not renew or rewrite Claude Code's sign-in.
+- **The Coding Plan lookup has not been run against the live service.** It
+  follows the answer format that several open-source tools document, and is
+  covered by tests built on that format. ZCode keeps its own key encrypted, so
+  the key has to come from you.
+- **How many reset cards are left** is known only to ZCode's account service
+  and is not shown.
+- The limitations listed for 0.3.0 still apply: one display setup tried by
+  hand, beta adapters not driven against their live agents, Intel build run
+  under Rosetta only, ad-hoc signed.
+
 ## [0.3.0] - 2026-10-13
 
 The island learns to follow the menu bar, finds sessions on its own, and

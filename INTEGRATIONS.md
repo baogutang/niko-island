@@ -56,8 +56,24 @@ reports `"source": "startup"`).
 
 Sessions of Claude Code and Codex are also read from their session logs
 (`.claude/projects/<project>/<session>.jsonl`,
-`.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`), which needs no registration at
-all. See `Sources/NikoCore/Scout/`.
+`.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`), and ZCode's from its database
+(`.zcode/cli/db/db.sqlite`: `session`, `message`, `part`; the desktop app's
+task list is `.zcode/v2/tasks-index.sqlite`), all read-only. None of that needs
+registration. See `Sources/NikoCore/Scout/`.
+
+Limits of a plan (0.4.0) come from, in this order of trust: files the agent
+writes (Codex rollouts: `rate_limits`), Claude Code's status line, Claude
+Code's transcript when a request is refused (`apiErrorParams.rate_limit_info`),
+and, only when the user switches it on, the provider:
+
+| Provider | Request | Credential | Answer |
+|---|---|---|---|
+| Anthropic | `GET https://api.anthropic.com/api/oauth/usage`, `anthropic-beta: oauth-2025-04-20` | Claude Code's own sign-in from the Keychain item `Claude Code-credentials`, read at call time, never renewed | `five_hour` / `seven_day` with `utilization` and `resets_at`, or a `limits` list |
+| BigModel / Z.ai (GLM Coding Plan) | `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` or `https://api.z.ai/…` | a key the user pastes, kept in the Keychain under this app's name | `data.limits[]` with `type`, `unit`, `number`, `percentage`, `nextResetTime`; `data.level` |
+
+Neither endpoint is documented by its provider. See
+`Sources/NikoCore/Usage/ProviderLookups.swift`. ZCode's own stored sign-in is
+encrypted by ZCode and is not read.
 
 ## Generic settings-adapter pattern
 

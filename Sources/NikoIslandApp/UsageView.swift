@@ -97,10 +97,14 @@ struct UsageView: View {
     }
 
     private func tile(_ title: String, _ window: UsageSnapshot.Window) -> some View {
-        tileFrame {
+        // Models on a plan often have no list price: then the tokens are the figure, not "$0.00".
+        let unpriced = window.cost == 0 && window.tokens > 0
+        return tileFrame {
             Text(title.uppercased()).font(look.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
-            Text(costText(window.cost)).font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
-            Text(L("%@ tokens", tokenText(window.tokens))).font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1)
+            Text(unpriced ? tokenText(window.tokens) : costText(window.cost))
+                .font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
+            Text(unpriced ? L("tokens, no list price") : L("%@ tokens", tokenText(window.tokens)))
+                .font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
         }
     }
 
@@ -300,7 +304,8 @@ struct UsageView: View {
                     Text(row.model).font(look.mono(12)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 6)
                     Text(tokenText(row.tokens)).font(look.mono(11, .regular)).foregroundStyle(Theme.secondary)
-                    Text(costText(row.cost)).font(look.mono(12, .semibold)).foregroundStyle(Theme.primary)
+                    Text(row.cost == 0 && row.tokens > 0 ? "—" : costText(row.cost)).font(look.mono(12, .semibold))
+                        .foregroundStyle(row.cost == 0 ? Theme.tertiary : Theme.primary)
                         .frame(minWidth: 58, alignment: .trailing)
                 }
             }

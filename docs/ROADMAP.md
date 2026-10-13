@@ -42,21 +42,40 @@ to what turned up when somebody did.
 | Settings: look, timing, display, full-screen policy, session retention, language, global shortcut, creature per agent | Built; the pages were looked at in the running app, not every switch was flipped by hand |
 | One package per architecture (Apple silicon, Intel) | Built and verified by `scripts/make-release.sh`; the Intel app has only run under Rosetta |
 
+## Released: 0.4.0
+
+| Area | State |
+|---|---|
+| ZCode sessions from its own database | Built and covered by tests on a database with the real tables; seen working with the ZCode desktop app, including a session that was open before ZCode was connected |
+| Limits from local sources: Codex session files, Claude Code's status line, Claude Code's "limit reached" transcript entries | Built and covered by tests. The transcript entries were read from real files; the usage view was looked at in the running app |
+| Asking the provider for limits (opt-in): Anthropic with Claude Code's sign-in, BigModel / Z.ai with a key the user pastes | Built and covered by tests with a stand-in for the network. Anthropic: the sign-in was found and correctly recognised as run out on the one machine tried, so no live answer has been read. BigModel / Z.ai: never run against the live service |
+| "Reset in ZCode…" instead of a local counter | Built; the button was seen, not pressed |
+| The welcome, laid out at the display's size, with a new entrance | Built; captured at the display's own resolution and recorded on one large display. Sharp there. Not every effect was watched (the confetti, creatures crossing) |
+| Lighter, smaller type; text size; faster closing; motion speed | Built; looked at in the running app |
+
 ## Next
 
-1. **Drive the beta adapters against their live agents**, Codex and ZCode
+1. **A live answer for the two provider lookups.** Anthropic's with a current
+   Claude Code sign-in, BigModel / Z.ai's with a real key. Until then both are
+   written against documented formats only.
+2. **Claude limits for people who only use the desktop app.** Today that needs
+   a sign-in Claude Code has renewed in a terminal. Renewing it ourselves
+   would mean acting as Claude Code and rewriting its Keychain entry, which
+   can sign it out; that is a decision for the owner of the Mac, not a
+   default.
+3. **Drive the beta adapters against their live agents**, Codex and ZCode
    first (they can approve), and move the ones that hold up to stable.
    `TESTPLAN.md` section 10.
-2. **Try the island on a MacBook's own display** and with two displays. The
+4. **Try the island on a MacBook's own display** and with two displays. The
    camera-housing layout has only been rendered, never seen on hardware.
-3. **Click a real approval through** from the island with a live Claude Code
+5. **Click a real approval through** from the island with a live Claude Code
    session, and work through the rest of `TESTPLAN.md`.
-4. **Listen to the built-in sounds** and tune them by ear.
-5. **ZCode sessions without hooks**, from its local database, the way Claude
-   Code and Codex sessions are found today.
-6. **A finished-turn card**: the last reply and a way to answer, right on the
-   island, instead of only a notice.
-7. **Notarized builds** if the project gets a signing identity. Until then
+6. **Listen to the built-in sounds** and tune them by ear.
+7. **A finished-turn card**: the last reply and a way to answer, right on the
+   island, instead of only a notice. Task progress from the agent's own to-do
+   list, and the git branch on a row, belong with it.
+8. **Keyboard shortcuts for Allow and Deny**, off by default.
+9. **Notarized builds** if the project gets a signing identity. Until then
    releases stay ad-hoc signed.
 
 ## Planned, not started

@@ -79,6 +79,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         // …and `-NikoOpenIsland sessions|usage` opens the island and keeps it open.
         if let route = UserDefaults.standard.string(forKey: "NikoOpenIsland") {
             model.route = route == "usage" ? .usage : .sessions
+            if let agent = UserDefaults.standard.string(forKey: "NikoUsageAgent") { model.usageAgent = agent }
             model.expand(.click)
             model.heldOpen = true
         }
