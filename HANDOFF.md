@@ -10,6 +10,8 @@
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
 | 本轮版本 | **v0.4.0 — ZCode 会话、真实额度、清晰的欢迎引导、更轻的文字**（2026-10-13，按你的要求发布） |
 | 发布产物 | 每种架构一份：`Niko-Island-0.4.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.4.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
+| 发布核对 | `ci.yml` 与 `release.yml`（v0.4.0）全部绿色。五个发布文件重新下载后：`shasum -c SHA256SUMS` 通过，摘要与 GitHub API 记录一致；两个 dmg 可挂载，应用分别只含 `arm64` / `x86_64`，ad-hoc 签名有效，版本 0.4.0；两个 zip 解压后签名有效。`releases/latest` → v0.4.0 |
+| 你机器上装的 | 我没有替你覆盖 `/Applications` 里的应用，请下载 `apple-silicon` 的 dmg 自己装 |
 | 旧版本 | v0.3.0、v0.2.0（universal）、v0.1.0（面板界面，只有 zip） |
 | 官网 | https://baogutang.github.io/niko-island/ |
 | 测试 | 306 个，本机通过；`scripts/smoke-launch.sh` 对两个架构的应用都通过（Intel 版在 Rosetta 下） |
