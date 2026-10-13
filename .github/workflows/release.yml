@@ -100,10 +100,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
-            --title "Niko Island ${{ steps.version.outputs.version }}" \
-            --notes-file "$RUNNER_TEMP/notes.md" \
-            --verify-tag
+          TITLE="Niko Island ${{ steps.version.outputs.version }}"
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            # The tag was pushed again (for example after it was moved):
+            # refresh the existing release in place instead of failing.
+            gh release edit "$GITHUB_REF_NAME" --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md"
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
+              --title "$TITLE" \
+              --notes-file "$RUNNER_TEMP/notes.md" \
+              --verify-tag
+          fi
       - name: Publish nightly pre-release
         if: github.ref_type != 'tag'
         env:

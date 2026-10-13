@@ -1,8 +1,8 @@
 # PROGRESS
-updated: 2026-10-13T01:19:42+0800
-milestone: DONE
+updated: 2026-10-13T08:32:15+0800
+milestone: R1 (post-release follow-up requested by the owner)
 done: [M0, M1, M2, M3, M4, M5, M6, M7]
-next: "Nothing left from the overnight plan. v0.1.0 is published. Follow-ups are the open issues #1–#6 (start with #1: confirm against a live Claude Code session) and the four owner decisions listed in HANDOFF.md."
+next: "R1a — history rewrite is done locally (14 commits, noreply email, identifier gone, trees identical); finish publishing it: gh release delete v0.1.0 → git push --force-with-lease=main:36c16e61 origin main → git push --force origin v0.1.0 → watch ci + release → verify. Then R1b — study https://github.com/erha19/ping-island (README, site, UI, sounds) as a DESIGN REFERENCE ONLY and redo UI/UX, README, website and sound effects with original assets and copy."
 notes:
   - "PROGRESS.md is committed (BUILD-PLAN overrides the initial .gitignore entry)"
   - "Toolchain: Xcode 26.3 / Swift 6.2.4 locally; keep sources compatible with Swift 6.0+ (CI macos-15). Never reference a weak-captured self from a nested closure (error on 6.0/6.1)"
@@ -79,3 +79,6 @@ notes:
   - "RELEASE LOG: tag v0.1.0 → ee192f2; release.yml run 38282638652 green (tests, universal build, lipo + codesign + Rosetta checks, smoke launch, gh release create). Release assets re-downloaded and verified: Niko-Island-0.1.0-universal.zip (3,418,350 bytes, sha256 d1d79e79…bda20), SHA256SUMS; releases/latest → v0.1.0; every external README link returns 200."
   - "Issues filed for open items: #1 live Claude Code session, #2 notification click-through, #3 notch layout, #4 experimental adapters (Cursor/Gemini format doubts), #5 Intel + fresh account, #6 usage engine follow-ups"
   - "After the tag: CHANGELOG wording aligned with the README ('stays until you decide or the agent withdraws it') and the release notes on GitHub refreshed to match; HANDOFF.md written; these commits are on main after v0.1.0"
+  - "OWNER REQUEST 2026-10-13 (overrides the earlier 'do not rewrite history' note): rewrite git history to remove the third-party identifier and use the GitHub email. Done with git filter-branch (env-filter + tree-filter) over all refs; identity = N1KO <48704302+baogutang@users.noreply.github.com> (account has no public email, so the GitHub noreply address); annotated tag recreated so its tagger line is clean too; repo-local git config updated. A pre-rewrite bundle sits in the session scratchpad until the push is verified, then it is deleted."
+  - "OWNER REQUEST 2026-10-13: the first UI is not good enough. Redo UI, UX, visual design, README, website and sound effects taking https://github.com/erha19/ping-island as the reference. Rule that still holds: reference means layout/interaction/structure ideas only — no copying of its icons, artwork, sounds, code or copy; everything shipped stays original."
+  - "release.yml publish step is now idempotent (existing release → edit + upload --clobber)"
