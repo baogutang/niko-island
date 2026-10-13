@@ -61,6 +61,9 @@ public struct AgentDescriptor: Sendable, Equatable {
     public var processes: [String] = []
     /// The island can decide permission requests for this agent.
     public var approvals = false
+    /// The agent's own app can spend a quota reset (ZCode's reset cards). We
+    /// never do that for it; the usage view offers to bring the app forward.
+    public var quotaResetInApp = false
     /// Something the user has to do in the agent itself after connecting.
     public var followUp: String?
     /// Files an earlier version of ours wrote for this agent and no longer uses.
@@ -207,6 +210,7 @@ public enum AgentRegistry {
             $0.bridgeArguments = ["--reply", "json-strict"]
             $0.approvals = true
             $0.followUp = "ZCode reads its hooks when a session starts: sessions that are already open stay as they are."
+            $0.quotaResetInApp = true
         },
         shared("cursor", "Cursor", dir: ".cursor", file: ".cursor/hooks.json", binary: "cursor-agent", events: cursorEvents,
                dialect: .cursor, stability: .beta, symbol: "cursorarrow.rays", apps: ["com.todesktop.230313mzl4w4u92"]),

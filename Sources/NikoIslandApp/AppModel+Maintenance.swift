@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NikoCore
 
@@ -111,20 +112,60 @@ extension AppModel {
             }
         }
         usageEngine = engine
-        engine.setResets(settings.usageResets)
         engine.start()
         refreshPricingIfDue()
+        reconcileProviderLimits()
     }
 
-    /// Starts a counter from now ("all" or an agent id). Nothing is deleted:
-    /// the usage history stays, a "since reset" figure appears next to it.
-    public func resetUsage(_ counter: String, now: Date = Date()) {
-        settings.setUsageReset(now, for: counter)
+    // MARK: Limits the providers keep (opt-in)
+
+    var providerLimitsConfig: ProviderLimitsClient.Config {
+        let region = GLMQuotaAPI.Region(rawValue: settings.glmRegion) ?? GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
+        return ProviderLimitsClient.Config(claude: settings.claudeLimitsLookup, glm: settings.glmLimitsLookup, glmRegion: region)
     }
 
-    /// Takes the "since reset" figure away again.
-    public func clearUsageReset(_ counter: String) {
-        settings.setUsageReset(nil, for: counter)
+    /// Starts, stops or re-aims the lookups after a setting changed. Nothing is
+    /// asked, and no login is read, unless one of the switches is on.
+    func reconcileProviderLimits() {
+        let config = providerLimitsConfig
+        if limitsClient == nil {
+            guard config.claude || config.glm else { return }
+            limitsClient = makeLimitsClient { [weak self] results in
+                DispatchQueue.main.async {
+                    MainActor.assumeIsolated { self?.receive(providerLimits: results) }
+                }
+            }
+        }
+        guard let client = limitsClient else { return }
+        Task { await client.configure(config) }
+        if !config.claude { providerLookups[ProviderLimitsClient.claude] = nil }
+        if !config.glm { providerLookups[ProviderLimitsClient.glm] = nil }
+    }
+
+    func receive(providerLimits results: [String: ProviderLimitsClient.Result]) {
+        providerLookups = results
+        usageEngine?.setAskedLimits(results.compactMapValues(\.limits))
+    }
+
+    /// "Check now" in the usage view and in Settings.
+    public func refreshProviderLimits() {
+        guard let client = limitsClient else { return }
+        Task { await client.refresh(force: true) }
+    }
+
+    /// The key for the GLM Coding Plan, typed by the user. Kept in the Keychain, never in a file.
+    public func setGLMKey(_ key: String?) {
+        ProviderKeychain.store(key, account: ProviderLimitsClient.glmAccount)
+        hasGLMKey = ProviderKeychain.exists(ProviderLimitsClient.glmAccount)
+        if hasGLMKey { refreshProviderLimits() } else { settings.glmLimitsLookup = false }
+    }
+
+    /// Brings an agent's own app forward: where a quota reset is actually spent.
+    public func openAgentApp(_ id: String) {
+        guard let bundle = AgentRegistry.all.first(where: { $0.id == id })?.apps.first,
+              let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundle) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+        collapse()
     }
 
     /// The only network request the app makes on its own, and only after the

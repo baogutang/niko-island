@@ -60,21 +60,21 @@ struct SessionRowView: View {
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(session.projectName)
-                        .font(Theme.body(12.5, .medium)).foregroundStyle(Theme.secondary)
+                        .font(look.body(12.5, .medium)).foregroundStyle(Theme.secondary)
                         .lineLimit(1).fixedSize()
-                    Text("·").font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                    Text("·").font(look.body(12.5)).foregroundStyle(Theme.tertiary)
                     Text(session.headline)
-                        .font(Theme.title(15)).foregroundStyle(Theme.primary)
+                        .font(look.title(15, .medium)).foregroundStyle(Theme.primary)
                         .lineLimit(1).truncationMode(.tail)
                 }
                 if let followUp = session.followUp {
                     Text(L("You: %@", followUp))
-                        .font(Theme.body(12)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                        .font(look.body(12)).foregroundStyle(Theme.tertiary).lineLimit(1)
                 }
                 activityLine
                 if let reply = session.replyLine {
                     Text(reply)
-                        .font(Theme.body(12)).foregroundStyle(Theme.secondary).lineLimit(1).truncationMode(.tail)
+                        .font(look.body(12)).foregroundStyle(Theme.secondary).lineLimit(1).truncationMode(.tail)
                 }
                 if model.grantedSessions.contains(session.key) { grantLine }
             }
@@ -116,12 +116,12 @@ struct SessionRowView: View {
         HStack(spacing: 5) {
             Circle().fill(Theme.color(for: session.phase, accent: look.accent)).frame(width: 6, height: 6)
             Text(session.activity.localizedVerb)
-                .font(Theme.body(12, .medium))
+                .font(look.body(12, .medium))
                 .foregroundStyle(Theme.color(for: session.phase, accent: look.accent))
                 .fixedSize()
             if let detail = session.activity.detail, !detail.isEmpty {
                 Text(detail)
-                    .font(Theme.mono(11.5, .regular))
+                    .font(look.mono(11.5, .regular))
                     .foregroundStyle(Theme.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -140,7 +140,7 @@ struct SessionRowView: View {
                 .buttonStyle(.plain)
                 .underline()
         }
-        .font(Theme.body(11.5))
+        .font(look.body(11.5))
         .foregroundStyle(Theme.amber)
     }
 }

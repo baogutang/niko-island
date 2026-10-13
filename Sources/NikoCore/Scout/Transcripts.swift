@@ -39,6 +39,8 @@ public struct TranscriptSnapshot: Sendable, Equatable {
     public var phaseSince: Date?
     public var isSubagent: Bool
     public var parentID: String?
+    /// The provider turned the agent away because this window is used up.
+    public var limitReached: RateLimitWindow?
 
     public init(key: SessionKey, path: String, cwd: String? = nil, host: SessionHost? = nil, title: String? = nil,
                 firstPrompt: String? = nil, lastPrompt: String? = nil, lastReply: String? = nil,
@@ -163,6 +165,8 @@ public enum ClaudeTranscript {
         var lastReply: String?
         var turn = Turn.unknown
         var since: Date?
+        var limit: RateLimitWindow?
+        var stoppedByLimit = false
 
         for line in TranscriptText.lines(tail, dropFirst: !tailIsWholeFile) {
             guard let object = TranscriptText.object(line) else {
@@ -199,9 +203,17 @@ public enum ClaudeTranscript {
                         lastPrompt = prompt
                         turn = .thinking
                         since = stamp ?? since
+                        stoppedByLimit = false
                     }
                 }
             case "assistant":
+                if let refused = limitReached(object) {
+                    limit = refused
+                    stoppedByLimit = true
+                    turn = .finished
+                    since = stamp ?? since
+                    continue
+                }
                 let message = object["message"]
                 var tool: Activity?
                 for item in message?["content"]?.arrayValue ?? [] {
@@ -235,12 +247,25 @@ public enum ClaudeTranscript {
             }
         }
 
-        let (phase, activity) = resolve(turn, modified: modified, now: now)
+        var (phase, activity) = resolve(turn, modified: modified, now: now)
+        // A window that has reset since is no longer news.
+        if let resets = limit?.resetsAt, resets <= now { limit = nil }
+        if stoppedByLimit, limit != nil, phase == .waiting { activity = Activity(verb: "hit its limit") }
         let host: SessionHost? = entrypoint == "claude-desktop" ? .claudeDesktop : nil
-        return TranscriptSnapshot(
+        var snapshot = TranscriptSnapshot(
             key: SessionKey(source: source, sessionID: id), path: path, cwd: cwd, host: host,
             title: title ?? agentName, firstPrompt: firstPrompt ?? lastPrompt, lastPrompt: lastPrompt, lastReply: lastReply,
             phase: phase, activity: activity, updatedAt: modified, phaseSince: since)
+        snapshot.limitReached = limit
+        return snapshot
+    }
+
+    /// Claude Code writes down why a request was refused: which window is full and when it opens again.
+    static func limitReached(_ object: JSONObject) -> RateLimitWindow? {
+        guard let info = object["apiErrorParams"]?["rate_limit_info"] ?? object["quotaLimits"], info.objectValue != nil,
+              info["status"]?.stringValue == "rejected", let kind = info["rateLimitType"]?.stringValue, !kind.isEmpty,
+              let resets = info["resetsAt"]?.doubleValue, resets > 0 else { return nil }
+        return RateLimitWindow(id: kind, usedPercent: 100, resetsAt: Date(timeIntervalSince1970: resets > 100_000_000_000 ? resets / 1000 : resets))
     }
 }
 

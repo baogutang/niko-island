@@ -30,11 +30,15 @@ struct IslandView: View {
 struct IslandBody: View {
     @ObservedObject var model: AppModel
     var metrics: IslandMetrics
+    @Environment(\.look) private var look
     @Environment(\.isStaticPreview) private var isStaticPreview
 
     var body: some View {
         let shape = IslandShape(ear: model.isExpanded ? 10 : 6, radius: model.isExpanded ? 30 : 13)
-        let spring = Animation.spring(response: 0.36, dampingFraction: 0.84)
+        // Opening has a little bounce; closing is quicker and settles without one,
+        // so the island is out of the way the moment it is not wanted.
+        let spring = model.isExpanded ? Animation.spring(response: 0.34 * look.motion, dampingFraction: 0.84)
+            : Animation.spring(response: 0.24 * look.motion, dampingFraction: 0.95)
         return VStack(spacing: 0) {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
@@ -134,7 +138,7 @@ struct CollapsedIsland: View {
                     HStack(spacing: 7) {
                         mascot(glance)
                         Text(glance.text)
-                            .font(Theme.body(11.5, .semibold))
+                            .font(look.body(11.5, .semibold))
                             .foregroundStyle(glance.color(accent: look.accent))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -167,12 +171,12 @@ struct CollapsedIsland: View {
         case .attention:
             HStack(spacing: 3) {
                 Image(systemName: "bell.fill").font(.system(size: 9, weight: .bold))
-                if glance.count > 1 { Text("\(glance.count)").font(Theme.mono(10, .bold)) }
+                if glance.count > 1 { Text("\(glance.count)").font(look.mono(10, .bold)) }
             }
             .foregroundStyle(Theme.amber)
         case .working:
             if glance.count > 1 {
-                Text("\(glance.count)").font(Theme.mono(10, .bold)).foregroundStyle(look.accent)
+                Text("\(glance.count)").font(look.mono(10, .bold)).foregroundStyle(look.accent)
             } else {
                 Circle().fill(look.accent).frame(width: 6, height: 6)
             }
@@ -191,6 +195,7 @@ struct CollapsedIsland: View {
 // MARK: - Expanded
 
 struct ExpandedIsland: View {
+    @Environment(\.look) private var look
     @ObservedObject var model: AppModel
     var metrics: IslandMetrics
     @Environment(\.isStaticPreview) private var isStaticPreview
@@ -221,9 +226,9 @@ struct ExpandedIsland: View {
     private var header: some View {
         HStack(spacing: 8) {
             MascotView(sprite: Mascots.island, size: 16)
-            Text(NikoVersion.displayName).font(Theme.body(12, .bold)).foregroundStyle(Theme.primary)
+            Text(NikoVersion.displayName).font(look.body(12, .bold)).foregroundStyle(Theme.primary)
             if !metrics.hasNotch {
-                Text(summary).font(Theme.body(11.5)).foregroundStyle(model.pending.isEmpty ? Theme.tertiary : Theme.amber)
+                Text(summary).font(look.body(11.5)).foregroundStyle(model.pending.isEmpty ? Theme.tertiary : Theme.amber)
             }
             Spacer(minLength: 0)
             IconButton(symbol: "chart.bar.fill", active: model.route == .usage, label: L("Usage")) {
@@ -242,6 +247,7 @@ struct ExpandedIsland: View {
 
 /// The session list, with the request that needs an answer opened up on top.
 struct SessionsPane: View {
+    @Environment(\.look) private var look
     @ObservedObject var model: AppModel
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var listHeight: CGFloat = 0
@@ -314,7 +320,7 @@ struct SessionsPane: View {
                 }
             }
             Text(running.isEmpty ? L("No agents running yet.") : L("All quiet."))
-                .font(Theme.title(16)).foregroundStyle(Theme.primary)
+                .font(look.title(16)).foregroundStyle(Theme.primary)
             Group {
                 if running.isEmpty {
                     Text(wired.isEmpty ? L("Nothing is connected yet. Connecting changes nothing until you say so.")
@@ -324,7 +330,7 @@ struct SessionsPane: View {
                            Localization.list(names), model.settings.sessionRetentionMinutes))
                 }
             }
-            .font(Theme.body(12.5)).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
+            .font(look.body(12.5)).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
             .fixedSize(horizontal: false, vertical: true)
             if !unconnected.isEmpty {
                 Button(L("Connect %@…", Localization.list(unconnected.map { AgentRegistry.displayName(for: $0) }))) {
@@ -351,8 +357,8 @@ struct SessionsPane: View {
         HStack(alignment: .top, spacing: 8) {
             Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.amber)
             VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(Theme.body(12.5, .semibold)).foregroundStyle(Theme.primary)
-                Text(detail).font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                Text(title).font(look.body(12.5, .semibold)).foregroundStyle(Theme.primary)
+                Text(detail).font(look.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
             }
             Spacer(minLength: 0)
         }

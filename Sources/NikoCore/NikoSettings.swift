@@ -141,19 +141,27 @@ public struct NikoSettings: Sendable, Equatable {
 
     // MARK: Usage
 
-    /// When the user last pressed Reset for a counter ("all" or an agent id).
-    public var usageResets: [String: Date] {
-        var out: [String: Date] = [:]
-        for member in raw["usageResets"]?.objectValue?.members ?? [] {
-            if let seconds = member.value.doubleValue, seconds > 0 { out[member.key] = Date(timeIntervalSince1970: seconds) }
-        }
-        return out
+    /// Ask Anthropic for the Claude plan's limits, with Claude Code's own login
+    /// from the Keychain. Off unless the user switches it on (SPEC §5).
+    public var claudeLimitsLookup: Bool {
+        get { bool("claudeLimitsLookup", default: false) }
+        set { raw["claudeLimitsLookup"] = .bool(newValue) }
     }
 
-    public mutating func setUsageReset(_ date: Date?, for counter: String) {
-        var object = raw["usageResets"]?.objectValue ?? JSONObject()
-        object[counter] = date.map { .number(String(Int($0.timeIntervalSince1970))) }
-        raw["usageResets"] = object.isEmpty ? nil : .object(object)
+    /// Ask BigModel / Z.ai for the GLM Coding Plan's limits, with a key the user
+    /// typed in. Off unless the user switches it on.
+    public var glmLimitsLookup: Bool {
+        get { bool("glmLimitsLookup", default: false) }
+        set { raw["glmLimitsLookup"] = .bool(newValue) }
+    }
+
+    /// "auto" (whatever ZCode is set to), "bigmodel" or "zai".
+    public var glmRegion: String {
+        get {
+            let value = raw["glmRegion"]?.stringValue ?? "auto"
+            return ["auto", "bigmodel", "zai"].contains(value) ? value : "auto"
+        }
+        set { raw["glmRegion"] = .string(newValue) }
     }
 
     // MARK: Appearance
@@ -251,6 +259,43 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["visibleRows"] = .int(newValue) }
     }
 
+    /// How large the type inside the island is drawn.
+    public enum TextSize: String, Sendable, CaseIterable {
+        case small, regular, large
+
+        public var scale: Double {
+            switch self {
+            case .small: return 0.88
+            case .regular: return 0.94
+            case .large: return 1.04
+            }
+        }
+    }
+
+    public var textSize: TextSize {
+        get { raw["textSize"]?.stringValue.flatMap(TextSize.init(rawValue:)) ?? .regular }
+        set { raw["textSize"] = .string(newValue.rawValue) }
+    }
+
+    /// How quickly the island opens and closes.
+    public enum Motion: String, Sendable, CaseIterable {
+        case calm, standard, brisk
+
+        /// Multiplies every duration.
+        public var factor: Double {
+            switch self {
+            case .calm: return 1.3
+            case .standard: return 1
+            case .brisk: return 0.7
+            }
+        }
+    }
+
+    public var motion: Motion {
+        get { raw["motion"]?.stringValue.flatMap(Motion.init(rawValue:)) ?? .standard }
+        set { raw["motion"] = .string(newValue.rawValue) }
+    }
+
     // MARK: Timing
 
     /// Milliseconds the pointer has to rest on the island before it opens.
@@ -262,10 +307,16 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     /// Milliseconds after the pointer leaves before a hover-opened island closes.
-    public static let closeDelayChoices = [200, 450, 900, 1500]
+    /// Short enough to feel like it follows the pointer, long enough to forgive
+    /// a pointer that slips off the edge for a moment.
+    public static let closeDelayChoices = [0, 150, 400, 900]
 
     public var hoverCloseDelayMS: Int {
-        get { min(5000, max(0, raw["hoverCloseDelayMS"]?.intValue ?? 450)) }
+        get {
+            // Values from before the choices changed land on the nearest one.
+            let stored = min(5000, max(0, raw["hoverCloseDelayMS"]?.intValue ?? 150))
+            return NikoSettings.closeDelayChoices.min { abs($0 - stored) < abs($1 - stored) } ?? 150
+        }
         set { raw["hoverCloseDelayMS"] = .int(newValue) }
     }
 

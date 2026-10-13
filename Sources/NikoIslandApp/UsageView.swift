@@ -2,8 +2,8 @@ import NikoCore
 import SwiftUI
 
 /// Usage, one agent at a time or all together: the rolling five hours, today,
-/// the last seven days, a counter the user can reset, the limits the provider
-/// reports about itself, a week of bars and the models behind the numbers.
+/// the last seven and thirty days, the limits of the plan as far as they are
+/// known, a week of bars and the models behind the numbers.
 /// Used inside the island and in Settings.
 struct UsageView: View {
     @ObservedObject var model: AppModel
@@ -21,23 +21,19 @@ struct UsageView: View {
         VStack(alignment: .leading, spacing: 14) {
             if let failure = usage.failure {
                 Text(L("Usage tracking is unavailable: %@", failure))
-                    .font(Theme.body(12)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
+                    .font(look.body(12)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
             }
             if usage.agents.count > 2 { switcher }
             if usage.agents.isEmpty || (current.week.tokens == 0 && current.limits.isEmpty && current.fiveHours.tokens == 0) {
                 if usage.failure == nil {
                     Text(usage.indexing ? L("Reading your local transcripts…")
                          : L("No usage found yet. Numbers appear after an agent has written a transcript on this Mac."))
-                        .font(Theme.body(12.5)).foregroundStyle(Theme.secondary)
+                        .font(look.body(12.5)).foregroundStyle(Theme.secondary)
                         .frame(maxWidth: .infinity, alignment: .leading).fixedSize(horizontal: false, vertical: true)
                 }
             } else {
                 tiles
-                if let since = current.resetAt {
-                    Text(L("Counting since %@ (%@).", since.formatted(Date.FormatStyle(date: .abbreviated, time: .shortened).locale(Localization.locale)), sinceText(since)))
-                        .font(Theme.body(11)).foregroundStyle(Theme.tertiary)
-                }
-                if current.id == "all" { allLimits } else if !current.limits.isEmpty { limits(current) }
+                if current.id == "all" { allLimits } else { limits(current) }
                 HStack(alignment: .top, spacing: 22) {
                     if current.days.contains(where: { $0.tokens > 0 }) { chart.frame(width: 200) }
                     if !current.models.isEmpty { breakdown }
@@ -67,7 +63,7 @@ struct UsageView: View {
                         HStack(spacing: 6) {
                             if agent.id != "all" { MascotView(source: agent.id, size: 15) }
                             Text(agent.id == "all" ? L("All") : AgentRegistry.displayName(for: agent.id))
-                                .font(Theme.body(12, .semibold))
+                                .font(look.body(12, .semibold))
                         }
                         .padding(.horizontal, 11).padding(.vertical, 6)
                         .foregroundStyle(selected ? Color.black : Theme.primary.opacity(0.85))
@@ -87,7 +83,7 @@ struct UsageView: View {
             tile(L("5 hours"), current.fiveHours)
             tile(L("Today"), current.today)
             tile(L("7 days"), current.week)
-            resetTile
+            tile(L("30 days"), current.month)
         }
     }
 
@@ -102,57 +98,10 @@ struct UsageView: View {
 
     private func tile(_ title: String, _ window: UsageSnapshot.Window) -> some View {
         tileFrame {
-            Text(title.uppercased()).font(Theme.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
-            Text(costText(window.cost)).font(Theme.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
-            Text(L("%@ tokens", tokenText(window.tokens))).font(Theme.body(11)).foregroundStyle(Theme.secondary).lineLimit(1)
+            Text(title.uppercased()).font(look.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
+            Text(costText(window.cost)).font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
+            Text(L("%@ tokens", tokenText(window.tokens))).font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1)
         }
-    }
-
-    /// A counter that starts when the user says so. Nothing is deleted by it.
-    private var resetTile: some View {
-        tileFrame {
-            HStack(spacing: 4) {
-                Text(L("Since reset").uppercased()).font(Theme.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary).lineLimit(1)
-                Spacer(minLength: 0)
-                if current.resetAt != nil {
-                    Button { model.clearUsageReset(current.id) } label: {
-                        Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.tertiary)
-                            .frame(width: 14, height: 12).contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .help(L("Stop this counter"))
-                    .accessibilityLabel(L("Stop this counter"))
-                }
-            }
-            if let window = current.sinceReset, let since = current.resetAt {
-                Text(costText(window.cost)).font(Theme.title(20)).foregroundStyle(look.accent).lineLimit(1).minimumScaleFactor(0.7)
-                HStack(spacing: 4) {
-                    Text(L("%@ tokens", tokenText(window.tokens)))
-                        .font(Theme.body(10.5)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                        .help(sinceText(since))
-                    Spacer(minLength: 0)
-                    resetButton(primary: false)
-                }
-            } else {
-                Text("—").font(Theme.title(20)).foregroundStyle(Theme.quaternary)
-                HStack(spacing: 4) {
-                    Text(L("Count from now")).font(Theme.body(10.5)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
-                    Spacer(minLength: 0)
-                    resetButton(primary: true)
-                }
-            }
-        }
-    }
-
-    private func resetButton(primary: Bool) -> some View {
-        Button { model.resetUsage(current.id) } label: {
-            Text(L("Reset")).font(Theme.body(10.5, .semibold))
-                .foregroundStyle(primary ? Color.black : Theme.primary)
-                .padding(.horizontal, 8).padding(.vertical, 3)
-                .background(Capsule().fill(primary ? Color.white : Color.white.opacity(0.14)))
-                .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private func sinceText(_ date: Date) -> String {
@@ -167,6 +116,12 @@ struct UsageView: View {
     // MARK: Limits
 
     private func windowName(_ window: RateLimitWindow) -> String {
+        switch window.id {
+        case "seven_day_opus": return L("Weekly, Opus")
+        case "seven_day_sonnet": return L("Weekly, Sonnet")
+        case "tools_month": return L("Tool calls, monthly")
+        default: break
+        }
         switch window.minutes {
         case 300?: return L("5-hour limit")
         case 10080?: return L("Weekly limit")
@@ -187,9 +142,9 @@ struct UsageView: View {
     private func limitRow(_ window: RateLimitWindow, agent: String?) -> some View {
         let hot = window.usedPercent >= 85
         return HStack(spacing: 10) {
-            if let agent { MascotView(source: agent, size: 16) }
-            Text(windowName(window)).font(Theme.body(12.5)).foregroundStyle(Theme.primary).lineLimit(1)
-                .frame(width: 104, alignment: .leading)
+            if let agent { MascotView(source: agent, size: 15) }
+            Text(windowName(window)).font(look.body(12)).foregroundStyle(Theme.primary).lineLimit(1)
+                .frame(width: 112, alignment: .leading)
             GeometryReader { proxy in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.10))
@@ -197,22 +152,107 @@ struct UsageView: View {
                         .frame(width: max(4, proxy.size.width * CGFloat(window.usedPercent / 100)))
                 }
             }
-            .frame(height: 6)
-            Text(String(format: "%.0f%%", window.usedPercent)).font(Theme.mono(12.5, .semibold))
+            .frame(height: 5)
+            Text(String(format: "%.0f%%", window.usedPercent)).font(look.mono(12, .medium))
                 .foregroundStyle(hot ? Theme.coral : Theme.primary).frame(width: 40, alignment: .trailing)
-            Text(resetText(window.resetsAt)).font(Theme.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
+            Text(resetText(window.resetsAt)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
                 .frame(width: 112, alignment: .trailing)
         }
     }
 
+    /// Who the numbers come from, in a few words.
+    private func sourceText(_ agent: UsageSnapshot.AgentUsage) -> String {
+        let name = AgentRegistry.displayName(for: agent.id)
+        switch agent.limitsSource {
+        case .provider?: return agent.limitsCapturedAt.map { L("asked %@", sinceText($0)) } ?? ""
+        case .statusLine?: return L("from %@'s status line", name)
+        case .limitReached?: return L("%@ was turned away", name)
+        case .agentFiles?, nil: return L("as %@ reports them", name)
+        }
+    }
+
+    /// The provider that can be asked about an agent's plan, if there is one.
+    private func lookup(for agent: String) -> (enabled: Bool, provider: String)? {
+        switch agent {
+        case ProviderLimitsClient.claude: return (model.settings.claudeLimitsLookup, "Anthropic")
+        case ProviderLimitsClient.glm: return (model.settings.glmLimitsLookup, "BigModel / Z.ai")
+        default: return nil
+        }
+    }
+
+    private func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
+        switch state {
+        case .ok: return nil
+        case .noLogin: return L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
+        case .loginExpired: return L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
+        case .denied: return L("macOS was told not to share Claude Code's sign-in.")
+        case .noKey: return L("No Coding Plan key has been added yet.")
+        case .unauthorized: return agent == ProviderLimitsClient.claude ? L("Anthropic did not accept the sign-in.") : L("The key was not accepted.")
+        case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
+        case .unreachable: return L("The provider could not be reached.")
+        case .unreadable: return L("The provider answered in a form this version does not read.")
+        }
+    }
+
+    private func smallButton(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title).font(look.body(11, .semibold))
+                .foregroundStyle(primary ? Color.black : Theme.primary)
+                .padding(.horizontal, 9).padding(.vertical, 3.5)
+                .background(Capsule().fill(primary ? Color.white : Color.white.opacity(0.13)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func openUsageSettings() {
+        model.settingsPage = "usage"
+        model.onOpenSettings?()
+    }
+
+    @ViewBuilder
     private func limits(_ agent: UsageSnapshot.AgentUsage) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: 6) {
-                Text(L("Limits, as %@ reports them", AgentRegistry.displayName(for: agent.id)).uppercased())
-                    .font(Theme.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
-                if let plan = agent.plan, !plan.isEmpty { Chip(text: plan) }
+        let name = AgentRegistry.displayName(for: agent.id)
+        let asking = lookup(for: agent.id)
+        let result = model.providerLookups[agent.id]
+        let resetsInApp = AgentRegistry.all.first { $0.id == agent.id }?.quotaResetInApp == true
+        if !agent.limits.isEmpty || asking != nil || resetsInApp {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    Text(L("Limits").uppercased()).font(look.mono(10, .semibold)).foregroundStyle(Theme.tertiary)
+                    if !agent.limits.isEmpty {
+                        Text(sourceText(agent)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                    }
+                    if let plan = agent.plan, !plan.isEmpty { Chip(text: plan.capitalized) }
+                    Spacer(minLength: 4)
+                    if let left = agent.resetsLeft { Chip(text: L("%lld resets left", left), tint: look.accent) }
+                    if asking?.enabled == true, !isStaticPreview { smallButton(L("Check now")) { model.refreshProviderLimits() } }
+                    if resetsInApp {
+                        smallButton(L("Reset in %@…", name)) { model.openAgentApp(agent.id) }
+                            .help(L("A reset is spent in %@ itself. This only brings it to the front.", name))
+                    }
+                }
+                ForEach(agent.limits) { limitRow($0, agent: nil) }
+                if let asking {
+                    if !asking.enabled {
+                        // Nothing local knows the plan's windows: say where they are and how to see them.
+                        if agent.limits.isEmpty || agent.limitsSource == .limitReached {
+                            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                                Text(L("%@ keeps the plan's limits on its own servers.", name))
+                                    .font(look.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                                Spacer(minLength: 4)
+                                smallButton(L("Show them…"), primary: true, action: openUsageSettings)
+                            }
+                        }
+                    } else if let result, let text = problem(result.state, agent: agent.id) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(text).font(look.body(11.5)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
+                            if result.state == .noKey || result.state == .unauthorized { smallButton(L("Settings…"), action: openUsageSettings) }
+                        }
+                    }
+                }
             }
-            ForEach(agent.limits) { limitRow($0, agent: nil) }
         }
     }
 
@@ -222,7 +262,7 @@ struct UsageView: View {
         let withLimits = usage.agents.filter { $0.id != "all" && !$0.limits.isEmpty }
         if !withLimits.isEmpty {
             VStack(alignment: .leading, spacing: 7) {
-                Text(L("Limits").uppercased()).font(Theme.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+                Text(L("Limits").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
                 ForEach(withLimits) { agent in
                     ForEach(agent.limits) { limitRow($0, agent: agent.id) }
                 }
@@ -241,7 +281,7 @@ struct UsageView: View {
                     RoundedRectangle(cornerRadius: 4, style: .continuous)
                         .fill(day.id == days.last?.id ? look.accent : look.accent.opacity(0.35))
                         .frame(height: max(3, 50 * CGFloat(day.tokens) / CGFloat(peak)))
-                    Text(String(day.id.suffix(2))).font(Theme.mono(9, .regular)).foregroundStyle(Theme.tertiary)
+                    Text(String(day.id.suffix(2))).font(look.mono(9, .regular)).foregroundStyle(Theme.tertiary)
                 }
                 .frame(maxWidth: .infinity)
                 .help("\(day.id): \(costText(day.cost)), \(tokenText(day.tokens))")
@@ -253,19 +293,19 @@ struct UsageView: View {
 
     private var breakdown: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(L("By model, last 7 days").uppercased()).font(Theme.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+            Text(L("By model, last 7 days").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
             ForEach(Array(current.models.prefix(4).enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 8) {
                     MascotView(source: row.agent, size: 16)
-                    Text(row.model).font(Theme.mono(12)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.middle)
+                    Text(row.model).font(look.mono(12)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 6)
-                    Text(tokenText(row.tokens)).font(Theme.mono(11, .regular)).foregroundStyle(Theme.secondary)
-                    Text(costText(row.cost)).font(Theme.mono(12, .semibold)).foregroundStyle(Theme.primary)
+                    Text(tokenText(row.tokens)).font(look.mono(11, .regular)).foregroundStyle(Theme.secondary)
+                    Text(costText(row.cost)).font(look.mono(12, .semibold)).foregroundStyle(Theme.primary)
                         .frame(minWidth: 58, alignment: .trailing)
                 }
             }
             if current.models.count > 4 {
-                Text(L("+ %lld more", current.models.count - 4)).font(Theme.body(11.5)).foregroundStyle(Theme.tertiary)
+                Text(L("+ %lld more", current.models.count - 4)).font(look.body(11.5)).foregroundStyle(Theme.tertiary)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -278,6 +318,6 @@ struct UsageView: View {
                 Text(L("No price known for: %@", usage.unpricedModels.prefix(4).joined(separator: ", ")))
             }
         }
-        .font(Theme.body(11)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
+        .font(look.body(11)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
     }
 }

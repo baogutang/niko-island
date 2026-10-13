@@ -652,15 +652,53 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertTrue(model.sessions.isEmpty)
     }
 
-    func testUsageCountersAreResetByMovingTheirStartNotByDeletingAnything() {
-        let moment = Date(timeIntervalSince1970: 1_800_000_000)
-        model.resetUsage("claude", now: moment)
-        XCTAssertEqual(model.settings.usageResets, ["claude": moment])
-        XCTAssertEqual(NikoSettings.load(paths: model.paths).usageResets, ["claude": moment], "kept across launches")
-        model.resetUsage("all", now: moment.addingTimeInterval(60))
-        XCTAssertEqual(model.settings.usageResets.count, 2)
-        model.clearUsageReset("claude")
-        XCTAssertEqual(Array(model.settings.usageResets.keys), ["all"])
+    func testProviderLimitsAreAskedOnlyWhenSwitchedOn() async throws {
+        final class Calls: @unchecked Sendable {
+            private let lock = NSLock()
+            private var hosts: [String] = []
+            func note(_ host: String) { lock.lock(); hosts.append(host); lock.unlock() }
+            var all: [String] { lock.lock(); defer { lock.unlock() }; return hosts }
+        }
+        let calls = Calls()
+        let paths = model.paths
+        let answer = Data(#"{"five_hour":{"utilization":37,"resets_at":"2099-01-01T00:00:00Z"},"seven_day":{"utilization":61,"resets_at":"2099-01-03T00:00:00Z"}}"#.utf8)
+        model.makeLimitsClient = { onChange in
+            ProviderLimitsClient(
+                paths: paths,
+                secrets: .init(claudeLogin: { .found(.init(token: "test-token", expiresAt: Date().addingTimeInterval(3600), plan: "max")) }, glmKey: { nil }),
+                transport: { request in
+                    calls.note(request.url?.host ?? "?")
+                    return (answer, 200)
+                }, onChange: onChange)
+        }
+        XCTAssertFalse(model.settings.claudeLimitsLookup, "off unless the user says so")
+        XCTAssertFalse(model.settings.glmLimitsLookup)
+        model.reconcileProviderLimits()
+        XCTAssertNil(model.limitsClient, "nothing is even created while both switches are off")
+
+        model.settings.claudeLimitsLookup = true
+        let client = try XCTUnwrap(model.limitsClient)
+        await client.refresh(force: true)
+        let deadline = Date().addingTimeInterval(5)
+        while model.providerLookups["claude"] == nil, Date() < deadline { try await Task.sleep(nanoseconds: 20_000_000) }
+        let result = try XCTUnwrap(model.providerLookups["claude"])
+        XCTAssertEqual(result.state, .ok)
+        XCTAssertEqual(result.limits?.windows.map(\.usedPercent), [37, 61])
+        XCTAssertEqual(result.limits?.plan, "max")
+        XCTAssertEqual(Set(calls.all), ["api.anthropic.com"], "one provider, one host")
+        // What is kept between runs holds percentages and times, never the sign-in.
+        let cached = try String(contentsOf: paths.cache.appendingPathComponent("provider-limits.json"), encoding: .utf8)
+        XCTAssertFalse(cached.contains("test-token"))
+        XCTAssertTrue(cached.contains("five_hour"))
+
+        model.settings.claudeLimitsLookup = false
+        XCTAssertNil(model.providerLookups["claude"], "switched off: the answer goes too")
+    }
+
+    func testResetsAreSpentInTheAgentsOwnApp() {
+        // The island never spends a quota reset; it can only say which agents have one to spend.
+        XCTAssertEqual(AgentRegistry.all.filter(\.quotaResetInApp).map(\.id), ["zcode"])
+        XCTAssertFalse(AgentRegistry.all.first { $0.id == "zcode" }?.apps.isEmpty ?? true, "there is an app to bring forward")
     }
 
     func testAppearanceAndTimingSettingsHaveSaneDefaultsAndStick() {
@@ -668,7 +706,14 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(settings.islandWidth.points, 640)
         XCTAssertEqual(settings.accent, .mint)
         XCTAssertEqual(settings.hoverOpenDelayMS, 160)
-        XCTAssertEqual(settings.hoverCloseDelayMS, 450)
+        XCTAssertEqual(settings.hoverCloseDelayMS, 150, "the island lets go soon after the pointer has")
+        XCTAssertEqual(NikoSettings(raw: ["hoverCloseDelayMS": .int(450)]).hoverCloseDelayMS, 400, "an older choice lands on the nearest one offered now")
+        XCTAssertEqual(NikoSettings(raw: ["hoverCloseDelayMS": .int(1500)]).hoverCloseDelayMS, 900)
+        XCTAssertEqual(settings.textSize, .regular)
+        XCTAssertLessThan(NikoSettings.TextSize.small.scale, NikoSettings.TextSize.regular.scale)
+        XCTAssertLessThan(NikoSettings.TextSize.regular.scale, 1, "regular is a little smaller than the type 0.3.0 drew")
+        XCTAssertEqual(settings.motion, .standard)
+        XCTAssertLessThan(NikoSettings.Motion.brisk.factor, NikoSettings.Motion.calm.factor)
         XCTAssertEqual(settings.toastSeconds, 5)
         XCTAssertEqual(settings.visibleRows, 6)
         XCTAssertEqual(settings.language, "system")
@@ -687,7 +732,11 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertFalse(saved.showsChip(.host))
         XCTAssertEqual(saved.mascotChoices, ["claude": "crab"])
         XCTAssertEqual(saved.language, "zh-Hans")
-        let look = IslandLook(settings: saved)
+        model.settings.textSize = .large
+        model.settings.motion = .brisk
+        let look = IslandLook(settings: model.settings)
+        XCTAssertEqual(look.textScale, NikoSettings.TextSize.large.scale)
+        XCTAssertEqual(look.motion, 0.7)
         XCTAssertEqual(look.chips, [.elapsed, .agent])
         XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "crab")
         XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "whale")
@@ -732,7 +781,8 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(list.sessions.first { $0.customTitle != nil }?.headline, "Install guide")
         let usage = PreviewRenderer.demoModel(.usage)
         XCTAssertEqual(usage.usage.agents.map(\.id), ["all", "claude", "codex"])
-        XCTAssertNotNil(usage.usage.agent("claude")?.sinceReset)
+        XCTAssertEqual(usage.usage.agent("claude")?.limitsSource, .provider)
+        XCTAssertGreaterThan(usage.usage.agent("claude")?.month.tokens ?? 0, usage.usage.agent("claude")?.week.tokens ?? 0)
         XCTAssertEqual(PreviewRenderer.demoModel(.empty).runningAgents, ["claude", "codex", "zcode"])
         let permission = PreviewRenderer.demoModel(.permission)
         XCTAssertEqual(permission.pending.count, 1)

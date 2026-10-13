@@ -47,16 +47,32 @@ extension UsageStore {
     }
 }
 
-/// Limits a provider reports about itself, as found in what its agent writes to disk.
+/// Where a set of limits was learned.
+public enum LimitsSource: String, Sendable, Equatable {
+    /// Something the agent wrote to disk for its own purposes (Codex rollouts).
+    case agentFiles = "files"
+    /// Claude Code's status line.
+    case statusLine = "statusline"
+    /// The provider, asked directly (opt-in).
+    case provider
+    /// The agent was turned away: all that is known is that the window is full, and until when.
+    case limitReached = "reached"
+}
+
+/// Limits a provider reports about itself.
 public struct ProviderLimits: Sendable, Equatable {
     public var windows: [RateLimitWindow] = []
     public var capturedAt: Date?
     public var plan: String?
+    public var source: LimitsSource?
+    /// Quota resets the account may still spend, where the provider says.
+    public var resetsLeft: Int?
 
-    public init(windows: [RateLimitWindow] = [], capturedAt: Date? = nil, plan: String? = nil) {
+    public init(windows: [RateLimitWindow] = [], capturedAt: Date? = nil, plan: String? = nil, source: LimitsSource? = nil) {
         self.windows = windows
         self.capturedAt = capturedAt
         self.plan = plan
+        self.source = source
     }
 
     /// Windows that have reset since they were captured no longer say anything true.
@@ -66,10 +82,25 @@ public struct ProviderLimits: Sendable, Equatable {
         return copy
     }
 
+    /// Several sources may know the same window; the one that looked last is right.
+    public static func merged(_ candidates: [ProviderLimits], now: Date) -> ProviderLimits? {
+        let live = candidates.map { $0.current(now: now) }.filter { !$0.windows.isEmpty }
+            .sorted { ($0.capturedAt ?? .distantPast) > ($1.capturedAt ?? .distantPast) }
+        guard var out = live.first else { return nil }
+        for other in live.dropFirst() {
+            for window in other.windows where !out.windows.contains(where: { $0.id == window.id }) { out.windows.append(window) }
+            out.plan = out.plan ?? other.plan
+            out.resetsLeft = out.resetsLeft ?? other.resetsLeft
+        }
+        return out
+    }
+
     var json: String {
         var object = JSONObject()
         if let capturedAt { object["captured_at"] = .number(String(capturedAt.timeIntervalSince1970)) }
         if let plan { object["plan"] = .string(plan) }
+        if let source { object["source"] = .string(source.rawValue) }
+        if let resetsLeft { object["resets_left"] = .int(resetsLeft) }
         object["windows"] = .array(windows.map { window in
             var item = JSONObject(["id": .string(window.id), "used": .number(String(window.usedPercent))])
             if let resets = window.resetsAt { item["resets_at"] = .number(String(resets.timeIntervalSince1970)) }
@@ -83,6 +114,8 @@ public struct ProviderLimits: Sendable, Equatable {
         guard let root = try? JSONValue.parse(json), root.objectValue != nil else { return nil }
         capturedAt = root["captured_at"]?.doubleValue.map(Date.init(timeIntervalSince1970:))
         plan = root["plan"]?.stringValue
+        source = root["source"]?.stringValue.flatMap(LimitsSource.init(rawValue:))
+        resetsLeft = root["resets_left"]?.intValue
         windows = (root["windows"]?.arrayValue ?? []).compactMap { item in
             guard let id = item["id"]?.stringValue, let used = item["used"]?.doubleValue else { return nil }
             return RateLimitWindow(id: id, usedPercent: used,
@@ -102,7 +135,7 @@ public enum CodexLimits {
             guard line.range(of: needle) != nil,
                   let object = (try? JSONValue.parse(Data(line), skipping: ["info"]))?.objectValue,
                   let limits = object["payload"]?["rate_limits"], limits.objectValue != nil else { continue }
-            var out = ProviderLimits()
+            var out = ProviderLimits(source: .agentFiles)
             out.capturedAt = ISOTime.flexible(object["timestamp"]).map(Date.init(timeIntervalSince1970:))
             out.plan = limits["plan_type"]?.stringValue
             for key in ["primary", "secondary"] {

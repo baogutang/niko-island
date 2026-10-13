@@ -36,8 +36,10 @@ public final class UsageEngine: @unchecked Sendable {
     private var indexing = false
     private var lastRateLimits = RateLimits.Cache()
     private var codexLimits = ProviderLimits()
-    /// When the user last reset each counter ("all" or an agent id).
-    private var resets: [String: Date] = [:]
+    /// What the providers answered when asked directly (opt-in), by agent id.
+    private var askedLimits: [String: ProviderLimits] = [:]
+    /// "This window is full until …", as an agent that was turned away wrote it down.
+    private var reachedLimits: [String: ProviderLimits] = [:]
     private var zcodePending = false
     private var failure: String?
     private var running = false
@@ -142,11 +144,27 @@ public final class UsageEngine: @unchecked Sendable {
         }
     }
 
-    /// The moments the user reset a counter; "since reset" is counted from them.
-    public func setResets(_ resets: [String: Date]) {
+    /// Limits the providers reported when asked (see `ProviderLimitsClient`).
+    public func setAskedLimits(_ limits: [String: ProviderLimits]) {
         queue.async { [self] in
-            guard resets != self.resets else { return }
-            self.resets = resets
+            guard limits != askedLimits else { return }
+            askedLimits = limits
+            if running { publish() }
+        }
+    }
+
+    /// An agent was refused because one of its windows is used up.
+    public func noteLimitReached(agent: String, window: RateLimitWindow, at date: Date) {
+        queue.async { [self] in
+            var known = reachedLimits[agent] ?? ProviderLimits(source: .limitReached)
+            if let index = known.windows.firstIndex(where: { $0.id == window.id }) {
+                guard known.windows[index] != window else { return }
+                known.windows[index] = window
+            } else {
+                known.windows.append(window)
+            }
+            known.capturedAt = max(known.capturedAt ?? .distantPast, date)
+            reachedLimits[agent] = known
             if running { publish() }
         }
     }
@@ -376,9 +394,17 @@ public final class UsageEngine: @unchecked Sendable {
         snapshot.pricingSource = pricing.source
         snapshot.failure = failure
         lastRateLimits = RateLimits.load(paths: paths, now: now)
-        let codex = codexLimits.current(now: now)
-        snapshot.rateLimits = lastRateLimits.windows + codex.windows
-        snapshot.rateLimitsCapturedAt = lastRateLimits.capturedAt ?? codex.capturedAt
+        // Each source knows some windows; whichever looked last wins a window.
+        var sources: [String: [ProviderLimits]] = [:]
+        sources["claude", default: []].append(ProviderLimits(windows: lastRateLimits.windows, capturedAt: lastRateLimits.capturedAt, source: .statusLine))
+        sources["codex", default: []].append(codexLimits)
+        for (id, asked) in askedLimits { sources[id, default: []].append(asked) }
+        for (id, reached) in reachedLimits { sources[id, default: []].append(reached) }
+        var limits: [String: ProviderLimits] = [:]
+        for (id, candidates) in sources { limits[id] = ProviderLimits.merged(candidates, now: now) }
+        let ordered = limits.keys.sorted { ($0 == "claude" ? "" : $0) < ($1 == "claude" ? "" : $1) }
+        snapshot.rateLimits = ordered.flatMap { limits[$0]?.windows ?? [] }
+        snapshot.rateLimitsCapturedAt = ordered.compactMap { limits[$0]?.capturedAt }.max()
         guard let store else { return snapshot }
         do {
             let today = store.day(for: now.timeIntervalSince1970)
@@ -398,14 +424,8 @@ public final class UsageEngine: @unchecked Sendable {
 
             // One entry per agent, and one for everything together.
             let fiveHours = try store.totals(since: now.timeIntervalSince1970 - 5 * 3600)
+            let month = try store.totals(since: now.timeIntervalSince1970 - 30 * 86_400)
             let perDay = try store.dailyTotalsByAgent(fromDay: first, toDay: today)
-            var limits: [String: ProviderLimits] = [:]
-            if !lastRateLimits.windows.isEmpty {
-                limits["claude"] = ProviderLimits(windows: lastRateLimits.windows, capturedAt: lastRateLimits.capturedAt)
-            }
-            if !codex.windows.isEmpty { limits["codex"] = codex }
-            var sinceReset: [String: [UsageTotals]] = [:]
-            for (id, date) in resets { sinceReset[id] = try store.totals(since: date.timeIntervalSince1970) }
 
             func usage(_ id: String) -> UsageSnapshot.AgentUsage {
                 func pick(_ rows: [UsageTotals]) -> [UsageTotals] { id == "all" ? rows : rows.filter { $0.agent == id } }
@@ -413,17 +433,16 @@ public final class UsageEngine: @unchecked Sendable {
                 agent.fiveHours = .init(pick(fiveHours))
                 agent.today = .init(pick(snapshot.today))
                 agent.week = .init(pick(snapshot.week))
+                agent.month = .init(pick(month))
                 agent.models = pick(snapshot.week)
                 agent.days = id == "all" ? snapshot.days : dayIDs.map {
                     UsageSnapshot.Day(id: $0, tokens: perDay[id]?[$0]?.tokens ?? 0, cost: perDay[id]?[$0]?.cost ?? 0)
                 }
-                if let date = resets[id] {
-                    agent.resetAt = date
-                    agent.sinceReset = .init(pick(sinceReset[id] ?? []))
-                }
                 agent.limits = limits[id]?.windows ?? []
                 agent.limitsCapturedAt = limits[id]?.capturedAt
+                agent.limitsSource = limits[id]?.source
                 agent.plan = limits[id]?.plan
+                agent.resetsLeft = limits[id]?.resetsLeft
                 return agent
             }
             var ids = Set(snapshot.week.map(\.agent)).union(fiveHours.map(\.agent)).union(limits.keys)

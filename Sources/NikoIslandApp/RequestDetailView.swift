@@ -17,6 +17,7 @@ enum QuestionAnswers {
 /// The request that needs a decision, opened up at the top of the island.
 /// It stays until the user decides or the agent withdraws it.
 struct RequestDetailView: View {
+    @Environment(\.look) private var look
     @ObservedObject var model: AppModel
     let request: AppModel.PendingRequest
 
@@ -47,10 +48,10 @@ struct RequestDetailView: View {
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Text(session?.projectName ?? agent)
-                        .font(Theme.body(13, .medium)).foregroundStyle(Theme.secondary).lineLimit(1).fixedSize()
+                        .font(look.body(13, .medium)).foregroundStyle(Theme.secondary).lineLimit(1).fixedSize()
                     Text("·").foregroundStyle(Theme.tertiary)
                     Text(session?.headline ?? L("New session"))
-                        .font(Theme.title(16)).foregroundStyle(Theme.primary).lineLimit(1)
+                        .font(look.title(16)).foregroundStyle(Theme.primary).lineLimit(1)
                 }
                 HStack(spacing: 6) {
                     Chip(text: agent, tint: AgentTint.color(for: request.event.source))
@@ -68,6 +69,7 @@ struct RequestDetailView: View {
 // MARK: - Permission
 
 struct PermissionForm: View {
+    @Environment(\.look) private var look
     @ObservedObject var model: AppModel
     let request: AppModel.PendingRequest
 
@@ -87,14 +89,14 @@ struct PermissionForm: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
-                Text(headline).font(Theme.title(17)).foregroundStyle(Theme.primary)
+                Text(headline).font(look.title(17)).foregroundStyle(Theme.primary)
                     .fixedSize(horizontal: false, vertical: true)
                 Text(L("Nothing happens until you decide. The agent is waiting."))
-                    .font(Theme.body(12.5)).foregroundStyle(Theme.secondary)
+                    .font(look.body(12.5)).foregroundStyle(Theme.secondary)
             }
             if let detail = request.summary.detail {
                 Text(detail)
-                    .font(Theme.mono(12.5, .regular))
+                    .font(look.mono(12.5, .regular))
                     .foregroundStyle(Theme.primary.opacity(0.92))
                     .lineLimit(7)
                     .textSelection(.enabled)
@@ -133,6 +135,7 @@ struct PermissionForm: View {
 /// Answer form for question-style requests: options as tiles, one question at
 /// a time. The result goes back as `updatedInput.answers`.
 struct QuestionForm: View {
+    @Environment(\.look) private var look
     @ObservedObject var model: AppModel
     let request: AppModel.PendingRequest
 
@@ -167,25 +170,25 @@ struct QuestionForm: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(L("%@ has a question", AgentRegistry.displayName(for: request.event.source)))
-                    .font(Theme.title(17)).foregroundStyle(Theme.primary)
+                    .font(look.title(17)).foregroundStyle(Theme.primary)
                 Text(L("Answer here and the agent carries on with the session."))
-                    .font(Theme.body(12.5)).foregroundStyle(Theme.secondary)
+                    .font(look.body(12.5)).foregroundStyle(Theme.secondary)
             }
             VStack(alignment: .leading, spacing: 5) {
                 HStack(spacing: 8) {
                     if let header = question.header, !header.isEmpty {
-                        Text(header).font(Theme.mono(12, .semibold)).foregroundStyle(Theme.sky)
+                        Text(header).font(look.mono(12, .semibold)).foregroundStyle(Theme.sky)
                     }
                     if request.questions.count > 1 {
                         Text(L("Question %lld of %lld", step + 1, request.questions.count))
-                            .font(Theme.mono(11)).foregroundStyle(Theme.tertiary)
+                            .font(look.mono(11)).foregroundStyle(Theme.tertiary)
                     }
                     if question.multiSelect {
-                        Text(L("Choose any that apply")).font(Theme.body(11.5)).foregroundStyle(Theme.tertiary)
+                        Text(L("Choose any that apply")).font(look.body(11.5)).foregroundStyle(Theme.tertiary)
                     }
                 }
                 Text(question.text)
-                    .font(Theme.body(15, .semibold)).foregroundStyle(Theme.primary)
+                    .font(look.body(15, .semibold)).foregroundStyle(Theme.primary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             LazyVGrid(columns: [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)], spacing: 8) {
@@ -220,15 +223,15 @@ struct QuestionForm: View {
         return Button { toggle(option.label) } label: {
             HStack(alignment: .top, spacing: 10) {
                 Text(badge)
-                    .font(Theme.mono(11, .bold))
+                    .font(look.mono(11, .bold))
                     .foregroundStyle(selected ? Color.black : Theme.secondary)
                     .frame(width: 22, height: 22)
                     .background(Circle().fill(selected ? Theme.sky : Color.white.opacity(0.10)))
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(option.label).font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
+                    Text(option.label).font(look.body(13.5, .semibold)).foregroundStyle(Theme.primary)
                         .fixedSize(horizontal: false, vertical: true)
                     if let detail = option.detail, !detail.isEmpty {
-                        Text(detail).font(Theme.body(11.5)).foregroundStyle(Theme.secondary)
+                        Text(detail).font(look.body(11.5)).foregroundStyle(Theme.secondary)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -250,7 +253,7 @@ struct QuestionForm: View {
         HStack(spacing: 8) {
             Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.tertiary)
             if isStaticPreview {
-                Text(L("Type something else…")).font(Theme.body(13)).foregroundStyle(Theme.tertiary)
+                Text(L("Type something else…")).font(look.body(13)).foregroundStyle(Theme.tertiary)
                 Spacer(minLength: 0)
             } else {
                 TextField(L("Type something else…"), text: Binding(
@@ -260,7 +263,7 @@ struct QuestionForm: View {
                         if !question.multiSelect, !value.trimmingCharacters(in: .whitespaces).isEmpty { selections[question.id] = [] }
                     }))
                     .textFieldStyle(.plain)
-                    .font(Theme.body(13))
+                    .font(look.body(13))
                     .foregroundStyle(Theme.primary)
             }
         }

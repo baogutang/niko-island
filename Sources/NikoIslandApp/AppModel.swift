@@ -90,7 +90,8 @@ public final class AppModel: ObservableObject {
             if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
             if settings.sessionRetentionMinutes != oldValue.sessionRetentionMinutes { scout?.setWindow(settings.sessionRetention) }
             if settings.discoverSessions != oldValue.discoverSessions { reconcileScout() }
-            if settings.usageResets != oldValue.usageResets { usageEngine?.setResets(settings.usageResets) }
+            if settings.claudeLimitsLookup != oldValue.claudeLimitsLookup || settings.glmLimitsLookup != oldValue.glmLimitsLookup
+                || settings.glmRegion != oldValue.glmRegion { reconcileProviderLimits() }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot() {
@@ -110,6 +111,13 @@ public final class AppModel: ObservableObject {
     @Published public var settingsPage = "general"
     /// Whose usage the usage view shows: "all" or an agent id.
     @Published public var usageAgent = "all"
+    /// What each provider answered the last time it was asked (opt-in lookups).
+    @Published public internal(set) var providerLookups: [String: ProviderLimitsClient.Result] = [:]
+    /// Whether a GLM Coding Plan key is in the Keychain (the key itself is never held here).
+    @Published public internal(set) var hasGLMKey = false
+    var limitsClient: ProviderLimitsClient?
+    /// Tests and previews replace this so that no Keychain is opened and no request leaves.
+    var makeLimitsClient: (@escaping @Sendable ([String: ProviderLimitsClient.Result]) -> Void) -> ProviderLimitsClient? = { _ in nil }
     /// Agents whose app or command-line tool is running right now.
     @Published public internal(set) var runningAgents: [String] = []
     /// Shown instead of the island's usual content the first time the app runs.
@@ -264,6 +272,10 @@ public final class AppModel: ObservableObject {
         dismissedAt = dismissedAt.filter { dismissed.contains($0.key) }
         let changes = store.merge(snapshots, dismissed: dismissed, live: scoutPrimed, now: now)
         scoutPrimed = true
+        for snapshot in snapshots {
+            guard let window = snapshot.limitReached else { continue }
+            usageEngine?.noteLimitReached(agent: snapshot.key.source, window: window, at: snapshot.updatedAt)
+        }
         guard !changes.isEmpty else { return }
         for change in changes { react(to: change) }
         publish()
@@ -277,6 +289,10 @@ public final class AppModel: ObservableObject {
         toastTask?.cancel()
         usageEngine?.stop()
         usageEngine = nil
+        if let client = limitsClient {
+            limitsClient = nil
+            Task { await client.configure(ProviderLimitsClient.Config()) }
+        }
         scout?.stop()
         scout = nil
         httpServer?.stop()

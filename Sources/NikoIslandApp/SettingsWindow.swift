@@ -164,6 +164,7 @@ struct SettingsPageView: View {
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var loginItemError: String?
     @State private var exportedPath: String?
+    @State private var glmKeyDraft = ""
     @Environment(\.look) private var look
 
     var body: some View {
@@ -305,6 +306,9 @@ struct SettingsPageView: View {
                 choiceRow(L("Width when open"),
                           options: [(NikoSettings.IslandWidth.compact, L("Compact")), (.regular, L("Regular")), (.wide, L("Wide"))],
                           selection: settingsBinding(\.islandWidth))
+                choiceRow(L("Text size"),
+                          options: [(NikoSettings.TextSize.small, L("Small")), (.regular, L("Regular")), (.large, L("Large"))],
+                          selection: settingsBinding(\.textSize))
                 choiceRow(L("Rows"),
                           options: [(NikoSettings.Density.comfortable, L("Roomy")), (.compact, L("Tight"))],
                           selection: settingsBinding(\.rowDensity))
@@ -322,8 +326,11 @@ struct SettingsPageView: View {
                           options: [(0, L("No wait")), (160, L("Short")), (350, L("Medium")), (600, L("Long"))],
                           selection: settingsBinding(\.hoverOpenDelayMS))
                 choiceRow(L("How soon it closes after the pointer leaves"),
-                          options: [(200, L("At once")), (450, L("Short")), (900, L("Medium")), (1500, L("Long"))],
+                          options: [(0, L("At once")), (150, L("Short")), (400, L("Medium")), (900, L("Long"))],
                           selection: settingsBinding(\.hoverCloseDelayMS))
+                choiceRow(L("How fast it opens and closes"),
+                          options: [(NikoSettings.Motion.calm, L("Calm")), (.standard, L("Standard")), (.brisk, L("Brisk"))],
+                          selection: settingsBinding(\.motion))
                 toggleRow(L("Open by itself when an agent needs a decision"),
                           L("It never takes keyboard focus away from what you are typing."), isOn: settingsBinding(\.expandOnAttention))
                 toggleRow(L("Show a short notice when an agent finishes"),
@@ -582,11 +589,93 @@ struct SettingsPageView: View {
                 .padding(18)
                 .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.cardStroke))
+            card(L("Limits the provider keeps")) {
+                Text(L("How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. Both are off until you turn them on."))
+                    .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 10)
+                Rectangle().fill(Theme.hairline).frame(height: 1)
+                toggleRow(L("Ask Anthropic for my Claude limits"),
+                          L("Reads the sign-in Claude Code keeps in your Keychain (macOS may ask you first) and sends it to api.anthropic.com, nowhere else. Asked every five minutes."),
+                          divider: lookupNote(ProviderLimitsClient.claude) != nil, isOn: settingsBinding(\.claudeLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.claude) { lookupStatus(note, divider: true) } else { Rectangle().fill(Theme.hairline).frame(height: 1) }
+                toggleRow(L("Ask BigModel / Z.ai for my GLM Coding Plan limits"),
+                          L("The plan ZCode draws on. ZCode keeps its own key locked away, so this needs a key of that plan from you. It is stored in your Keychain and sent only to the service chosen below."),
+                          isOn: settingsBinding(\.glmLimitsLookup))
+                glmKeyRow
+                choiceRow(L("Service"), L("Automatic: the one ZCode is set to."), divider: lookupNote(ProviderLimitsClient.glm) != nil,
+                          options: [("auto", L("Automatic")), ("bigmodel", "bigmodel.cn"), ("zai", "z.ai")], selection: settingsBinding(\.glmRegion))
+                if let note = lookupNote(ProviderLimitsClient.glm) { lookupStatus(note, divider: false) }
+            }
             card(L("Price list")) {
                 toggleRow(L("Refresh the model price list from the network (weekly)"),
-                          L("Off by default. It is the only network request this app can make; everything else stays on this Mac."),
+                          L("Off by default. It downloads a public list of prices and sends nothing about you."),
                           divider: false, isOn: settingsBinding(\.pricingRefreshEnabled))
             }
+        }
+    }
+
+    /// What the last lookup said, in words; nil while that lookup is switched off.
+    private func lookupNote(_ provider: String) -> String? {
+        let enabled = provider == ProviderLimitsClient.claude ? model.settings.claudeLimitsLookup : model.settings.glmLimitsLookup
+        guard enabled else { return nil }
+        guard let result = model.providerLookups[provider] else { return L("Asking…") }
+        switch result.state {
+        case .ok: return L("Answered. %lld windows known.", result.limits?.windows.count ?? 0)
+        case .noLogin: return L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
+        case .loginExpired: return L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
+        case .denied: return L("macOS was told not to share Claude Code's sign-in.")
+        case .noKey: return L("No Coding Plan key has been added yet.")
+        case .unauthorized: return provider == ProviderLimitsClient.claude ? L("Anthropic did not accept the sign-in.") : L("The key was not accepted.")
+        case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
+        case .unreachable: return L("The provider could not be reached.")
+        case .unreadable: return L("The provider answered in a form this version does not read.")
+        }
+    }
+
+    private func lookupStatus(_ note: String, divider: Bool) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Text(note).font(Theme.body(11.5)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 8)
+                Button(L("Check now")) { model.refreshProviderLimits() }.buttonStyle(PillButtonStyle())
+            }
+            .padding(.vertical, 9)
+            if divider { Rectangle().fill(Theme.hairline).frame(height: 1) }
+        }
+    }
+
+    private var glmKeyRow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                if model.hasGLMKey {
+                    Image(systemName: "key.fill").font(.system(size: 11)).foregroundStyle(look.accent)
+                    Text(L("A key is saved in your Keychain.")).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
+                    Spacer(minLength: 8)
+                    Button(L("Remove")) {
+                        model.setGLMKey(nil)
+                        glmKeyDraft = ""
+                    }.buttonStyle(PillButtonStyle())
+                } else if isStaticPreview {
+                    Text(L("Paste the plan's API key")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                        .padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Button(L("Save")) {}.buttonStyle(PillButtonStyle(kind: .primary))
+                } else {
+                    SecureField(L("Paste the plan's API key"), text: $glmKeyDraft)
+                        .textFieldStyle(.plain).font(Theme.mono(12))
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Button(L("Save")) {
+                        model.setGLMKey(glmKeyDraft)
+                        glmKeyDraft = ""
+                        if model.hasGLMKey { model.settings.glmLimitsLookup = true }
+                    }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(glmKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
+                }
+            }
+            .padding(.vertical, 10)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
         }
     }
 

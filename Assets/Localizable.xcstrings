@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@ keeps the plan's limits on its own servers.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 把套餐的额度记在它自己的服务器上。"
+          }
+        }
+      }
+    },
     "%@ needs you": {
       "localizations": {
         "zh-Hans": {
@@ -111,6 +121,16 @@
         }
       }
     },
+    "%@ was turned away": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 被限流拒绝了"
+          }
+        }
+      }
+    },
     "%lld agents on this Mac are not connected": {
       "localizations": {
         "zh-Hans": {
@@ -147,6 +167,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 分钟前"
+          }
+        }
+      }
+    },
+    "%lld resets left": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还可重置 %lld 次"
           }
         }
       }
@@ -251,6 +281,16 @@
         }
       }
     },
+    "30 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 天"
+          }
+        }
+      }
+    },
     "30 min": {
       "localizations": {
         "zh-Hans": {
@@ -311,6 +351,16 @@
         }
       }
     },
+    "A key is saved in your Keychain.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥已保存在你的钥匙串里。"
+          }
+        }
+      }
+    },
     "A permission request or a question is waiting.": {
       "localizations": {
         "zh-Hans": {
@@ -337,6 +387,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "一份已脱敏的报告，可以附在 Issue 里。"
+          }
+        }
+      }
+    },
+    "A reset is spent in %@ itself. This only brings it to the front.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置要在 %@ 里使用，这里只是把它带到前台。"
           }
         }
       }
@@ -551,12 +611,62 @@
         }
       }
     },
+    "Answered. %lld windows known.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已获取，共 %lld 个额度窗口。"
+          }
+        }
+      }
+    },
+    "Anthropic did not accept the sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Anthropic 没有接受这个登录凭据。"
+          }
+        }
+      }
+    },
     "App": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "应用"
+          }
+        }
+      }
+    },
+    "Ask Anthropic for my Claude limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Anthropic 查询我的 Claude 额度"
+          }
+        }
+      }
+    },
+    "Ask BigModel / Z.ai for my GLM Coding Plan limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向智谱 BigModel / Z.ai 查询我的 GLM Coding Plan 额度"
+          }
+        }
+      }
+    },
+    "Asking…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在查询…"
           }
         }
       }
@@ -611,6 +721,16 @@
         }
       }
     },
+    "Automatic: the one ZCode is set to.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动：跟随 ZCode 当前的设置。"
+          }
+        }
+      }
+    },
     "Available in the installed app.": {
       "localizations": {
         "zh-Hans": {
@@ -641,12 +761,42 @@
         }
       }
     },
+    "Brisk": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利落"
+          }
+        }
+      }
+    },
     "By model, last 7 days": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "按模型统计（最近 7 天）"
+          }
+        }
+      }
+    },
+    "Calm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "舒缓"
+          }
+        }
+      }
+    },
+    "Check now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即查询"
           }
         }
       }
@@ -667,6 +817,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "即使会话处于空闲、在本应用启动之前就已开始，或者运行在尚未接入的桌面端里，Claude Code 和 Codex 的会话也会显示。日志只在这台 Mac 上读取，不做任何修改。"
+          }
+        }
+      }
+    },
+    "Claude Code has not signed in on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 还没有在这台 Mac 上登录，所以没有可用来查询的凭据。"
+          }
+        }
+      }
+    },
+    "Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 在这台 Mac 上的登录已过期。下次在终端里运行 Claude Code 时它会自己续期。"
           }
         }
       }
@@ -827,26 +997,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "费用是按公开标价估算的，可能与你的套餐或账单不同。仅统计各代理在这台 Mac 上写下的记录。"
-          }
-        }
-      }
-    },
-    "Count from now": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "从现在开始计数"
-          }
-        }
-      }
-    },
-    "Counting since %@ (%@).": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "从 %@ 开始计数（%@）。"
           }
         }
       }
@@ -1121,6 +1271,16 @@
         }
       }
     },
+    "How fast it opens and closes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "展开与收起的速度"
+          }
+        }
+      }
+    },
     "How it looks and behaves": {
       "localizations": {
         "zh-Hans": {
@@ -1151,6 +1311,16 @@
         }
       }
     },
+    "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. Both are off until you turn them on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套餐用了多少，只有厂商知道，这台 Mac 上并没有记录（Codex 例外：它会把额度写进自己的会话文件）。下面每个开关只向一家厂商查询，用的是你自己的登录凭据，只保留百分比和恢复时间。两个开关默认都是关闭的。"
+          }
+        }
+      }
+    },
     "How soon it closes after the pointer leaves": {
       "localizations": {
         "zh-Hans": {
@@ -1161,12 +1331,12 @@
         }
       }
     },
-    "Install one, then connect it from Settings. The island also finds Claude Code and Codex sessions by itself.": {
+    "Install one, then connect it from Settings. The island also finds Claude Code, Codex and ZCode sessions by itself.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "先安装一个代理，再到设置里接入。Claude Code 和 Codex 的会话，小岛自己也能发现。"
+            "value": "先安装一个，再到设置里接入。小岛也会自己发现 Claude Code、Codex 和 ZCode 的会话。"
           }
         }
       }
@@ -1251,6 +1421,16 @@
         }
       }
     },
+    "Large": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "大"
+          }
+        }
+      }
+    },
     "Limit close": {
       "localizations": {
         "zh-Hans": {
@@ -1271,12 +1451,12 @@
         }
       }
     },
-    "Limits, as %@ reports them": {
+    "Limits the provider keeps": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "限额（%@ 自己报告的）"
+            "value": "厂商那边的额度"
           }
         }
       }
@@ -1421,6 +1601,16 @@
         }
       }
     },
+    "No Coding Plan key has been added yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有添加 Coding Plan 的密钥。"
+          }
+        }
+      }
+    },
     "No agents found yet": {
       "localizations": {
         "zh-Hans": {
@@ -1561,12 +1751,12 @@
         }
       }
     },
-    "Off by default. It is the only network request this app can make; everything else stays on this Mac.": {
+    "Off by default. It downloads a public list of prices and sends nothing about you.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "默认关闭。这是本应用唯一可能发出的网络请求，其余一切都留在这台 Mac 上。"
+            "value": "默认关闭。它只下载一份公开的价格表，不会发送任何与你有关的信息。"
           }
         }
       }
@@ -1701,6 +1891,16 @@
         }
       }
     },
+    "Paste the plan's API key": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "粘贴该套餐的 API 密钥"
+          }
+        }
+      }
+    },
     "Pixel creatures": {
       "localizations": {
         "zh-Hans": {
@@ -1811,6 +2011,16 @@
         }
       }
     },
+    "Reads the sign-in Claude Code keeps in your Keychain (macOS may ask you first) and sends it to api.anthropic.com, nowhere else. Asked every five minutes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只发送到 api.anthropic.com，不发往别处。每五分钟查询一次。"
+          }
+        }
+      }
+    },
     "Refresh the model price list from the network (weekly)": {
       "localizations": {
         "zh-Hans": {
@@ -1851,12 +2061,12 @@
         }
       }
     },
-    "Reset": {
+    "Reset in %@…": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "重置"
+            "value": "去 %@ 重置…"
           }
         }
       }
@@ -1911,6 +2121,16 @@
         }
       }
     },
+    "Save": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        }
+      }
+    },
     "See what each one is doing, approve and answer where you are, and go back to the right window when you want to.": {
       "localizations": {
         "zh-Hans": {
@@ -1927,6 +2147,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "发送回答"
+          }
+        }
+      }
+    },
+    "Service": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务"
           }
         }
       }
@@ -2021,6 +2251,16 @@
         }
       }
     },
+    "Show them…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示额度…"
+          }
+        }
+      }
+    },
     "Show which agent": {
       "localizations": {
         "zh-Hans": {
@@ -2041,22 +2281,22 @@
         }
       }
     },
-    "Since reset": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "重置以来"
-          }
-        }
-      }
-    },
     "Skip": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "跳过"
+          }
+        }
+      }
+    },
+    "Small": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小"
           }
         }
       }
@@ -2087,6 +2327,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "音效"
+          }
+        }
+      }
+    },
+    "Standard": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "标准"
           }
         }
       }
@@ -2131,22 +2381,22 @@
         }
       }
     },
-    "Stop this counter": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "停止这个计数"
-          }
-        }
-      }
-    },
     "Stopped with an error": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "因出错而停止"
+          }
+        }
+      }
+    },
+    "Text size": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文字大小"
           }
         }
       }
@@ -2177,6 +2427,56 @@
           "stringUnit": {
             "state": "translated",
             "value": "首次启动时的那段介绍。"
+          }
+        }
+      }
+    },
+    "The key was not accepted.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "密钥没有被接受。"
+          }
+        }
+      }
+    },
+    "The plan ZCode draws on. ZCode keeps its own key locked away, so this needs a key of that plan from you. It is stored in your Keychain and sent only to the service chosen below.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "也就是 ZCode 使用的套餐。ZCode 把自己的密钥加密保存了，所以需要你提供该套餐的一个密钥。它会保存在你的钥匙串里，只发送到下面选定的服务。"
+          }
+        }
+      }
+    },
+    "The provider answered in a form this version does not read.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "厂商返回的格式，这个版本还读不懂。"
+          }
+        }
+      }
+    },
+    "The provider asked for a pause. Trying again in a few minutes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "厂商要求稍后再试，几分钟后会自动重试。"
+          }
+        }
+      }
+    },
+    "The provider could not be reached.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接到厂商。"
           }
         }
       }
@@ -2227,6 +2527,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Token、费用与限额"
+          }
+        }
+      }
+    },
+    "Tool calls, monthly": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具调用（每月）"
           }
         }
       }
@@ -2347,6 +2657,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "每周限额"
+          }
+        }
+      }
+    },
+    "Weekly, Opus": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每周（Opus）"
+          }
+        }
+      }
+    },
+    "Weekly, Sonnet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每周（Sonnet）"
           }
         }
       }
@@ -2481,6 +2811,26 @@
         }
       }
     },
+    "as %@ reports them": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来自 %@ 自己的记录"
+          }
+        }
+      }
+    },
+    "asked %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询于 %@"
+          }
+        }
+      }
+    },
     "beta": {
       "localizations": {
         "zh-Hans": {
@@ -2561,6 +2911,16 @@
         }
       }
     },
+    "from %@'s status line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来自 %@ 的状态栏"
+          }
+        }
+      }
+    },
     "has a question": {
       "localizations": {
         "zh-Hans": {
@@ -2577,6 +2937,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "出错了"
+          }
+        }
+      }
+    },
+    "hit its limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已达额度上限"
           }
         }
       }
@@ -2607,6 +2977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "macOS 仍把这个应用放在隔离区"
+          }
+        }
+      }
+    },
+    "macOS was told not to share Claude Code's sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你在 macOS 的询问里选择了不共享 Claude Code 的登录凭据。"
           }
         }
       }

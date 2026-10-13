@@ -57,10 +57,21 @@ struct IslandLook: Equatable {
     var showMascots = true
     var compact = false
     var chips = Set(NikoSettings.RowChip.allCases)
+    /// The island's type is drawn a little smaller or larger on request.
+    var textScale: CGFloat = NikoSettings.TextSize.regular.scale
+    /// How long the island takes to open and close, relative to the standard.
+    var motion: Double = 1
 
     init() {}
 
+    // Type inside the island: semibold rather than bold, so a list of sessions reads as a list.
+    func title(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font { .system(size: size * textScale, weight: weight, design: .rounded) }
+    func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size * textScale, weight: weight) }
+    func mono(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font { .system(size: size * textScale, weight: weight, design: .monospaced) }
+
     init(settings: NikoSettings) {
+        textScale = settings.textSize.scale
+        motion = settings.motion.factor
         accent = Theme.color(for: settings.accent)
         mascots = settings.mascotChoices
         showMascots = settings.showMascots
@@ -109,14 +120,15 @@ struct Chip: View {
     var text: String
     var tint: Color?
     var mono = true
+    @Environment(\.look) private var look
 
     var body: some View {
         Text(text)
-            .font(mono ? Theme.mono(11) : Theme.body(11, .semibold))
+            .font(mono ? look.mono(10.5) : look.body(10.5, .medium))
             .lineLimit(1)
             .fixedSize()
-            .padding(.horizontal, 9)
-            .padding(.vertical, 4.5)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
             .foregroundStyle(tint ?? Theme.primary.opacity(0.88))
             .background(Capsule().fill(tint.map { $0.opacity(0.20) } ?? Theme.chip))
     }
@@ -195,12 +207,14 @@ struct IconButton: View {
 // the documentation images, and would not match the island's look anyway.)
 
 struct SwitchToggleStyle: ToggleStyle {
+    var scale: CGFloat = 1
+
     func makeBody(configuration: Configuration) -> some View {
         Button { configuration.isOn.toggle() } label: {
             HStack(spacing: 10) {
                 configuration.label
                 Spacer(minLength: 8)
-                SwitchTrack(isOn: configuration.isOn)
+                SwitchTrack(isOn: configuration.isOn, scale: scale)
             }
             .contentShape(Rectangle())
         }
@@ -211,14 +225,15 @@ struct SwitchToggleStyle: ToggleStyle {
 
 private struct SwitchTrack: View {
     var isOn: Bool
+    var scale: CGFloat = 1
     @Environment(\.look) private var look
 
     var body: some View {
         Capsule()
             .fill(isOn ? look.accent : Color.white.opacity(0.16))
-            .frame(width: 36, height: 21)
+            .frame(width: 36 * scale, height: 21 * scale)
             .overlay(alignment: isOn ? .trailing : .leading) {
-                Circle().fill(Color.white).frame(width: 17, height: 17).padding(2)
+                Circle().fill(Color.white).frame(width: 17 * scale, height: 17 * scale).padding(2 * scale)
             }
             .animation(.easeOut(duration: 0.14), value: isOn)
     }
@@ -252,14 +267,16 @@ struct LevelSlider: View {
 struct ChoicePills<Value: Hashable>: View {
     var options: [(value: Value, label: String)]
     @Binding var selection: Value
+    /// Drawn larger on a large welcome screen; type is laid out at that size, never magnified.
+    var scale: CGFloat = 1
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 6 * scale) {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
                 Button { selection = option.value } label: {
                     Text(option.label)
-                        .font(Theme.body(12, .semibold))
-                        .padding(.horizontal, 12).padding(.vertical, 6.5)
+                        .font(Theme.body(12 * scale, .semibold))
+                        .padding(.horizontal, 12 * scale).padding(.vertical, 6.5 * scale)
                         .foregroundStyle(selection == option.value ? Color.black : Theme.primary.opacity(0.85))
                         .background(Capsule().fill(selection == option.value ? Color.white : Color.white.opacity(0.10)))
                         .contentShape(Capsule())

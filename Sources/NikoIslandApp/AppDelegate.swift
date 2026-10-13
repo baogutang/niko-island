@@ -34,6 +34,14 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         model.soundPlayer = sounds
         model.onPreviewSound = { [weak sounds] event in sounds?.preview(event) }
 
+        // The real thing: the system Keychain and the network. Tests and previews
+        // never get here, so they cannot open either.
+        let paths = model.paths
+        let home = model.home
+        model.makeLimitsClient = { onChange in
+            ProviderLimitsClient(paths: paths, secrets: .system(home: home), onChange: onChange)
+        }
+        model.hasGLMKey = ProviderKeychain.exists(ProviderLimitsClient.glmAccount)
         model.start()
         if model.startFailure == .anotherInstanceRunning {
             // One island is enough: the running instance keeps the socket.

@@ -85,22 +85,23 @@ public struct UsageSnapshot: Sendable, Equatable {
         }
     }
 
-    /// One agent's usage: the rolling five hours, today, the last seven days,
-    /// since the user last reset the counter, and the provider's own limits
-    /// where it reports them.
+    /// One agent's usage: the rolling five hours, today, the last seven and
+    /// thirty days, and the provider's own limits where they are known.
     public struct AgentUsage: Sendable, Equatable, Identifiable {
         public var id: String
         public var fiveHours = Window()
         public var today = Window()
         public var week = Window()
-        public var sinceReset: Window?
-        public var resetAt: Date?
+        public var month = Window()
         /// Per model, last seven days.
         public var models: [UsageTotals] = []
         public var days: [Day] = []
         public var limits: [RateLimitWindow] = []
         public var limitsCapturedAt: Date?
+        public var limitsSource: LimitsSource?
         public var plan: String?
+        /// Quota resets the account can still spend, when the provider says.
+        public var resetsLeft: Int?
 
         public init(id: String) { self.id = id }
     }
@@ -175,7 +176,7 @@ public struct UsageSnapshot: Sendable, Equatable {
             RateLimitWindow(id: "seven_day", usedPercent: 61, resetsAt: now.addingTimeInterval(3.2 * 86_400)),
         ]
         snapshot.rateLimitsCapturedAt = now.addingTimeInterval(-40)
-        func usage(_ id: String, five: (Int, Double), limits: [RateLimitWindow], reset: Double?) -> AgentUsage {
+        func usage(_ id: String, five: (Int, Double), limits: [RateLimitWindow], source: LimitsSource? = nil) -> AgentUsage {
             var agent = AgentUsage(id: id)
             let today = id == "all" ? snapshot.today : snapshot.today.filter { $0.agent == id }
             let week = id == "all" ? snapshot.week : snapshot.week.filter { $0.agent == id }
@@ -187,19 +188,17 @@ public struct UsageSnapshot: Sendable, Equatable {
             agent.days = snapshot.days.map { Day(id: $0.id, tokens: Int(Double($0.tokens) * share), cost: $0.cost * share) }
             agent.limits = limits
             agent.limitsCapturedAt = limits.isEmpty ? nil : now.addingTimeInterval(-40)
-            if let reset {
-                agent.resetAt = now.addingTimeInterval(-reset * 3600)
-                agent.sinceReset = Window(tokens: Int(Double(agent.today.tokens) * 0.4), cost: agent.today.cost * 0.4, messages: 60)
-            }
+            agent.limitsSource = limits.isEmpty ? nil : source
+            agent.month = Window(tokens: Int(Double(agent.week.tokens) * 3.7), cost: agent.week.cost * 3.7, messages: agent.week.messages * 4)
             return agent
         }
         snapshot.agents = [
-            usage("all", five: (2_240_000, 3.86), limits: [], reset: nil),
-            usage("claude", five: (1_900_000, 3.41), limits: snapshot.rateLimits, reset: 3.5),
+            usage("all", five: (2_240_000, 3.86), limits: []),
+            usage("claude", five: (1_900_000, 3.41), limits: snapshot.rateLimits, source: .provider),
             usage("codex", five: (340_000, 0.45), limits: [
                 RateLimitWindow(id: "primary", usedPercent: 22, resetsAt: now.addingTimeInterval(1.6 * 3600), windowMinutes: 300),
                 RateLimitWindow(id: "secondary", usedPercent: 48, resetsAt: now.addingTimeInterval(4.1 * 86_400), windowMinutes: 10080),
-            ], reset: nil),
+            ], source: .agentFiles),
         ]
         snapshot.updatedAt = now
         snapshot.pricingSource = "bundled"

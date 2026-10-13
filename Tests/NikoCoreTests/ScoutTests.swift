@@ -72,6 +72,33 @@ final class TranscriptParsingTests: XCTestCase {
         XCTAssertEqual(claude([#"{"type":"file-history-snapshot"}"#], quietFor: 600).phase, .waiting)
     }
 
+    func testClaudeBeingTurnedAwayAtALimitIsReadFromItsTranscript() {
+        // As Claude Code writes it when the plan's window is used up (keys from a real file).
+        let resets = Int(now.timeIntervalSince1970) + 5400
+        let refused = #"{"type":"assistant","timestamp":"2027-01-15T08:00:03.000Z","isApiErrorMessage":true,"apiError":"usage_limit_reached","apiErrorStatus":429,"error":"rate_limit","apiErrorParams":{"rate_limit_info":{"status":"rejected","resetsAt":RESETS,"rateLimitType":"five_hour","overageStatus":"rejected","isUsingOverage":false}},"quotaLimits":{"status":"rejected","resetsAt":RESETS,"rateLimitType":"five_hour"},"message":{"role":"assistant","content":[{"type":"text","text":"You've hit your session limit"}]}}"#
+            .replacingOccurrences(of: "RESETS", with: String(resets))
+        var snapshot = claude([prompt, refused], quietFor: 30)
+        XCTAssertEqual(snapshot.limitReached, RateLimitWindow(id: "five_hour", usedPercent: 100, resetsAt: Date(timeIntervalSince1970: Double(resets))))
+        XCTAssertEqual(snapshot.limitReached?.minutes, 300)
+        XCTAssertEqual(snapshot.phase, .waiting)
+        XCTAssertEqual(snapshot.activity.verb, "hit its limit")
+
+        // The person tries again: the row is about that again, the window is still full.
+        snapshot = claude([prompt, refused, prompt, toolUse], quietFor: 2)
+        XCTAssertEqual(snapshot.phase, .working)
+        XCTAssertEqual(snapshot.activity.verb, "running")
+        XCTAssertNotNil(snapshot.limitReached)
+
+        // Once the window has opened again there is nothing left to report.
+        let later = ClaudeTranscript.snapshot(path: "/h/.claude/projects/-tmp-proj/0f0e-session.jsonl", tail: jsonl([prompt, refused]), tailIsWholeFile: true,
+                                              modified: now, now: now.addingTimeInterval(6000))
+        XCTAssertNil(later?.limitReached)
+        XCTAssertEqual(later?.activity, .waiting)
+        // An "allowed" notice is not a refusal.
+        let allowed = refused.replacingOccurrences(of: "\"status\":\"rejected\"", with: "\"status\":\"allowed_warning\"")
+        XCTAssertNil(claude([prompt, allowed]).limitReached)
+    }
+
     func testClaudeHugeLinesAreClassifiedWithoutParsing() {
         let blob = String(repeating: "x", count: TranscriptText.parseLimit + 10)
         let huge = #"{"type":"user","toolUseResult":{"file":"\#(blob)"},"message":{"role":"user","content":[{"type":"tool_result","content":"…"}]}}"#
@@ -287,5 +314,152 @@ final class TranscriptMergeTests: XCTestCase {
         XCTAssertEqual(store[key]?.subagents, 2)
         store.merge([snapshot(), idleHelper], now: now)
         XCTAssertEqual(store[key]?.subagents, 0)
+    }
+}
+
+/// ZCode keeps sessions in a database; the fixture has the tables and columns
+/// of the real one (ZCode 3.15), with made-up rows.
+final class ZCodeSessionsTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_800_000_000)
+    private var ms: Int64 { Int64(now.timeIntervalSince1970 * 1000) }
+
+    private func makeHome(_ scratch: Scratch) throws -> (home: URL, db: SQLiteDB) {
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".zcode/cli/db"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".zcode/v2"), withIntermediateDirectories: true)
+        let db = try SQLiteDB(path: ZCodeSessions.databasePath(home: home))
+        try db.execute("""
+            CREATE TABLE session (id TEXT PRIMARY KEY, parent_id TEXT, directory TEXT, title TEXT, time_created INTEGER,
+                                  time_updated INTEGER, time_archived INTEGER, task_type TEXT);
+            CREATE TABLE message (id TEXT PRIMARY KEY, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT, sequence INTEGER);
+            CREATE TABLE part (id TEXT PRIMARY KEY, message_id TEXT, session_id TEXT, time_created INTEGER, time_updated INTEGER, data TEXT, sequence INTEGER);
+            """)
+        return (home, db)
+    }
+
+    private func session(_ db: SQLiteDB, _ id: String, parent: String? = nil, directory: String, title: String, quietFor seconds: Double, archived: Bool = false) throws {
+        try db.run("INSERT INTO session VALUES (?, ?, ?, ?, ?, ?, ?, ?)", [
+            .text(id), parent.map { .text($0) } ?? .null, .text(directory), .text(title), .integer(ms - 3_600_000),
+            .integer(ms - Int64(seconds * 1000)), archived ? .integer(ms) : .null, .text(parent == nil ? "interactive" : "subagent_child"),
+        ])
+    }
+
+    private var counter = 0
+    private func message(_ db: SQLiteDB, _ sessionID: String, _ data: String, parts: [String]) throws {
+        counter += 1
+        let id = "msg_\(counter)"
+        try db.run("INSERT INTO message VALUES (?, ?, ?, ?, ?, ?)", [.text(id), .text(sessionID), .integer(ms), .integer(ms), .text(data), .integer(Int64(counter))])
+        for (index, part) in parts.enumerated() {
+            try db.run("INSERT INTO part VALUES (?, ?, ?, ?, ?, ?, ?)",
+                       [.text("\(id)_p\(index)"), .text(id), .text(sessionID), .integer(ms), .integer(ms), .text(part), .integer(Int64(index))])
+        }
+    }
+
+    func testSessionsAreReadFromZCodesDatabase() throws {
+        let scratch = Scratch()
+        let (home, db) = try makeHome(scratch)
+        let user = #"{"role":"user","time":{"created":1800000000000}}"#
+        // A turn in full swing: asked, answered with a tool call that is still running.
+        try session(db, "sess_busy", directory: "/Users/me/projects/atlas", title: "Fix the upload retry", quietFor: 3)
+        try message(db, "sess_busy", user, parts: [#"{"type":"text","text":"Fix the flaky upload retry test"}"#])
+        try message(db, "sess_busy", #"{"role":"assistant","finish":"tool-calls","time":{"created":1,"completed":2}}"#,
+                    parts: [#"{"type":"text","text":"Let me look."}"#, #"{"type":"tool","tool":"Read","state":{"status":"completed","input":{"file_path":"/a/Upload.swift"},"output":"…"}}"#])
+        try message(db, "sess_busy", #"{"role":"assistant","time":{"created":3}}"#,
+                    parts: [#"{"type":"step-start"}"#, #"{"type":"text","text":"Running the tests now."}"#,
+                            #"{"type":"tool","tool":"Bash","state":{"status":"running","input":{"command":"swift test --filter Upload","description":"run"},"output":"big"}}"#])
+        // A helper of that session.
+        try session(db, "sess_helper", parent: "sess_busy", directory: "/Users/me/projects/atlas", title: "Explore the retry code", quietFor: 5)
+        try message(db, "sess_helper", user, parts: [#"{"type":"text","text":"Find the retry code"}"#])
+        // Finished and waiting, in ZCode's own scratch folder.
+        try session(db, "sess_done", directory: home.appendingPathComponent(".zcode/workspace/default").path, title: "  Name ideas  ", quietFor: 120)
+        try message(db, "sess_done", user, parts: [#"{"type":"text","synthetic":true,"text":"<system note>"}"#, #"{"type":"text","text":"Ten names for a crab"}"#])
+        try message(db, "sess_done", #"{"role":"assistant","finish":"stop","time":{"created":5,"completed":1799999880000}}"#,
+                    parts: [#"{"type":"reasoning","text":"hidden"}"#, #"{"type":"text","text":"Here are ten."}"#])
+        // Asking the person something.
+        try session(db, "sess_ask", directory: "/Users/me/projects/shop", title: "Checkout form", quietFor: 20)
+        try message(db, "sess_ask", user, parts: [#"{"type":"text","text":"Rework the checkout form"}"#])
+        try message(db, "sess_ask", #"{"role":"assistant","time":{"created":7}}"#,
+                    parts: [#"{"type":"tool","tool":"AskUserQuestion","state":{"status":"running","input":{"questions":[]}}}"#])
+        // Not to be listed: archived, too old, and one the desktop app has deleted.
+        try session(db, "sess_archived", directory: "/x", title: "Archived", quietFor: 10, archived: true)
+        try session(db, "sess_old", directory: "/x", title: "Old", quietFor: 90_000)
+        try session(db, "sess_deleted", directory: "/x", title: "Deleted in the app", quietFor: 10)
+        db.close()
+
+        let tasks = try SQLiteDB(path: ZCodeSessions.taskIndexPath(home: home))
+        try tasks.execute("CREATE TABLE tasks (task_id TEXT, archived INTEGER, deleted INTEGER, updated_at INTEGER)")
+        for (id, deleted) in [("sess_busy", 0), ("sess_done", 0), ("sess_deleted", 1)] {
+            try tasks.run("INSERT INTO tasks VALUES (?, 0, ?, ?)", [.text(id), .integer(Int64(deleted)), .integer(ms)])
+        }
+        tasks.close()
+
+        let reader = ZCodeSessions(home: home)
+        let found = reader.snapshots(since: now.addingTimeInterval(-3600), now: now)
+        XCTAssertEqual(found.map(\.key.sessionID), ["sess_busy", "sess_helper", "sess_ask", "sess_done"], "newest first; hidden ones left out")
+        XCTAssertTrue(found.allSatisfy { $0.key.source == "zcode" })
+
+        let busy = found[0]
+        XCTAssertEqual(busy.phase, .working)
+        XCTAssertEqual(busy.activity, Activity(verb: "running", detail: "swift test --filter Upload"))
+        XCTAssertEqual(busy.title, "Fix the upload retry")
+        XCTAssertEqual(busy.lastPrompt, "Fix the flaky upload retry test")
+        XCTAssertEqual(busy.lastReply, "Running the tests now.")
+        XCTAssertEqual(busy.cwd, "/Users/me/projects/atlas")
+        XCTAssertEqual(busy.host, .zcodeDesktop, "it is in the desktop app's own list")
+        XCTAssertFalse(busy.isSubagent)
+
+        let helper = found[1]
+        XCTAssertTrue(helper.isSubagent)
+        XCTAssertEqual(helper.parentID, "sess_busy")
+        XCTAssertEqual(helper.host, .zcodeDesktop, "a helper lives where its parent lives")
+        XCTAssertEqual(helper.phase, .working)
+
+        let ask = found[2]
+        XCTAssertEqual(ask.phase, .needsAttention)
+        XCTAssertEqual(ask.activity.verb, "has a question")
+        XCTAssertNil(ask.host, "not in the desktop list: a terminal session")
+
+        let done = found[3]
+        XCTAssertEqual(done.phase, .waiting)
+        XCTAssertEqual(done.title, "Name ideas")
+        XCTAssertEqual(done.lastPrompt, "Ten names for a crab", "notes the app writes for itself are not what the person asked")
+        XCTAssertEqual(done.lastReply, "Here are ten.")
+        XCTAssertNil(done.cwd, "ZCode's scratch folder is not a project")
+
+        // A turn nobody has written to for a long time is not shown as running.
+        let muchLater = reader.snapshots(since: now.addingTimeInterval(-3600), now: now.addingTimeInterval(1200))
+        XCTAssertEqual(muchLater.first { $0.key.sessionID == "sess_busy" }?.phase, .waiting)
+    }
+
+    func testAMissingOrStrangeDatabaseIsSimplyNoSessions() throws {
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        XCTAssertTrue(ZCodeSessions(home: home).snapshots(since: .distantPast, now: now).isEmpty, "no ZCode at all")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".zcode/cli/db"), withIntermediateDirectories: true)
+        try Data("this is not a database".utf8).write(to: URL(fileURLWithPath: ZCodeSessions.databasePath(home: home)))
+        let reader = ZCodeSessions(home: home)
+        XCTAssertTrue(reader.snapshots(since: .distantPast, now: now).isEmpty)
+        XCTAssertTrue(reader.snapshots(since: .distantPast, now: now.addingTimeInterval(1)).isEmpty, "and it is left alone for a while")
+        // A database with other tables in it (a future ZCode) is not an error either.
+        try FileManager.default.removeItem(atPath: ZCodeSessions.databasePath(home: home))
+        let db = try SQLiteDB(path: ZCodeSessions.databasePath(home: home))
+        try db.execute("CREATE TABLE something_else (id TEXT)")
+        db.close()
+        XCTAssertTrue(ZCodeSessions(home: home).snapshots(since: .distantPast, now: now).isEmpty)
+    }
+
+    func testTheScoutReportsZCodeNextToTheOthers() throws {
+        let scratch = Scratch()
+        let (home, db) = try makeHome(scratch)
+        let recent = Int64(Date().timeIntervalSince1970 * 1000) - 4000
+        try db.run("INSERT INTO session VALUES ('sess_live', NULL, '/Users/me/projects/atlas', 'Live one', ?, ?, NULL, 'interactive')", [.integer(recent), .integer(recent)])
+        try db.run("INSERT INTO message VALUES ('m1', 'sess_live', 0, 0, ?, 1)", [.text(#"{"role":"user","time":{"created":1}}"#)])
+        try db.run("INSERT INTO part VALUES ('p1', 'm1', 'sess_live', 0, 0, ?, 0)", [.text(#"{"type":"text","text":"Hello there"}"#)])
+        db.close()
+        let scout = TranscriptScout(home: home) { _ in }
+        let snapshots = scout.scanOnce()
+        XCTAssertEqual(snapshots.map(\.key), [SessionKey(source: "zcode", sessionID: "sess_live")])
+        XCTAssertEqual(snapshots.first?.lastPrompt, "Hello there")
+        XCTAssertEqual(snapshots.first?.phase, .working)
     }
 }

@@ -1,8 +1,9 @@
 import Foundation
 
-/// Watches the transcripts agents write for themselves and reports the
-/// sessions that have been active recently. Read-only, local, and cheap: file
-/// times are polled, and a file is only read again when it has grown.
+/// Watches the transcripts agents write for themselves (Claude Code and Codex
+/// as files, ZCode as a database) and reports the sessions that have been
+/// active recently. Read-only, local, and cheap: file times are polled, and a
+/// file is only read again when it has grown.
 public final class TranscriptScout: @unchecked Sendable {
     public struct Options: Sendable {
         /// Sessions quiet for longer than this are no longer reported.
@@ -36,6 +37,7 @@ public final class TranscriptScout: @unchecked Sendable {
     private var entries: [String: Entry] = [:]
     private var tick = 0
     private var lastEmitted: [TranscriptSnapshot]?
+    private lazy var zcode = ZCodeSessions(home: home)
 
     public init(home: URL, options: Options = Options(), onChange: @escaping @Sendable ([TranscriptSnapshot]) -> Void) {
         self.home = home
@@ -107,6 +109,8 @@ public final class TranscriptScout: @unchecked Sendable {
             }
             if let snapshot = snapshot(path: path, entry: entry, now: now) { out.append(snapshot) }
         }
+        // ZCode keeps its sessions in a database instead of one file each.
+        out.append(contentsOf: zcode.snapshots(since: cutoff, now: now))
         return out.sorted { $0.updatedAt != $1.updatedAt ? $0.updatedAt > $1.updatedAt : $0.path < $1.path }
     }
 

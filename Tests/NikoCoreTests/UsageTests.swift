@@ -621,7 +621,7 @@ final class UsageWindowTests: XCTestCase {
                     session: "s", project: nil, input: input, output: output)
     }
 
-    func testPerAgentWindowsLimitsAndResets() throws {
+    func testPerAgentWindowsAndLimitsFromSeveralSources() throws {
         let scratch = Scratch()
         let paths = NikoPaths(root: scratch.file("ni"))
         let home = scratch.file("home")
@@ -634,12 +634,21 @@ final class UsageWindowTests: XCTestCase {
         let t = now.timeIntervalSince1970
         try store.commit(records: [
             record("claude", "a", at: t - 600), record("claude", "b", at: t - 7 * 3600), record("claude", "c", at: t - 3 * 86_400),
+            record("claude", "old", at: t - 20 * 86_400, input: 1000, output: 0), record("claude", "ancient", at: t - 40 * 86_400),
             record("codex", "d", at: t - 1200, input: 1000, output: 0), record("zcode", "e", at: t - 60, input: 10, output: 5),
         ], pricing: Pricing(rates: [:], source: "test"), file: nil)
         store.close()
 
         let again = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
-        again.setResets(["claude": now.addingTimeInterval(-3600), "all": now.addingTimeInterval(-900)])
+        // What a provider answered when asked, and what an agent wrote down when it was turned away.
+        again.setAskedLimits(["zcode": ProviderLimits(windows: [
+            RateLimitWindow(id: "five_hour", usedPercent: 12, resetsAt: now.addingTimeInterval(3600), windowMinutes: 300),
+            RateLimitWindow(id: "seven_day", usedPercent: 40, resetsAt: now.addingTimeInterval(86_400), windowMinutes: 10080),
+        ], capturedAt: now.addingTimeInterval(-30), plan: "pro", source: .provider)])
+        again.noteLimitReached(agent: "claude", window: RateLimitWindow(id: "five_hour", usedPercent: 100, resetsAt: now.addingTimeInterval(1800)),
+                               at: now.addingTimeInterval(-120))
+        again.noteLimitReached(agent: "claude", window: RateLimitWindow(id: "seven_day", usedPercent: 100, resetsAt: now.addingTimeInterval(-5)),
+                               at: now.addingTimeInterval(-9000))
         let snapshot = again.scanNow()
         again.stop()
 
@@ -649,14 +658,22 @@ final class UsageWindowTests: XCTestCase {
         XCTAssertEqual(claude.fiveHours.tokens, 150, "only what happened in the last five hours")
         XCTAssertEqual(claude.week.tokens, 450)
         XCTAssertEqual(claude.week.messages, 3)
-        XCTAssertEqual(claude.sinceReset?.tokens, 150, "counted from the reset, an hour ago")
+        XCTAssertEqual(claude.month.tokens, 450 + 1000, "thirty days, not forty")
+        XCTAssertEqual(claude.limits.map(\.id), ["five_hour"], "a window that has opened again is not reported as full")
+        XCTAssertEqual(claude.limits.first?.usedPercent, 100)
+        XCTAssertEqual(claude.limitsSource, .limitReached)
         XCTAssertEqual(claude.days.count, 7)
         XCTAssertEqual(claude.days.reduce(0) { $0 + $1.tokens }, 450)
         XCTAssertEqual(claude.models.map(\.model), ["claude-model"])
-        XCTAssertNil(try XCTUnwrap(snapshot.agent("codex")).sinceReset, "no reset asked for")
+        XCTAssertTrue(try XCTUnwrap(snapshot.agent("codex")).limits.isEmpty, "nobody said anything about Codex")
+        let zcode = try XCTUnwrap(snapshot.agent("zcode"))
+        XCTAssertEqual(zcode.limits.map(\.usedPercent), [12, 40])
+        XCTAssertEqual(zcode.limitsSource, .provider)
+        XCTAssertEqual(zcode.plan, "pro")
+        XCTAssertEqual(snapshot.rateLimits.count, 3, "every known window, for the cue that a limit is close")
         let all = try XCTUnwrap(snapshot.agent("all"))
         XCTAssertEqual(all.fiveHours.tokens, 150 + 1000 + 15)
-        XCTAssertEqual(all.sinceReset?.tokens, 150 + 15, "the last fifteen minutes, every agent")
+        XCTAssertEqual(all.month.tokens, 450 + 1000 + 1000 + 15)
         XCTAssertEqual(all.week.tokens, snapshot.weekTokens)
     }
 

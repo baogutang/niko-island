@@ -346,6 +346,57 @@ public enum NikoCLI {
             }
             print("\(snapshots.count) session(s) active in the last \(Int(minutes)) min, scanned in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             return 0
+        case "limits":
+            // One opt-in lookup, to check that a provider answers in a form this version reads.
+            // Prints states, percentages and the shape of the answer; never a credential.
+            let which = args.positional() ?? "claude"
+            let home = URL(fileURLWithPath: NSHomeDirectory())
+            let work = NikoPaths(root: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("niko-limits-\(getpid())"))
+            try? FileManager.default.createDirectory(at: work.cache, withIntermediateDirectories: true)
+            defer { try? FileManager.default.removeItem(at: work.root) }
+            @Sendable func shape(_ value: JSONValue, depth: Int = 0) -> String {
+                if let object = value.objectValue {
+                    return "{" + object.members.map { "\($0.key): \(shape($0.value, depth: depth + 1))" }.joined(separator: ", ") + "}"
+                }
+                if let array = value.arrayValue { return "[\(array.count) × \(array.first.map { shape($0, depth: depth + 1) } ?? "")]" }
+                if let text = value.stringValue { return "str(\(text.count))" }
+                if value.doubleValue != nil { return "num" }
+                return value.boolValue != nil ? "bool" : "null"
+            }
+            let transport: ProviderLimitsClient.Transport = { request in
+                let (data, status) = try await ProviderLimitsClient.network(request)
+                print("\(request.url?.host ?? "?") → HTTP \(status), \(data.count) bytes")
+                if let parsed = try? JSONValue.parse(data) { print("shape: \(shape(parsed))") }
+                return (data, status)
+            }
+            if which == "claude" {
+                // When the stored sign-in runs out says whether a lookup can work at all. The sign-in itself is not shown.
+                switch ClaudeCodeLogin.read(home: home) {
+                case .found(let login):
+                    let minutes = login.expiresAt.map { Int($0.timeIntervalSinceNow / 60) }
+                    print("sign-in: found, plan=\(login.plan ?? "-"), expires in \(minutes.map(String.init) ?? "?") min")
+                case .missing: print("sign-in: none on this Mac")
+                case .denied: print("sign-in: macOS said no")
+                }
+            }
+            let done = DispatchSemaphore(value: 0)
+            let region = GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
+            Task.detached {
+                let client = ProviderLimitsClient(paths: work, secrets: .system(home: home), transport: transport) { _ in }
+                await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region))
+                await client.refresh(force: true)
+                for (provider, result) in await client.current() {
+                    print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")
+                    for window in result.limits?.windows ?? [] {
+                        let resets = window.resetsAt.map { "\(Int($0.timeIntervalSinceNow / 60)) min" } ?? "-"
+                        print("  \(window.id)\tused=\(Int(window.usedPercent))%\tresets in \(resets)\tminutes=\(window.minutes.map(String.init) ?? "-")")
+                    }
+                }
+                await client.configure(.init())
+                done.signal()
+            }
+            done.wait()
+            return 0
         case "listen":
             // Headless ingress for checking an integration: prints one line per
             // admitted event (names and keys only, never values) and makes no decisions.
