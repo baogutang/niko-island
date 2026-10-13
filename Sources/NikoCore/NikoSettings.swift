@@ -139,6 +139,137 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["showIslandWhenIdle"] = .bool(newValue) }
     }
 
+    // MARK: Appearance
+
+    public enum IslandWidth: String, Sendable, CaseIterable {
+        case compact, regular, wide
+
+        public var points: Double {
+            switch self {
+            case .compact: return 560
+            case .regular: return 640
+            case .wide: return 720
+            }
+        }
+    }
+
+    /// Width of the open island.
+    public var islandWidth: IslandWidth {
+        get { raw["islandWidth"]?.stringValue.flatMap(IslandWidth.init(rawValue:)) ?? .regular }
+        set { raw["islandWidth"] = .string(newValue.rawValue) }
+    }
+
+    public enum Accent: String, Sendable, CaseIterable {
+        case mint, sky, violet, amber, coral
+    }
+
+    /// The colour of "working" and of the things you can press.
+    public var accent: Accent {
+        get { raw["accent"]?.stringValue.flatMap(Accent.init(rawValue:)) ?? .mint }
+        set { raw["accent"] = .string(newValue.rawValue) }
+    }
+
+    public enum Density: String, Sendable, CaseIterable {
+        case comfortable, compact
+    }
+
+    public var rowDensity: Density {
+        get { raw["rowDensity"]?.stringValue.flatMap(Density.init(rawValue:)) ?? .comfortable }
+        set { raw["rowDensity"] = .string(newValue.rawValue) }
+    }
+
+    public enum RowChip: String, Sendable, CaseIterable {
+        case elapsed, agent, host
+    }
+
+    /// Whether a kind of chip is shown on session rows.
+    public func showsChip(_ chip: RowChip) -> Bool {
+        raw["rowChips"]?[chip.rawValue]?.boolValue ?? true
+    }
+
+    public mutating func setChip(_ chip: RowChip, shown: Bool) {
+        var object = raw["rowChips"]?.objectValue ?? JSONObject()
+        object[chip.rawValue] = .bool(shown)
+        raw["rowChips"] = .object(object)
+    }
+
+    /// Show the pixel creatures (off: a plain coloured dot per agent).
+    public var showMascots: Bool {
+        get { bool("showMascots", default: true) }
+        set { raw["showMascots"] = .bool(newValue) }
+    }
+
+    /// The creature the user picked for an agent, by sprite name.
+    public func mascot(for agent: String) -> String? {
+        raw["mascots"]?[agent]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Every choice the user made, agent id → sprite name.
+    public var mascotChoices: [String: String] {
+        var out: [String: String] = [:]
+        for member in raw["mascots"]?.objectValue?.members ?? [] {
+            if let name = member.value.stringValue, !name.isEmpty { out[member.key] = name }
+        }
+        return out
+    }
+
+    public mutating func setMascot(_ sprite: String?, for agent: String) {
+        var object = raw["mascots"]?.objectValue ?? JSONObject()
+        object[agent] = sprite.map(JSONValue.string)
+        raw["mascots"] = object.isEmpty ? nil : .object(object)
+    }
+
+    /// How many rows the open island shows before it scrolls.
+    public static let visibleRowChoices = [4, 6, 8, 12]
+
+    public var visibleRows: Int {
+        get { min(20, max(2, raw["visibleRows"]?.intValue ?? 6)) }
+        set { raw["visibleRows"] = .int(newValue) }
+    }
+
+    // MARK: Timing
+
+    /// Milliseconds the pointer has to rest on the island before it opens.
+    public static let hoverDelayChoices = [0, 160, 350, 600]
+
+    public var hoverOpenDelayMS: Int {
+        get { min(2000, max(0, raw["hoverOpenDelayMS"]?.intValue ?? 160)) }
+        set { raw["hoverOpenDelayMS"] = .int(newValue) }
+    }
+
+    /// Milliseconds after the pointer leaves before a hover-opened island closes.
+    public static let closeDelayChoices = [200, 450, 900, 1500]
+
+    public var hoverCloseDelayMS: Int {
+        get { min(5000, max(0, raw["hoverCloseDelayMS"]?.intValue ?? 450)) }
+        set { raw["hoverCloseDelayMS"] = .int(newValue) }
+    }
+
+    /// Seconds the "finished" notice stays on the closed island.
+    public static let toastChoices = [3, 5, 8, 15]
+
+    public var toastSeconds: Int {
+        get { min(60, max(1, raw["toastSeconds"]?.intValue ?? 5)) }
+        set { raw["toastSeconds"] = .int(newValue) }
+    }
+
+    // MARK: App
+
+    /// "system", "en" or "zh-Hans".
+    public var language: String {
+        get {
+            let value = raw["language"]?.stringValue ?? "system"
+            return ["en", "zh-Hans"].contains(value) ? value : "system"
+        }
+        set { raw["language"] = .string(newValue) }
+    }
+
+    /// Control-Option-I opens and closes the island from anywhere.
+    public var hotkeyEnabled: Bool {
+        get { bool("hotkeyEnabled", default: true) }
+        set { raw["hotkeyEnabled"] = .bool(newValue) }
+    }
+
     /// Find sessions from the transcripts agents write, not only from hooks.
     public var discoverSessions: Bool {
         get { bool("discoverSessions", default: true) }

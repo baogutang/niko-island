@@ -22,6 +22,15 @@ extension Session {
         return line.isEmpty || line == headline || Activity.oneLine(last, limit: 72) == headline ? nil : line
     }
 
+    /// Where the session lives, as the chip says it. An agent's own desktop
+    /// app is "Desktop": its name is already on the chip next to it.
+    var hostLabel: String? {
+        if let host, terminal.isEmpty, AgentRegistry.descriptor(source)?.apps.contains(host.bundleID ?? "") == true {
+            return L("Desktop")
+        }
+        return hostName
+    }
+
     /// What the agent said last, shown once it has stopped.
     var replyLine: String? {
         guard phase == .waiting, let reply = lastReply else { return nil }
@@ -37,6 +46,7 @@ struct SessionRowView: View {
     let session: Session
     var now: Date
     @State private var hovering = false
+    @Environment(\.look) private var look
 
     private var pendingHere: AppModel.PendingRequest? {
         model.pending.first { $0.sessionKey == session.key }
@@ -71,15 +81,17 @@ struct SessionRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
 
             HStack(spacing: 6) {
-                Chip(text: elapsedText(since: session.phaseSince, now: now))
-                Chip(text: AgentRegistry.displayName(for: session.source), tint: AgentTint.color(for: session.source))
-                if let host = session.hostName { Chip(text: host) }
+                if look.chips.contains(.elapsed) { Chip(text: elapsedText(since: session.phaseSince, now: now)) }
+                if look.chips.contains(.agent) {
+                    Chip(text: AgentRegistry.displayName(for: session.source), tint: AgentTint.color(for: session.source))
+                }
+                if look.chips.contains(.host), let host = session.hostLabel { Chip(text: host) }
                 if session.subagents > 0 { Chip(text: L("%lld helpers", session.subagents), tint: Theme.sky) }
                 if session.phase == .needsAttention { BellBadge() }
             }
             .padding(.top, 1)
         }
-        .padding(.vertical, 9)
+        .padding(.vertical, look.compact ? 5 : 9)
         .padding(.horizontal, 10)
         .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(hovering ? Theme.hover : Color.clear))
         .padding(.horizontal, -10)
@@ -102,10 +114,10 @@ struct SessionRowView: View {
 
     private var activityLine: some View {
         HStack(spacing: 5) {
-            Circle().fill(Theme.color(for: session.phase)).frame(width: 6, height: 6)
+            Circle().fill(Theme.color(for: session.phase, accent: look.accent)).frame(width: 6, height: 6)
             Text(session.activity.localizedVerb)
                 .font(Theme.body(12, .medium))
-                .foregroundStyle(Theme.color(for: session.phase))
+                .foregroundStyle(Theme.color(for: session.phase, accent: look.accent))
                 .fixedSize()
             if let detail = session.activity.detail, !detail.isEmpty {
                 Text(detail)

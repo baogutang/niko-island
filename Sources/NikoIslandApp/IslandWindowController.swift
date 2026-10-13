@@ -347,7 +347,7 @@ final class IslandWindowController: NSObject {
         if inside {
             closeTimer?.cancel()
             guard !model.isExpanded, model.settings.expandOnHover else { return }
-            schedule(&openTimer, after: 0.16) { [weak self] in
+            schedule(&openTimer, after: Double(model.settings.hoverOpenDelayMS) / 1000) { [weak self] in
                 guard let self, self.pointerInside else { return }
                 self.model.expand(.hover)
             }
@@ -355,7 +355,7 @@ final class IslandWindowController: NSObject {
             openTimer?.cancel()
             quicken(for: 0.6)
             guard model.isExpanded, model.expandReason == .hover else { return }
-            schedule(&closeTimer, after: 0.45) { [weak self] in
+            schedule(&closeTimer, after: Double(model.settings.hoverCloseDelayMS) / 1000) { [weak self] in
                 guard let self, !self.pointerInside, self.model.expandReason == .hover else { return }
                 self.model.collapse()
                 self.quicken(for: 0.6)

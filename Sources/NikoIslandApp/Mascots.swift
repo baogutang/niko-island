@@ -314,7 +314,15 @@ enum Mascots {
         "............",
     ]], palette: ["g": rgb(110, 214, 150), "t": rgb(176, 124, 84), "s": rgb(240, 214, 150), "c": rgb(110, 190, 240)])
 
-    static let all: [MascotSprite] = [starfish, whale, jellyfish, turtle, gull, boat, octopus, puffer, island]
+    /// Every creature, for the picker in Settings.
+    static let all: [MascotSprite] = [starfish, whale, jellyfish, turtle, gull, boat, octopus, puffer, crab, island]
+
+    static func named(_ name: String) -> MascotSprite? { all.first { $0.name == name } }
+
+    /// The creature for an agent, honouring what the user picked.
+    static func sprite(for source: String, choices: [String: String]) -> MascotSprite {
+        choices[source].flatMap(named) ?? sprite(for: source)
+    }
 
     /// Which creature stands for which agent.
     static func sprite(for source: String) -> MascotSprite {
@@ -346,31 +354,42 @@ enum Mascots {
 /// Draws a sprite on a pixel grid. Animated only while `animated` is true, so
 /// idle rows cost nothing.
 struct MascotView: View {
-    var sprite: MascotSprite
+    /// Set when the view stands for an agent: the user's choice of creature applies.
+    var source: String?
+    private var fixed: MascotSprite
     var size: CGFloat = 30
     var animated = false
     /// Fixed frame for documentation images.
     var frame: Int?
     @Environment(\.isStaticPreview) private var isStaticPreview
     @Environment(\.mascotFrame) private var mascotFrame
+    @Environment(\.look) private var look
 
     init(source: String, size: CGFloat = 30, animated: Bool = false, frame: Int? = nil) {
-        self.sprite = Mascots.sprite(for: source)
+        self.source = source
+        self.fixed = Mascots.sprite(for: source)
         self.size = size
         self.animated = animated
         self.frame = frame
     }
 
     init(sprite: MascotSprite, size: CGFloat = 30, animated: Bool = false, frame: Int? = nil) {
-        self.sprite = sprite
+        self.fixed = sprite
         self.size = size
         self.animated = animated
         self.frame = frame
     }
 
+    private var sprite: MascotSprite {
+        source.map { Mascots.sprite(for: $0, choices: look.mascots) } ?? fixed
+    }
+
     var body: some View {
         Group {
-            if animated, frame == nil, !isStaticPreview {
+            if let source, !look.showMascots {
+                // Creatures switched off: a plain dot in the agent's colour.
+                Circle().fill(AgentTint.color(for: source)).frame(width: size * 0.42, height: size * 0.42)
+            } else if animated, frame == nil, !isStaticPreview {
                 TimelineView(.periodic(from: .now, by: 0.55)) { context in
                     canvas(frame: Int(context.date.timeIntervalSinceReferenceDate / 0.55) % 2)
                 }

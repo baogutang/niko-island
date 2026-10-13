@@ -24,17 +24,60 @@ enum Theme {
     static let card = Color.white.opacity(0.055)
     static let cardStroke = Color.white.opacity(0.09)
 
-    static func color(for phase: Session.Phase) -> Color {
+    static let violet = Color(red: 0.72, green: 0.62, blue: 1.00)
+
+    static func color(for phase: Session.Phase, accent: Color = mint) -> Color {
         switch phase {
-        case .working: return mint
+        case .working: return accent
         case .waiting: return amber
         case .needsAttention: return coral
+        }
+    }
+
+    static func color(for accent: NikoSettings.Accent) -> Color {
+        switch accent {
+        case .mint: return mint
+        case .sky: return sky
+        case .violet: return violet
+        case .amber: return amber
+        case .coral: return coral
         }
     }
 
     static func title(_ size: CGFloat) -> Font { .system(size: size, weight: .bold, design: .rounded) }
     static func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size, weight: weight) }
     static func mono(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font { .system(size: size, weight: weight, design: .monospaced) }
+}
+
+/// The parts of the island's look the user can change, handed down the view tree.
+struct IslandLook: Equatable {
+    var accent = Theme.mint
+    /// Agent id → sprite name, for agents whose creature the user picked.
+    var mascots: [String: String] = [:]
+    var showMascots = true
+    var compact = false
+    var chips = Set(NikoSettings.RowChip.allCases)
+
+    init() {}
+
+    init(settings: NikoSettings) {
+        accent = Theme.color(for: settings.accent)
+        mascots = settings.mascotChoices
+        showMascots = settings.showMascots
+        compact = settings.rowDensity == .compact
+        chips = Set(NikoSettings.RowChip.allCases.filter(settings.showsChip))
+    }
+}
+
+private struct IslandLookKey: EnvironmentKey {
+    static let defaultValue = IslandLook()
+}
+
+extension EnvironmentValues {
+    var look: IslandLook {
+        get { self[IslandLookKey.self] }
+        set { self[IslandLookKey.self] = newValue }
+    }
 }
 
 /// Tint used for an agent's chip. Our own palette, not vendor brand colours.
@@ -157,13 +200,7 @@ struct SwitchToggleStyle: ToggleStyle {
             HStack(spacing: 10) {
                 configuration.label
                 Spacer(minLength: 8)
-                Capsule()
-                    .fill(configuration.isOn ? Theme.mint : Color.white.opacity(0.16))
-                    .frame(width: 36, height: 21)
-                    .overlay(alignment: configuration.isOn ? .trailing : .leading) {
-                        Circle().fill(Color.white).frame(width: 17, height: 17).padding(2)
-                    }
-                    .animation(.easeOut(duration: 0.14), value: configuration.isOn)
+                SwitchTrack(isOn: configuration.isOn)
             }
             .contentShape(Rectangle())
         }
@@ -172,15 +209,31 @@ struct SwitchToggleStyle: ToggleStyle {
     }
 }
 
+private struct SwitchTrack: View {
+    var isOn: Bool
+    @Environment(\.look) private var look
+
+    var body: some View {
+        Capsule()
+            .fill(isOn ? look.accent : Color.white.opacity(0.16))
+            .frame(width: 36, height: 21)
+            .overlay(alignment: isOn ? .trailing : .leading) {
+                Circle().fill(Color.white).frame(width: 17, height: 17).padding(2)
+            }
+            .animation(.easeOut(duration: 0.14), value: isOn)
+    }
+}
+
 struct LevelSlider: View {
     @Binding var value: Double
+    @Environment(\.look) private var look
 
     var body: some View {
         GeometryReader { proxy in
             let width = proxy.size.width
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.white.opacity(0.12)).frame(height: 5)
-                Capsule().fill(Theme.mint).frame(width: max(5, width * value), height: 5)
+                Capsule().fill(look.accent).frame(width: max(5, width * value), height: 5)
                 Circle().fill(Color.white).frame(width: 15, height: 15)
                     .offset(x: min(max(0, width * value - 7.5), width - 15))
             }

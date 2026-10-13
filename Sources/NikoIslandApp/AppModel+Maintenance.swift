@@ -8,6 +8,20 @@ public struct MaintenanceState: Sendable, Equatable {
         public var name: String
         public var stability: AgentDescriptor.Stability
         public var wired: Bool
+        /// The island can decide permission requests for this agent.
+        public var approvals = false
+        /// Something the user still has to do in the agent itself.
+        public var followUp: String?
+
+        public init(id: String, name: String, stability: AgentDescriptor.Stability, wired: Bool,
+                    approvals: Bool = false, followUp: String? = nil) {
+            self.id = id
+            self.name = name
+            self.stability = stability
+            self.wired = wired
+            self.approvals = approvals
+            self.followUp = followUp
+        }
     }
 
     public var agents: [AgentRow] = []
@@ -42,7 +56,8 @@ extension AppModel {
             let wired = agent.activeFiles.contains { file in
                 scanned.files[file]?.data.map { HookMerge.isOurs(command: String(decoding: $0, as: UTF8.self)) } ?? false
             }
-            return MaintenanceState.AgentRow(id: agent.id, name: agent.displayName, stability: agent.stability, wired: wired)
+            return MaintenanceState.AgentRow(id: agent.id, name: agent.displayName, stability: agent.stability, wired: wired,
+                                             approvals: agent.approvals, followUp: agent.followUp)
         }
     }
 

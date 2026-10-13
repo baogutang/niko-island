@@ -1,4 +1,5 @@
 import AppKit
+import Combine
 import NikoCore
 import SwiftUI
 
@@ -9,6 +10,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var settingsWindow: SettingsWindowController?
     private var notifier: SystemNotifier?
     private var sounds: SoundPlayer?
+    private let onboarding = OnboardingWindowController()
+    private var subscriptions: Set<AnyCancellable> = []
     public let model: AppModel
 
     public override init() {
@@ -17,6 +20,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        Localization.use(language: model.settings.language)
         let settingsWindow = SettingsWindowController(model: model)
         self.settingsWindow = settingsWindow
         model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
@@ -41,6 +45,28 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.island = island
         island.show()
         statusItem = StatusItemController(model: model)
+
+        Hotkey.shared.action = { [weak self] in self?.model.toggleExpanded() }
+        model.$settings
+            .receive(on: DispatchQueue.main)
+            .sink { settings in
+                Localization.use(language: settings.language)
+                Hotkey.shared.setEnabled(settings.hotkeyEnabled)
+            }
+            .store(in: &subscriptions)
+        model.$wantsOnboarding
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] wanted in
+                guard let self, wanted else { return }
+                self.model.wantsOnboarding = false
+                self.onboarding.show(model: self.model)
+            }
+            .store(in: &subscriptions)
+
+        // The first launch gets the welcome (scripted launches say no thanks).
+        if !model.settings.onboardingDone, !UserDefaults.standard.bool(forKey: "NikoOnboardingDisabled") {
+            model.wantsOnboarding = true
+        }
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

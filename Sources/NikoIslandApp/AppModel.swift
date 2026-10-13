@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import NikoCore
 
@@ -87,6 +88,8 @@ public final class AppModel: ObservableObject {
             hub.updatePolicy(settings.admissionPolicy)
             reconcileHTTPIngress()
             if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
+            if settings.sessionRetentionMinutes != oldValue.sessionRetentionMinutes { scout?.setWindow(settings.sessionRetention) }
+            if settings.discoverSessions != oldValue.discoverSessions { reconcileScout() }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot() {
@@ -104,6 +107,10 @@ public final class AppModel: ObservableObject {
     public var onPreviewSound: ((SoundEvent) -> Void)?
     /// The settings page that is showing (raw value of `SettingsPage`).
     @Published public var settingsPage = "general"
+    /// Agents whose app or command-line tool is running right now.
+    @Published public internal(set) var runningAgents: [String] = []
+    /// Shown instead of the island's usual content the first time the app runs.
+    @Published public var wantsOnboarding = false
     /// Brings the session's terminal to the front; replaced in tests.
     public var jumpHandler: (Session) -> Void = { TerminalJumper.jump(to: $0) }
 
@@ -113,11 +120,14 @@ public final class AppModel: ObservableObject {
     private var unixServer: UnixIngressServer?
     private var httpServer: HTTPIngressServer?
     private var pruneTimer: Timer?
+    private var presenceTimer: Timer?
     private var toastTask: Task<Void, Never>?
     private var lastPlayed: [SoundEvent: Date] = [:]
     var usageEngine: UsageEngine?
     private var scout: TranscriptScout?
     private var scoutPrimed = false
+    /// The app was started with session discovery (tests start without).
+    private var scoutWanted = false
     /// Sessions the user dismissed, and when; a transcript must not bring them
     /// back until it has something new to say.
     private var dismissedAt: [SessionKey: Date] = [:]
@@ -180,10 +190,34 @@ public final class AppModel: ObservableObject {
         RunLoop.main.add(timer, forMode: .common)
         pruneTimer = timer
 
+        if scout ?? usage { startPresence() }
         if usage { startUsageEngine() }
         if scout ?? usage { startScout() }
         refreshMaintenance()
         return true
+    }
+
+    // MARK: Agents that are running
+
+    private func startPresence() {
+        refreshPresence()
+        let timer = Timer(timeInterval: 6, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.refreshPresence() }
+        }
+        timer.tolerance = 2
+        RunLoop.main.add(timer, forMode: .common)
+        presenceTimer = timer
+    }
+
+    func refreshPresence() {
+        let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        Task.detached(priority: .utility) {
+            let running = AgentPresence.running(apps: apps, processes: AgentPresence.runningProcessNames())
+            await MainActor.run {
+                if self.runningAgents != running { self.runningAgents = running }
+            }
+        }
     }
 
     // MARK: Sessions found on disk
@@ -191,7 +225,22 @@ public final class AppModel: ObservableObject {
     /// Hooks only speak when something happens. The transcripts say what is
     /// there right now: idle sessions, sessions started before the app, and
     /// agents that are not connected at all.
+    /// Follows the "find sessions" setting once the app is running.
+    private func reconcileScout() {
+        guard scoutWanted else { return }
+        if settings.discoverSessions {
+            startScout()
+        } else {
+            scout?.stop()
+            scout = nil
+            scoutPrimed = false
+            mergeTranscripts([])            // sessions known only from transcripts go with it
+            scoutPrimed = false
+        }
+    }
+
     private func startScout() {
+        scoutWanted = true
         guard scout == nil, settings.discoverSessions else { return }
         var options = TranscriptScout.Options()
         options.window = settings.sessionRetention
@@ -220,6 +269,8 @@ public final class AppModel: ObservableObject {
     public func stop() {
         pruneTimer?.invalidate()
         pruneTimer = nil
+        presenceTimer?.invalidate()
+        presenceTimer = nil
         toastTask?.cancel()
         usageEngine?.stop()
         usageEngine = nil
@@ -411,7 +462,7 @@ public final class AppModel: ObservableObject {
         self.toast = toast
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 4_500_000_000)
+            try? await Task.sleep(nanoseconds: UInt64(self?.settings.toastSeconds ?? 5) * 1_000_000_000)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }

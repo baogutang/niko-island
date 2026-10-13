@@ -22,6 +22,7 @@ struct IslandView: View {
         .coordinateSpace(name: "island-canvas")
         .onPreferenceChange(IslandFrameKey.self) { onFrameChange($0) }
         .environment(\.colorScheme, .dark)
+        .environment(\.look, IslandLook(settings: model.settings))
     }
 }
 
@@ -43,7 +44,7 @@ struct IslandBody: View {
                     .transition(.opacity.animation(.easeOut(duration: 0.1)))
             }
         }
-        .frame(width: model.isExpanded ? IslandMetrics.expandedWidth : nil)
+        .frame(width: model.isExpanded ? CGFloat(model.settings.islandWidth.points) : nil)
         .background(shape.fill(Theme.island))
         .clipShape(shape)
         .contentShape(shape)
@@ -100,13 +101,13 @@ struct IslandGlance: Equatable {
         }
     }
 
-    var color: Color {
+    func color(accent: Color) -> Color {
         switch tone {
         case .idle: return Theme.tertiary
         case .working: return Theme.primary.opacity(0.9)
         case .waiting: return Theme.amber
         case .attention: return Theme.amber
-        case .done: return Theme.mint
+        case .done: return accent
         case .failed: return Theme.coral
         }
     }
@@ -115,6 +116,7 @@ struct IslandGlance: Equatable {
 struct CollapsedIsland: View {
     @ObservedObject var model: AppModel
     var metrics: IslandMetrics
+    @Environment(\.look) private var look
 
     var body: some View {
         let glance = IslandGlance(model: model)
@@ -133,7 +135,7 @@ struct CollapsedIsland: View {
                         mascot(glance)
                         Text(glance.text)
                             .font(Theme.body(11.5, .semibold))
-                            .foregroundStyle(glance.color)
+                            .foregroundStyle(glance.color(accent: look.accent))
                             .lineLimit(1)
                             .truncationMode(.tail)
                             .frame(maxWidth: 230)
@@ -150,9 +152,13 @@ struct CollapsedIsland: View {
         .accessibilityLabel(glance.text)
     }
 
+    @ViewBuilder
     private func mascot(_ glance: IslandGlance) -> some View {
-        MascotView(sprite: glance.source.map(Mascots.sprite) ?? Mascots.island, size: 17, animated: glance.tone == .working)
-            .opacity(glance.tone == .idle ? 0.75 : 1)
+        if let source = glance.source {
+            MascotView(source: source, size: 17, animated: glance.tone == .working)
+        } else {
+            MascotView(sprite: Mascots.island, size: 17).opacity(0.75)
+        }
     }
 
     @ViewBuilder
@@ -166,14 +172,14 @@ struct CollapsedIsland: View {
             .foregroundStyle(Theme.amber)
         case .working:
             if glance.count > 1 {
-                Text("\(glance.count)").font(Theme.mono(10, .bold)).foregroundStyle(Theme.mint)
+                Text("\(glance.count)").font(Theme.mono(10, .bold)).foregroundStyle(look.accent)
             } else {
-                Circle().fill(Theme.mint).frame(width: 6, height: 6)
+                Circle().fill(look.accent).frame(width: 6, height: 6)
             }
         case .waiting:
             Circle().fill(Theme.amber).frame(width: 6, height: 6)
         case .done:
-            Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(Theme.mint)
+            Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(look.accent)
         case .failed:
             Image(systemName: "exclamationmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.coral)
         case .idle:
@@ -240,7 +246,10 @@ struct SessionsPane: View {
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var listHeight: CGFloat = 0
 
-    static let maxListHeight: CGFloat = 430
+    /// Height of the list before it scrolls: the number of rows the user asked for.
+    private var maxListHeight: CGFloat {
+        CGFloat(model.settings.visibleRows) * (model.settings.rowDensity == .compact ? 52 : 68)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -275,7 +284,7 @@ struct SessionsPane: View {
                             Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
                         })
                 }
-                .frame(height: min(max(listHeight, 44), SessionsPane.maxListHeight))
+                .frame(height: min(max(listHeight, 44), maxListHeight))
                 .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
             }
         }
@@ -289,22 +298,53 @@ struct SessionsPane: View {
         }
     }
 
+    /// Nothing to list. Say what the island can see instead of leaving it at that:
+    /// which agents are open, and which of them are not connected yet.
     private var emptyState: some View {
-        let wired = model.maintenance.agents.contains { $0.wired }
-        return VStack(spacing: 8) {
-            MascotView(sprite: Mascots.island, size: 44, animated: true)
-            Text(L("No agents running yet.")).font(Theme.title(16)).foregroundStyle(Theme.primary)
-            Text(wired ? L("Start an agent in any terminal and it will show up here.")
-                 : L("Hooks are not installed yet. Nothing is changed until you say so."))
-                .font(Theme.body(12.5)).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
-            if !wired {
-                Button(L("Connect an agent…")) { model.onOpenSettings?() }
-                    .buttonStyle(PillButtonStyle(kind: .primary, large: true))
-                    .padding(.top, 4)
+        let running = model.runningAgents
+        let wired = Set(model.maintenance.agents.filter(\.wired).map(\.id))
+        let unconnected = running.filter { !wired.contains($0) && model.maintenance.agents.map(\.id).contains($0) }
+        let names = running.map { AgentRegistry.displayName(for: $0) }
+        return VStack(spacing: 9) {
+            if running.isEmpty {
+                MascotView(sprite: Mascots.island, size: 44, animated: true)
+            } else {
+                HStack(spacing: 10) {
+                    ForEach(running.prefix(6), id: \.self) { MascotView(source: $0, size: 34, animated: true) }
+                }
+            }
+            Text(running.isEmpty ? L("No agents running yet.") : L("All quiet."))
+                .font(Theme.title(16)).foregroundStyle(Theme.primary)
+            Group {
+                if running.isEmpty {
+                    Text(wired.isEmpty ? L("Nothing is connected yet. Connecting changes nothing until you say so.")
+                         : L("Start an agent and it will show up here."))
+                } else {
+                    Text(L("%@ open, with nothing happening in the last %lld minutes.",
+                           ListFormatter.localizedString(byJoining: names), model.settings.sessionRetentionMinutes))
+                }
+            }
+            .font(Theme.body(12.5)).foregroundStyle(Theme.secondary).multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
+            if !unconnected.isEmpty {
+                Button(L("Connect %@…", ListFormatter.localizedString(byJoining: unconnected.map { AgentRegistry.displayName(for: $0) }))) {
+                    model.settingsPage = "agents"
+                    model.onOpenSettings?()
+                }
+                .buttonStyle(PillButtonStyle(kind: .primary, large: true))
+                .padding(.top, 4)
+            } else if wired.isEmpty {
+                Button(L("Connect an agent…")) {
+                    model.settingsPage = "agents"
+                    model.onOpenSettings?()
+                }
+                .buttonStyle(PillButtonStyle(kind: .primary, large: true))
+                .padding(.top, 4)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 22)
+        .padding(.horizontal, 30)
     }
 
     private func notice(_ title: String, detail: String) -> some View {

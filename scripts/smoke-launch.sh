@@ -30,7 +30,7 @@ trap cleanup EXIT
 EVENT='{"hook_event_name":"SessionStart","session_id":"smoke","cwd":"'"$ROOT"'"}'
 
 START="$(now_ms)"
-NIKO_ISLAND_DEBUG=1 "$BIN" -NikoNotificationsDisabled YES >"$WORK/out.log" 2>&1 &
+NIKO_ISLAND_DEBUG=1 "$BIN" -NikoNotificationsDisabled YES -NikoOnboardingDisabled YES >"$WORK/out.log" 2>&1 &
 PID=$!
 
 # Cold start: keep offering an event until the app has accepted one.

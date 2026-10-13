@@ -4,7 +4,7 @@ import ServiceManagement
 import SwiftUI
 
 enum SettingsPage: String, CaseIterable, Identifiable {
-    case general, island, agents, sounds, usage, about
+    case general, island, sessions, agents, sounds, usage, about
 
     var id: String { rawValue }
 
@@ -12,6 +12,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: return L("General")
         case .island: return L("Island")
+        case .sessions: return L("Sessions")
         case .agents: return L("Agents")
         case .sounds: return L("Sounds")
         case .usage: return L("Usage")
@@ -21,9 +22,10 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .general: return L("Notifications and startup")
-        case .island: return L("How it opens and closes")
-        case .agents: return L("Hooks and connections")
+        case .general: return L("Language, startup, notifications")
+        case .island: return L("How it looks and behaves")
+        case .sessions: return L("What is listed, and for how long")
+        case .agents: return L("Connections and creatures")
         case .sounds: return L("Cues for each moment")
         case .usage: return L("Tokens, cost and limits")
         case .about: return L("Version and privacy")
@@ -34,6 +36,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: return "gearshape.fill"
         case .island: return "capsule.fill"
+        case .sessions: return "list.bullet"
         case .agents: return "link"
         case .sounds: return "speaker.wave.2.fill"
         case .usage: return "chart.bar.fill"
@@ -45,6 +48,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         switch self {
         case .general: return Color(red: 0.36, green: 0.56, blue: 0.98)
         case .island: return Color(red: 0.55, green: 0.48, blue: 0.96)
+        case .sessions: return Color(red: 0.36, green: 0.70, blue: 0.92)
         case .agents: return Color(red: 0.25, green: 0.74, blue: 0.66)
         case .sounds: return Color(red: 0.36, green: 0.78, blue: 0.45)
         case .usage: return Color(red: 0.95, green: 0.66, blue: 0.28)
@@ -108,6 +112,7 @@ struct SettingsRootView: View {
         }
         .frame(minWidth: 820, minHeight: 540)
         .environment(\.colorScheme, .dark)
+        .environment(\.look, IslandLook(settings: model.settings))
     }
 
     private var sidebar: some View {
@@ -159,6 +164,7 @@ struct SettingsPageView: View {
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var loginItemError: String?
     @State private var exportedPath: String?
+    @Environment(\.look) private var look
 
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
@@ -169,6 +175,7 @@ struct SettingsPageView: View {
             switch page {
             case .general: general
             case .island: island
+            case .sessions: sessions
             case .agents: agents
             case .sounds: sounds
             case .usage: usage
@@ -215,6 +222,25 @@ struct SettingsPageView: View {
         }
     }
 
+    /// A choice between a few values: title and detail, then the pills on their own line.
+    private func choiceRow<Value: Hashable>(_ title: String, _ detail: String? = nil, divider: Bool = true,
+                                            options: [(Value, String)], selection: Binding<Value>) -> some View {
+        VStack(spacing: 0) {
+            VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
+                    if let detail {
+                        Text(detail).font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                ChoicePills(options: options.map { (value: $0.0, label: $0.1) }, selection: selection)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.vertical, 11)
+            if divider { Rectangle().fill(Theme.hairline).frame(height: 1) }
+        }
+    }
+
     private func toggleRow(_ title: String, _ detail: String? = nil, divider: Bool = true, isOn: Binding<Bool>) -> some View {
         row(title, detail, divider: divider) {
             Toggle(isOn: isOn) { EmptyView() }.toggleStyle(SwitchToggleStyle()).frame(width: 46)
@@ -241,13 +267,15 @@ struct SettingsPageView: View {
                     get: { model.settings.notificationsEnabled(for: .idle) },
                     set: { model.settings.setNotifications($0, for: .idle) }))
             }
-            card(L("Startup")) {
-                toggleRow(L("Open Niko Island at login"), loginItemError, divider: false, isOn: Binding(
+            card(L("App")) {
+                toggleRow(L("Open Niko Island at login"), loginItemError, isOn: Binding(
                     get: { LoginItem.isEnabled },
                     set: { enabled in loginItemError = LoginItem.set(enabled) }))
-            }
-            card(L("Language")) {
-                row(L("Follows the system language"), L("English and Simplified Chinese are included."), divider: false) { EmptyView() }
+                toggleRow(L("Open the island with %@", Hotkey.display),
+                          L("From anywhere, without the pointer."), isOn: settingsBinding(\.hotkeyEnabled))
+                choiceRow(L("Language"), divider: false,
+                          options: [("system", L("Same as macOS")), ("en", "English"), ("zh-Hans", "简体中文")],
+                          selection: settingsBinding(\.language))
             }
         }
     }
@@ -255,15 +283,80 @@ struct SettingsPageView: View {
     // MARK: Island
 
     private var island: some View {
-        card {
-            toggleRow(L("Open when the pointer rests on it"),
-                      L("It closes again when the pointer leaves."), isOn: settingsBinding(\.expandOnHover))
-            toggleRow(L("Open by itself when an agent needs a decision"),
-                      L("It never takes keyboard focus away from what you are typing."), isOn: settingsBinding(\.expandOnAttention))
-            toggleRow(L("Show a short notice when an agent finishes"),
-                      L("The collapsed island names the session for a few seconds."), isOn: settingsBinding(\.showCompletionToast))
-            toggleRow(L("Keep the island visible when nothing is running"),
-                      L("Off: it appears only while there are sessions."), divider: false, isOn: settingsBinding(\.showIslandWhenIdle))
+        VStack(alignment: .leading, spacing: 18) {
+            card(L("Look")) {
+                row(L("Colour"), L("For sessions at work and for the things you can press.")) {
+                    HStack(spacing: 9) {
+                        ForEach(NikoSettings.Accent.allCases, id: \.self) { accent in
+                            Button { model.settings.accent = accent } label: {
+                                Circle().fill(Theme.color(for: accent)).frame(width: 22, height: 22)
+                                    .overlay(Circle().strokeBorder(Color.white, lineWidth: model.settings.accent == accent ? 2.5 : 0))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(accent.rawValue)
+                        }
+                    }
+                }
+                choiceRow(L("Width when open"),
+                          options: [(NikoSettings.IslandWidth.compact, L("Compact")), (.regular, L("Regular")), (.wide, L("Wide"))],
+                          selection: settingsBinding(\.islandWidth))
+                choiceRow(L("Rows"),
+                          options: [(NikoSettings.Density.comfortable, L("Roomy")), (.compact, L("Tight"))],
+                          selection: settingsBinding(\.rowDensity))
+                choiceRow(L("Sessions before the list scrolls"),
+                          options: NikoSettings.visibleRowChoices.map { ($0, "\($0)") }, selection: settingsBinding(\.visibleRows))
+                toggleRow(L("Pixel creatures"), L("Off: a plain dot in each agent's colour."), isOn: settingsBinding(\.showMascots))
+                toggleRow(L("Show how long"), isOn: chipBinding(.elapsed))
+                toggleRow(L("Show which agent"), isOn: chipBinding(.agent))
+                toggleRow(L("Show which terminal or app"), divider: false, isOn: chipBinding(.host))
+            }
+            card(L("Opening and closing")) {
+                toggleRow(L("Open when the pointer rests on it"),
+                          L("It closes again when the pointer leaves."), isOn: settingsBinding(\.expandOnHover))
+                choiceRow(L("How long the pointer has to rest"),
+                          options: [(0, L("No wait")), (160, L("Short")), (350, L("Medium")), (600, L("Long"))],
+                          selection: settingsBinding(\.hoverOpenDelayMS))
+                choiceRow(L("How soon it closes after the pointer leaves"),
+                          options: [(200, L("At once")), (450, L("Short")), (900, L("Medium")), (1500, L("Long"))],
+                          selection: settingsBinding(\.hoverCloseDelayMS))
+                toggleRow(L("Open by itself when an agent needs a decision"),
+                          L("It never takes keyboard focus away from what you are typing."), isOn: settingsBinding(\.expandOnAttention))
+                toggleRow(L("Show a short notice when an agent finishes"),
+                          L("The collapsed island names the session for a few seconds."), isOn: settingsBinding(\.showCompletionToast))
+                choiceRow(L("How long the notice stays"),
+                          options: NikoSettings.toastChoices.map { ($0, L("%lld s", $0)) }, selection: settingsBinding(\.toastSeconds))
+                toggleRow(L("Keep the island visible when nothing is running"),
+                          L("Off: it appears only while there are sessions."), divider: false, isOn: settingsBinding(\.showIslandWhenIdle))
+            }
+            card(L("Full-screen apps")) {
+                choiceRow(L("Where there is no menu bar"),
+                          L("Following the menu bar, the island slides away with the desktop and comes down when you push the pointer to the top of the screen."),
+                          options: [(FullScreenPolicy.followMenuBar, L("Follow the menu bar")), (.always, L("Always show")), (.never, L("Never"))],
+                          selection: settingsBinding(\.fullScreenPolicy))
+                toggleRow(L("Come in over a full-screen app when an agent needs a decision"),
+                          divider: false, isOn: settingsBinding(\.attentionBreaksFullScreen))
+            }
+        }
+    }
+
+    private func chipBinding(_ chip: NikoSettings.RowChip) -> Binding<Bool> {
+        Binding(get: { model.settings.showsChip(chip) }, set: { model.settings.setChip(chip, shown: $0) })
+    }
+
+    // MARK: Sessions
+
+    private var sessions: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            card {
+                toggleRow(L("Find sessions by reading the agents' own session logs"),
+                          L("Claude Code and Codex sessions show up even when they are idle, were started before this app, or run in a desktop app that is not connected. The logs are only read, on this Mac."),
+                          isOn: settingsBinding(\.discoverSessions))
+                choiceRow(L("Keep a quiet session listed for"), divider: false,
+                          options: [(10, L("10 min")), (30, L("30 min")), (120, L("2 hours")), (480, L("8 hours"))],
+                          selection: settingsBinding(\.sessionRetentionMinutes))
+            }
+            Text(L("Sessions found this way can be watched and jumped to. Approving from the island needs the agent to be connected."))
+                .font(Theme.body(12)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -284,28 +377,55 @@ struct SettingsPageView: View {
             .padding(14)
             .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.amber.opacity(0.10)))
         }
+        let unconnected = model.maintenance.agents.filter { !$0.wired && $0.stability != .experimental }
+        if !unconnected.isEmpty {
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L("%lld agents on this Mac are not connected", unconnected.count))
+                        .font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
+                    Text(unconnected.map(\.name).joined(separator: ", "))
+                        .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).lineLimit(2)
+                }
+                Spacer(minLength: 8)
+                Button(L("Connect all")) { model.runInstaller(.install, agents: unconnected.map(\.id)) }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(model.maintenance.busy)
+            }
+            .padding(14)
+            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(look.accent.opacity(0.10)))
+            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(look.accent.opacity(0.25)))
+        }
         card {
             if model.maintenance.agents.isEmpty {
                 row(L("No supported agent was found in your home directory."), divider: false) { EmptyView() }
             }
             ForEach(Array(model.maintenance.agents.enumerated()), id: \.element.id) { index, agent in
-                HStack(spacing: 12) {
-                    MascotView(source: agent.id, size: 28)
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 7) {
-                            Text(agent.name).font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
-                            if agent.stability == .experimental { Chip(text: L("experimental"), tint: Theme.amber, mono: false) }
-                            if agent.stability == .beta { Chip(text: L("beta"), tint: Theme.sky, mono: false) }
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        MascotView(source: agent.id, size: 28)
+                        VStack(alignment: .leading, spacing: 2) {
+                            HStack(spacing: 7) {
+                                Text(agent.name).font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
+                                if agent.stability == .experimental { Chip(text: L("experimental"), tint: Theme.amber, mono: false) }
+                                if agent.stability == .beta { Chip(text: L("beta"), tint: Theme.sky, mono: false) }
+                                if model.runningAgents.contains(agent.id) { Chip(text: L("running now"), tint: look.accent, mono: false) }
+                            }
+                            Text((agent.wired ? L("connected") : L("not connected")) + " · "
+                                 + (agent.approvals ? L("status and approvals") : L("status")))
+                                .font(Theme.body(11.5)).foregroundStyle(agent.wired ? look.accent : Theme.tertiary)
                         }
-                        Text(agent.wired ? L("connected") : L("not connected"))
-                            .font(Theme.body(11.5)).foregroundStyle(agent.wired ? Theme.mint : Theme.tertiary)
+                        Spacer()
+                        Button(agent.wired ? L("Remove") : L("Connect")) {
+                            model.runInstaller(agent.wired ? .uninstall : .install, agents: [agent.id])
+                        }
+                        .buttonStyle(PillButtonStyle(kind: agent.wired ? .neutral : .primary))
+                        .disabled(model.maintenance.busy)
                     }
-                    Spacer()
-                    Button(agent.wired ? L("Remove") : L("Connect")) {
-                        model.runInstaller(agent.wired ? .uninstall : .install, agents: [agent.id])
+                    if agent.wired, let followUp = agent.followUp {
+                        Text(L(followUp)).font(Theme.body(11.5)).foregroundStyle(Theme.amber)
+                            .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
                     }
-                    .buttonStyle(PillButtonStyle(kind: agent.wired ? .neutral : .primary))
-                    .disabled(model.maintenance.busy)
+                    creaturePicker(for: agent.id)
                 }
                 .padding(.vertical, 10)
                 if index < model.maintenance.agents.count - 1 { Rectangle().fill(Theme.hairline).frame(height: 1) }
@@ -321,6 +441,28 @@ struct SettingsPageView: View {
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Theme.field))
         }
+    }
+
+    /// Any creature can stand for any agent.
+    private func creaturePicker(for agent: String) -> some View {
+        let chosen = Mascots.sprite(for: agent, choices: model.settings.mascotChoices).name
+        return HStack(spacing: 5) {
+            ForEach(Mascots.all, id: \.name) { sprite in
+                Button {
+                    // Picking the agent's own creature clears the choice.
+                    model.settings.setMascot(sprite.name == Mascots.sprite(for: agent).name ? nil : sprite.name, for: agent)
+                } label: {
+                    MascotView(sprite: sprite, size: 18)
+                        .padding(4)
+                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                            .fill(sprite.name == chosen ? Color.white.opacity(0.16) : Color.clear))
+                        .opacity(sprite.name == chosen ? 1 : 0.45)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(sprite.name)
+            }
+        }
+        .padding(.leading, 36)
     }
 
     // MARK: Sounds
@@ -464,6 +606,9 @@ struct SettingsPageView: View {
                 }
             }
             card {
+                row(L("Welcome"), L("The introduction from the first launch."), divider: true) {
+                    Button(L("Show it again")) { model.wantsOnboarding = true }.buttonStyle(PillButtonStyle())
+                }
                 row(L("Diagnostics"), exportedPath ?? L("A redacted report you can attach to an issue."), divider: true) {
                     Button(L("Export diagnostics")) {
                         if let url = model.exportDiagnostics() {
