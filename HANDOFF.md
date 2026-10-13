@@ -11,7 +11,8 @@
 | 已发布 | v0.1.0 — `Niko-Island-0.1.0-universal.zip` + `SHA256SUMS`（旧的面板界面） |
 | `main` 上未发布 | **0.2.0：岛屿界面重做**（`Version.swift` 已是 0.2.0，**没有打标签，没有发版**） |
 | 官网 | https://baogutang.github.io/niko-island/（已换成新设计） |
-| 测试 | 250 个，`scripts/check.sh` 通过；`scripts/smoke-launch.sh` 通过 |
+| 测试 | 250 个，本机与 CI（macos-15）均通过；`scripts/smoke-launch.sh` 在本机与 CI 上均通过 |
+| CI | `ci.yml` 与 `pages.yml` 在重做提交 `cc66c0e` 上绿色；`release.yml` 没有触发（没有新标签） |
 
 **最重要的两句实话：**
 

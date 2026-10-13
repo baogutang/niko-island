@@ -1,5 +1,5 @@
 # PROGRESS
-updated: 2026-10-13T09:24:00+0800
+updated: 2026-10-13T09:34:00+0800
 milestone: R2 done on main (island redesign, version 0.2.0, NOT tagged or released); waiting for the owner
 done: [M0, M1, M2, M3, M4, M5, M6, M7, R1, R2]
 next: "Nothing is owed. Open decisions for the owner are listed in HANDOFF.md (release 0.2.0 or not, naming the reference project in Acknowledgments, tuning the sounds by ear). If asked to release: date the CHANGELOG section, remove the README version notes and the website hero.note, tag v0.2.0 (must equal Version.swift), push the tag, watch release.yml with `gh run watch <id> --exit-status`."
@@ -95,3 +95,4 @@ notes:
   - "R2 WEBSITE CHECK: served via .claude/launch.json, looked at with headless Chrome at 1280 px (all sections, EN + zh) and in the built-in browser at 375 px: no horizontal overflow, island fits its frame in every state, no console errors, the ten sound buttons render finite samples with peak 0.5. Headless Chrome --headless=new does not exit after --screenshot here (wrap it in `perl -e 'alarm 14; exec @ARGV'`), has a 500 px minimum width, and --virtual-time-budget captures CSS transitions mid-flight (use --force-prefers-reduced-motion for stills)."
   - "R2 HONESTY: nobody has used the island by hand or listened to the sounds; the notch layout exists only as renders; 0.2.0 was built for arm64 only (no universal build yet). README, website, CHANGELOG, ROADMAP and HANDOFF all say so. README and website carry a version note (pictures are 0.2.0, the download is 0.1.0) that must be removed when 0.2.0 is released."
   - "R2 OPEN (owner): release 0.2.0?; name erha19/ping-island in Acknowledgments? (left generic because of the no-third-party-names rule); tune the cues by ear."
+  - "R2 PUBLISH LOG 2026-10-13: cc66c0e pushed to main. ci.yml run 38331891116 green on macos-15 (250 tests, shellcheck, make-app, smoke: the island lays out and opens for a request on the runner too); pages.yml run 38331891440 green; the live site serves the new page and images (200). README checked on github.com: header, badges, hero and creature strip render. No tag, no release. The repo's About text on GitHub still describes the 0.1.0 panel — left for the owner (`gh repo edit --description`)."
