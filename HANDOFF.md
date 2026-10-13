@@ -10,7 +10,7 @@
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
 | 本轮版本 | **v0.6.0 — 离开小结、推送到手机、定时免打扰、分组、从岛上回复（实验性）；真实 Claude Code 验证**（2026-10-13，按你的要求做完并发布） |
 | 发布产物 | 每种架构一份：`Niko-Island-0.6.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.6.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
-| 发布核对 | 见 `PROGRESS.md` 里的 R7 发布记录 |
+| 发布核对 | `ci.yml` 与 `release.yml`（v0.6.0）全部绿色。五个发布文件重新下载后：`shasum -c SHA256SUMS` 通过，摘要与 GitHub API 记录一致；两个 dmg 可挂载，应用分别只含 `arm64` / `x86_64`，ad-hoc 签名有效，版本 0.6.0；两个 zip 解压后签名有效。`releases/latest` → v0.6.0 |
 | 你机器上装的 | 我没有替你覆盖 `/Applications` 里的应用，请下载 `apple-silicon` 的 dmg 自己装 |
 | 旧版本 | v0.5.0、v0.4.0、v0.3.0、v0.2.0（universal）、v0.1.0（面板界面，只有 zip） |
 | 官网 | https://baogutang.github.io/niko-island/ |
