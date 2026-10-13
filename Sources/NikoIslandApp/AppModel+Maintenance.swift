@@ -39,7 +39,7 @@ extension AppModel {
         guard let report = try? installer.scan(.uninstall) else { return [] }
         return AgentRegistry.installable.compactMap { agent in
             guard let scanned = report.agents[agent.id], scanned.directory == .present else { return nil }
-            let wired = agent.files.contains { file in
+            let wired = agent.activeFiles.contains { file in
                 scanned.files[file]?.data.map { HookMerge.isOurs(command: String(decoding: $0, as: UTF8.self)) } ?? false
             }
             return MaintenanceState.AgentRow(id: agent.id, name: agent.displayName, stability: agent.stability, wired: wired)

@@ -70,9 +70,19 @@ final class CLITests: XCTestCase {
         XCTAssertFalse(niko("install").stdout.contains("Codex"))
         XCTAssertEqual(scratch.read("home/.codex/hooks.json"), "{}")
         let all = niko("install", "--all")
-        XCTAssertTrue(all.stdout.contains("Experimental adapters selected"))
-        XCTAssertTrue(all.stdout.contains("Codex CLI: modify ~/.codex/hooks.json"))
-        XCTAssertTrue(niko("uninstall").stdout.contains("Codex CLI: modify ~/.codex/hooks.json"))
+        XCTAssertTrue(all.stdout.contains("Beta adapters selected"), all.stdout)
+        XCTAssertTrue(all.stdout.contains("Experimental adapters selected"), all.stdout)
+        XCTAssertTrue(all.stdout.contains("Codex: modify ~/.codex/hooks.json"), all.stdout)
+        XCTAssertTrue(all.stdout.contains("Codex runs a new hook only after you trust it"), "what the user still has to do")
+        XCTAssertTrue(niko("uninstall").stdout.contains("Codex: modify ~/.codex/hooks.json"))
+        XCTAssertEqual(scratch.read("home/.codex/hooks.json"), "{}")
+
+        // --recommended: what the app offers on first launch. Agents that are not installed are left alone.
+        let recommended = niko("install", "--recommended")
+        XCTAssertTrue(recommended.stdout.contains("Codex: modify ~/.codex/hooks.json"), recommended.stdout)
+        XCTAssertFalse(recommended.stdout.contains("Experimental adapters selected"))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.cursor").path))
+        XCTAssertEqual(niko("uninstall").status, 0)
         XCTAssertEqual(scratch.read("home/.codex/hooks.json"), "{}")
     }
 

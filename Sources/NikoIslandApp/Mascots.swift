@@ -256,6 +256,35 @@ enum Mascots {
         "............",
     ]], palette: ["a": rgb(246, 210, 96), "b": rgb(214, 160, 60), "c": rgb(255, 240, 180), "w": white, "e": ink])
 
+    /// A crab waving its claws.
+    static let crab = MascotSprite(name: "crab", frames: [[
+        "............",
+        "a..a....a..a",
+        "aa.a....a.aa",
+        ".aa......aa.",
+        "..aaaaaaaa..",
+        ".aaeaaaaeaa.",
+        ".aaaaaaaaaa.",
+        "..aabbbbaa..",
+        ".a.aaaaaa.a.",
+        "a..a....a..a",
+        "............",
+        "............",
+    ], [
+        "a..a....a..a",
+        "aa.a....a.aa",
+        ".aa......aa.",
+        "..a......a..",
+        "..aaaaaaaa..",
+        ".aaeaaaaeaa.",
+        ".aaaaaaaaaa.",
+        "..aabbbbaa..",
+        "a..aaaaaa..a",
+        ".a.a....a.a.",
+        "............",
+        "............",
+    ]], palette: ["a": rgb(236, 98, 92), "b": rgb(178, 60, 62), "e": ink])
+
     /// The island itself: used for unknown agents and for the app's own states.
     static let island = MascotSprite(name: "island", frames: [[
         "....gg.gg...",
@@ -294,6 +323,9 @@ enum Mascots {
         case "codex": return whale
         case "cursor": return boat
         case "copilot": return gull
+        case "zcode": return crab
+        case "codebuddy":
+            return gull.recolored(["a": rgb(150, 196, 255), "b": rgb(96, 140, 214)])
         case "gemini": return jellyfish
         case "qwen", "qwenwork":
             return jellyfish.recolored(["a": rgb(120, 212, 226), "b": rgb(74, 160, 180), "c": rgb(206, 244, 250)])

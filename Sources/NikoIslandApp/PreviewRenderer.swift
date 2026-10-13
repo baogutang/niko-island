@@ -120,8 +120,8 @@ enum PreviewRenderer {
             model.settingsPage = SettingsPage.agents.rawValue
             model.maintenance.agents = [
                 .init(id: "claude", name: "Claude Code", stability: .stable, wired: true),
-                .init(id: "codex", name: "Codex CLI", stability: .experimental, wired: false),
-                .init(id: "gemini", name: "Gemini CLI", stability: .experimental, wired: false),
+                .init(id: "codex", name: "Codex", stability: .beta, wired: true),
+                .init(id: "gemini", name: "Gemini CLI", stability: .beta, wired: false),
                 .init(id: "opencode", name: "OpenCode", stability: .experimental, wired: false),
             ]
         }

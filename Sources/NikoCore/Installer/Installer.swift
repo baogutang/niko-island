@@ -76,6 +76,9 @@ public struct InstallResult: Sendable {
     public var backups: [String] = []
 
     public var succeeded: Bool { error == nil }
+
+    /// The plan changes something for this agent.
+    public func touched(_ agent: String) -> Bool { plan.changes.contains { $0.agent == agent } }
 }
 
 public enum InstallError: Error, CustomStringConvertible {
@@ -154,10 +157,14 @@ public struct Installer: Sendable {
                 break
             }
             let before = plan.changes.count
-            let skip: String?
+            var skip: String?
             switch action {
             case .install: skip = planInstall(agent, scanned: scanned, into: &plan)
             case .uninstall: skip = planUninstall(agent, scanned: scanned, into: &plan)
+            }
+            // Whatever an earlier version left behind goes either way (only files that carry our marker).
+            if skip == nil, !agent.legacyFiles.isEmpty {
+                skip = planOwnedRemoval(agent, files: agent.legacyFiles, scanned: scanned, into: &plan)
             }
             if let skip {
                 plan.changes.removeSubrange(before...)
@@ -205,7 +212,7 @@ public struct Installer: Sendable {
         case .none:
             return "no adapter yet"
 
-        case .sharedSettings(let file, let events, let wantsStatusLine):
+        case .sharedSettings(let file, let events, let wantsStatusLine, let dialect):
             let parsed: (root: JSONObject, text: String?)
             switch parseShared(scanned.files[file] ?? .unreadable, file: file) {
             case .failure(let skip): return skip.reason
@@ -213,8 +220,8 @@ public struct Installer: Sendable {
             }
             var root: JSONObject
             do {
-                root = try HookMerge.install(into: parsed.root, specs: events) { _ in
-                    Shims.hookCommand(paths: options.paths, source: agent.id)
+                root = try HookMerge.install(into: parsed.root, specs: events, dialect: dialect) { _ in
+                    Shims.hookCommand(paths: options.paths, source: agent.id, extraArguments: agent.bridgeArguments)
                 }
             } catch {
                 return "\(error) in ~/\(file) — left untouched"
@@ -243,8 +250,8 @@ public struct Installer: Sendable {
             // exactly what the user had. If that ever fails, refuse to write.
             // (Empty hook containers are ignored: stripping cannot tell an empty
             // array the user wrote from one that only ever held our entry.)
-            var check = HookMerge.pruningEmptyContainers(HookMerge.strip(root).root)
-            var original = HookMerge.pruningEmptyContainers(HookMerge.strip(parsed.root).root)
+            var check = HookMerge.comparable(root, dialect: dialect)
+            var original = HookMerge.comparable(parsed.root, dialect: dialect)
             if touchedStatusLine {
                 check["statusLine"] = nil
                 original["statusLine"] = nil
@@ -306,7 +313,7 @@ public struct Installer: Sendable {
         case .none:
             return nil
 
-        case .sharedSettings(let file, _, _):
+        case .sharedSettings(let file, _, _, let dialect):
             let state = scanned.files[file] ?? .unreadable
             guard case .present(let data) = state else {
                 if case .missing = state { return nil }
@@ -317,8 +324,8 @@ public struct Installer: Sendable {
             case .failure(let skip): return skip.reason
             case .success(let value): parsed = value
             }
-            guard HookMerge.containsOurs(parsed.root) else { return nil }
-            let stripped = HookMerge.strip(parsed.root)
+            guard HookMerge.containsOurs(parsed.root, dialect: dialect) else { return nil }
+            let stripped = HookMerge.strip(parsed.root, dialect: dialect)
             var root = stripped.root
             var summary = "removed \(stripped.removed) hook entries"
             if HookMerge.statusLineIsOurs(root) {
@@ -328,7 +335,7 @@ public struct Installer: Sendable {
             }
             // If nothing else changed since we installed, hand back the user's
             // original bytes rather than a re-serialisation of them.
-            let after = pristineBackup(for: file, matching: root) ?? serialize(root, like: parsed.text)
+            let after = pristineBackup(for: file, matching: root, dialect: dialect) ?? serialize(root, like: parsed.text)
             if after != data {
                 plan.changes.append(FileChange(agent: agent.id, relativePath: file, kind: .modify, before: data, after: after,
                                                summary: summary, keepsBackup: true))
@@ -371,14 +378,16 @@ public struct Installer: Sendable {
 
     /// Bytes of the newest backup that is free of our entries and structurally
     /// identical (same keys, same order, same values) to `root`.
-    private func pristineBackup(for relative: String, matching root: JSONObject) -> Data? {
+    private func pristineBackup(for relative: String, matching root: JSONObject, dialect: HookDialect) -> Data? {
         for path in backups(for: relative) {
             guard let data = FileManager.default.contents(atPath: path),
                   let object = (try? JSONValue.parse(data))?.objectValue else { continue }
             // Empty hook containers are ignored: stripping cannot recreate an
             // empty object the user had, but the backup still has it.
-            if !HookMerge.containsOurs(object),
-               HookMerge.pruningEmptyContainers(object) == HookMerge.pruningEmptyContainers(root) { return data }
+            // Neither can it tell whether a key the agent requires was ours to add:
+            // the backup is what says so.
+            if !HookMerge.containsOurs(object, dialect: dialect),
+               HookMerge.comparable(object, dialect: dialect) == HookMerge.comparable(root, dialect: dialect) { return data }
         }
         return nil
     }
@@ -518,8 +527,10 @@ public struct Installer: Sendable {
                 throw InstallError.verificationFailed("~/" + change.relativePath)
             }
             guard let after = change.after, change.relativePath.hasSuffix(".json") else { continue }
+            var dialect = HookDialect.claude
+            if case .sharedSettings(_, _, _, let own)? = AgentRegistry.descriptor(change.agent)?.mechanism { dialect = own }
             guard let object = (try? JSONValue.parse(after))?.objectValue,
-                  HookMerge.containsOurs(object) == (plan.action == .install)
+                  HookMerge.containsOurs(object, dialect: dialect) == (plan.action == .install)
                     || HookMerge.isOurs(command: String(decoding: after, as: UTF8.self)) == (plan.action == .install) else {
                 throw InstallError.verificationFailed("~/" + change.relativePath)
             }
@@ -570,6 +581,7 @@ public struct Installer: Sendable {
             for agent in agents(for: .uninstall) {
                 // Remove plugin directories that were created for us and are now empty.
                 if case .ownedPluginDirectory(let directory, _) = agent.mechanism { rmdir(absolute(directory)) }
+                for file in agent.legacyFiles { rmdir((absolute(file) as NSString).deletingLastPathComponent) }
             }
             guard options.purge else { return }
             for agent in agents(for: .uninstall) {

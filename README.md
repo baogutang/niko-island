@@ -135,21 +135,23 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 <a id="supported-agents"></a>
 ## Supported agents
 
-| Agent | Creature | Status | What you get | What `install` touches |
+| Agent | Creature | Status | What you get | What connecting touches |
 |---|---|---|---|---|
-| **Claude Code** | starfish | Stable | Live status, approvals, questions, usage, rate limits | `~/.claude/settings.json` (hook entries + status line wrapper) |
-| Codex CLI | whale | Experimental | Live status; usage from session logs | `~/.codex/hooks.json` |
-| Cursor CLI | boat | Experimental | Live status | `~/.cursor/hooks.json` |
-| Copilot CLI | gull | Experimental | Live status | `~/.copilot/hooks/niko.json` (own file) |
-| Gemini CLI | jellyfish | Experimental | Live status | `~/.gemini/config/plugins/niko/` (own directory) |
-| Grok CLI | pufferfish | Experimental | Live status | `~/.grok/hooks/niko.json` (own file) |
-| Trae | octopus | Experimental | Live status | `~/.trae/hooks.json`, `~/.trae-cn/hooks.json` |
-| Windsurf | boat | Experimental | Live status | `~/.codeium/windsurf/hooks.json` |
+| **Claude Code** (terminal and desktop app) | starfish | Stable | Live status, approvals, questions, usage, rate limits | `~/.claude/settings.json` (hook entries + status line wrapper) |
+| Codex (CLI, IDE extension, desktop app) | whale | Beta | Live status, approvals, usage. Codex asks you to trust new hooks once | `~/.codex/hooks.json` |
+| ZCode | crab | Beta | Live status, approvals | `~/.zcode/cli/config.json` |
+| Cursor | boat | Beta | Live status | `~/.cursor/hooks.json` |
+| Windsurf | boat | Beta | Live status | `~/.codeium/windsurf/hooks.json` |
+| Gemini CLI | jellyfish | Beta | Live status | `~/.gemini/settings.json` |
+| Trae | octopus | Beta | Live status | `~/.trae/hooks.json`, `~/.trae-cn/hooks.json` |
+| Qwen Code | jellyfish | Beta | Live status | `~/.qwen/settings.json` |
+| CodeBuddy | gull | Beta | Live status | `~/.codebuddy/settings.json` |
+| Factory | pufferfish | Beta | Live status | `~/.factory/settings.json` |
+| Grok CLI | pufferfish | Beta | Live status | `~/.grok/hooks/niko.json` (own file) |
 | OpenCode, MiMoCode | turtle | Experimental | Live status through a small plugin; usage is best effort | `~/.config/opencode/plugins/niko.js`, `~/.config/mimocode/plugins/niko.js` (own files) |
-| Qwen Code, QwenWork | jellyfish | Experimental | Live status | `~/.qwen/settings.json`, `~/.qwenwork/settings.json` |
-| Kiro | octopus | Experimental | Live status | `~/.kiro/settings/cli.json` |
-| Factory | pufferfish | Experimental | Live status | `~/.factory/settings.json` |
-| Kimi Code, DeepSeek CLI, Droid, Pi / OhMyPi, OpenClaw, Amp | — | Planned | — | — |
+| Copilot CLI | gull | Experimental | Live status | `~/.copilot/hooks/niko.json` (own file) |
+| QwenWork, Kiro | jellyfish, octopus | Experimental | Live status | `~/.qwenwork/settings.json`, `~/.kiro/settings/cli.json` |
+| Kimi Code, Devin, Mistral Vibe, DeepSeek CLI, Pi / OhMyPi, OpenClaw, Amp | — | Planned | — | — |
 
 **Stable** means wired end to end and covered by tests. **Experimental** means the adapter follows the config location and format listed in [INTEGRATIONS.md](INTEGRATIONS.md) but has **not been validated against a live copy of that agent**. Experimental adapters are never installed by default:
 

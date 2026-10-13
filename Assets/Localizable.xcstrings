@@ -1471,6 +1471,16 @@
         }
       }
     },
+    "beta": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "测试版"
+          }
+        }
+      }
+    },
     "compacting": {
       "localizations": {
         "zh-Hans": {

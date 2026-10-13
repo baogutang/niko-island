@@ -113,14 +113,20 @@ public struct AgentEvent: Sendable, Equatable {
     }
 
     public init(json: JSONValue, defaultSource: String? = nil, fallbackCwd: String? = nil) throws {
-        guard let object = json.objectValue else { throw EventError.notAnObject }
+        guard var object = json.objectValue else { throw EventError.notAnObject }
+        // The bridge says which adapter it is in its own envelope. A top-level
+        // "source" only counts for senders without one (the in-process
+        // plugins): agents use that key for other things.
+        func text(_ value: JSONValue?) -> String? { value?.stringValue.flatMap { $0.isEmpty ? nil : $0 } }
+        let source = AgentEvent.sanitizeIdentifier(
+            text(object[AgentEvent.metaKey]?["source"]) ?? defaultSource ?? text(object["source"]) ?? "unknown")
+        EventDialect.normalize(&object, source: source)
         guard let name = (object["hook_event_name"] ?? object["event"])?.stringValue, !name.isEmpty else {
             throw EventError.missingEventName
         }
         self.raw = object
         self.name = name
-        let source = object["source"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
-        self.source = AgentEvent.sanitizeIdentifier(source ?? defaultSource ?? "unknown")
+        self.source = source
         self.cwd = object["cwd"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? fallbackCwd
         if let id = object["session_id"]?.stringValue, !id.isEmpty {
             self.sessionID = id
@@ -145,6 +151,110 @@ public struct AgentEvent: Sendable, Equatable {
     }
 
     public var date: Date { Date(timeIntervalSince1970: timestampMS / 1000) }
+}
+
+/// Agents that do not speak the Claude Code hook dialect are translated into
+/// it here, so everything downstream sees one vocabulary. Field names follow
+/// each agent's published hook reference.
+enum EventDialect {
+    static func normalize(_ object: inout JSONObject, source: String) {
+        switch source {
+        case "cursor": cursor(&object)
+        case "windsurf": windsurf(&object)
+        case "gemini": gemini(&object)
+        case "codex":
+            if object["hook_event_name"]?.stringValue == "Interrupt" { object["hook_event_name"] = .string(HookEvent.stop) }
+        default: break
+        }
+    }
+
+    private static func tool(_ object: inout JSONObject, name: String, input: JSONObject) {
+        if object["tool_name"]?.stringValue == nil { object["tool_name"] = .string(name) }
+        if object["tool_input"]?.objectValue == nil { object["tool_input"] = .object(input) }
+    }
+
+    private static func cursor(_ object: inout JSONObject) {
+        guard let native = object["hook_event_name"]?.stringValue else { return }
+        if object["session_id"]?.stringValue?.isEmpty ?? true, let id = object["conversation_id"]?.stringValue {
+            object["session_id"] = .string(id)
+        }
+        if object["cwd"]?.stringValue?.isEmpty ?? true, let root = object["workspace_roots"]?.arrayValue?.first?.stringValue {
+            object["cwd"] = .string(root)
+        }
+        let canonical: String
+        switch native {
+        case "sessionStart": canonical = HookEvent.sessionStart
+        case "sessionEnd": canonical = HookEvent.sessionEnd
+        case "beforeSubmitPrompt": canonical = HookEvent.userPromptSubmit
+        case "preToolUse": canonical = HookEvent.preToolUse
+        case "beforeShellExecution":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: "Bash", input: ["command": object["command"] ?? .string("")])
+        case "beforeMCPExecution": canonical = HookEvent.preToolUse
+        case "beforeReadFile":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: "Read", input: ["file_path": object["file_path"] ?? .string("")])
+        case "postToolUse", "postToolUseFailure", "afterShellExecution", "afterMCPExecution", "afterFileEdit",
+             "afterAgentThought", "afterAgentResponse":
+            canonical = HookEvent.postToolUse
+        case "subagentStop": canonical = HookEvent.subagentStop
+        case "preCompact": canonical = HookEvent.preCompact
+        case "stop":
+            canonical = object["status"]?.stringValue == "error" ? HookEvent.stopFailure : HookEvent.stop
+        default: return                       // unknown or already canonical: leave it alone
+        }
+        object["native_event"] = .string(native)
+        object["hook_event_name"] = .string(canonical)
+    }
+
+    private static func windsurf(_ object: inout JSONObject) {
+        guard let native = (object["agent_action_name"] ?? object["hook_event_name"])?.stringValue else { return }
+        if object["session_id"]?.stringValue?.isEmpty ?? true, let id = object["trajectory_id"]?.stringValue {
+            object["session_id"] = .string(id)
+        }
+        let info = object["tool_info"]?.objectValue ?? JSONObject()
+        if object["cwd"]?.stringValue?.isEmpty ?? true, let cwd = info["cwd"]?.stringValue { object["cwd"] = .string(cwd) }
+        let canonical: String
+        switch native {
+        case "pre_user_prompt":
+            canonical = HookEvent.userPromptSubmit
+            if let prompt = info["user_prompt"] { object["prompt"] = prompt }
+        case "pre_run_command":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: "Bash", input: ["command": info["command_line"] ?? .string("")])
+        case "pre_read_code":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: "Read", input: ["file_path": info["file_path"] ?? .string("")])
+        case "pre_write_code":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: "Edit", input: ["file_path": info["file_path"] ?? .string("")])
+        case "pre_mcp_tool_use":
+            canonical = HookEvent.preToolUse
+            tool(&object, name: info["mcp_tool_name"]?.stringValue ?? "MCP", input: JSONObject())
+        case "post_run_command", "post_read_code", "post_write_code", "post_mcp_tool_use":
+            canonical = HookEvent.postToolUse
+        case "post_cascade_response", "post_cascade_response_with_transcript":
+            canonical = HookEvent.stop
+        default: return
+        }
+        object["native_event"] = .string(native)
+        object["hook_event_name"] = .string(canonical)
+    }
+
+    private static func gemini(_ object: inout JSONObject) {
+        guard let native = object["hook_event_name"]?.stringValue else { return }
+        let canonical: String
+        switch native {
+        case "BeforeAgent": canonical = HookEvent.userPromptSubmit
+        case "AfterAgent": canonical = HookEvent.stop
+        case "BeforeTool": canonical = HookEvent.preToolUse
+        case "AfterTool": canonical = HookEvent.postToolUse
+        case "PreCompress": canonical = HookEvent.preCompact
+        default: return
+        }
+        object["native_event"] = .string(native)
+        object["hook_event_name"] = .string(canonical)
+    }
 }
 
 /// Human activity for the status line (PROTOCOLS §1.2).

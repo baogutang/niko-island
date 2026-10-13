@@ -39,6 +39,7 @@ public enum NikoCLI {
       niko-island install [options]     register hooks (scan first, back up, verify, roll back on failure)
           --dry-run                     show what would change, change nothing
           --agents a,b,…                choose agents (default: stable adapters only)
+          --recommended                 every detected agent with a stable or beta adapter
           --all                         every detected agent, including experimental adapters
           --no-statusline               do not touch the Claude Code status line
       niko-island uninstall [options]   remove every niko-bridge entry; agents keep working
@@ -102,6 +103,7 @@ public enum NikoCLI {
         options.purge = args.flag("--purge")
         if args.flag("--no-statusline") { options.includeStatusLine = false }
         let all = args.flag("--all")
+        let recommended = args.flag("--recommended")
         if let list = args.value("--agents") {
             let ids = list.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
             let unknown = ids.filter { AgentRegistry.descriptor($0) == nil }
@@ -117,6 +119,9 @@ public enum NikoCLI {
             options.agentIDs = ids
         } else if all, action == .install {
             options.agentIDs = AgentRegistry.installable.map(\.id)
+        } else if recommended, action == .install {
+            // Everything the app would offer on first launch; agents that are not installed are skipped by the scan.
+            options.agentIDs = AgentRegistry.recommendedIDs
         }
         if rejectLeftovers(args) { return 64 }
         if options.purge, action == .install {
@@ -127,14 +132,25 @@ public enum NikoCLI {
         options.appExecutable = Bundle.main.executablePath
 
         let installer = Installer(options: options)
-        let experimental = installer.agents(for: action).filter { $0.stability == .experimental }
+        let selected = installer.agents(for: action)
+        let beta = selected.filter { $0.stability == .beta }
+        let experimental = selected.filter { $0.stability == .experimental }
+        if action == .install, !beta.isEmpty {
+            print("Beta adapters selected: \(beta.map(\.id).joined(separator: ", ")).")
+            print("They follow each agent's own hook reference; we have not driven them against the live agents ourselves.\n")
+        }
         if action == .install, !experimental.isEmpty {
             print("Experimental adapters selected: \(experimental.map(\.id).joined(separator: ", ")).")
-            print("Their wiring follows INTEGRATIONS.md and has not been validated against live agents.\n")
+            print("Their config format is taken on trust and has not been confirmed.\n")
         }
         print("Scanning \(options.home.path) …")
         let result = installer.run(action)
         print(result.report(home: options.home.path))
+        if action == .install, result.succeeded {
+            for agent in selected where result.touched(agent.id) {
+                if let followUp = agent.followUp { print("\(agent.displayName): \(followUp)") }
+            }
+        }
         if action == .install, result.succeeded, !options.dryRun, options.bridgeBinary == nil {
             print("note: bridge binary not found next to this executable; hooks stay inert until the app is installed.")
         }

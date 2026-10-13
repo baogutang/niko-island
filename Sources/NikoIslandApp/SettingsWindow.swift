@@ -295,6 +295,7 @@ struct SettingsPageView: View {
                         HStack(spacing: 7) {
                             Text(agent.name).font(Theme.body(13.5, .semibold)).foregroundStyle(Theme.primary)
                             if agent.stability == .experimental { Chip(text: L("experimental"), tint: Theme.amber, mono: false) }
+                            if agent.stability == .beta { Chip(text: L("beta"), tint: Theme.sky, mono: false) }
                         }
                         Text(agent.wired ? L("connected") : L("not connected"))
                             .font(Theme.body(11.5)).foregroundStyle(agent.wired ? Theme.mint : Theme.tertiary)

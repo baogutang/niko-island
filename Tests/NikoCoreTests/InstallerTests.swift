@@ -509,17 +509,148 @@ final class InstallerTests: XCTestCase {
 
     func testGenericSettingsAdapterMergesAndUninstalls() throws {
         let original = "{\n  \"hooks\": {\n    \"Stop\": [\n      {\n        \"hooks\": [\n          {\n            \"type\": \"command\",\n            \"command\": \"echo theirs\"\n          }\n        ]\n      }\n    ]\n  }\n}\n"
-        scratch.write("home/.codex/hooks.json", original)
-        XCTAssertTrue(run(.install, agents: ["codex"]).applied)
-        let root = try XCTUnwrap(JSONValue.parse(Data(contentsOf: scratch.file("home/.codex/hooks.json"))).objectValue)
+        scratch.write("home/.qwen/settings.json", original)
+        XCTAssertTrue(run(.install, agents: ["qwen"]).applied)
+        let root = try XCTUnwrap(JSONValue.parse(Data(contentsOf: scratch.file("home/.qwen/settings.json"))).objectValue)
         XCTAssertEqual(root["hooks"]?["Stop"]?.arrayValue?.count, 2)
         XCTAssertEqual(root["hooks"]?["Stop"]?[0]?["hooks"]?[0]?["command"]?.stringValue, "echo theirs")
-        XCTAssertTrue(root["hooks"]?["PreToolUse"]?[0]?["hooks"]?[0]?["command"]?.stringValue?.contains("--source codex") ?? false)
-        XCTAssertNil(root["hooks"]?["PermissionRequest"], "approval wiring is Claude-only until verified per agent")
+        XCTAssertTrue(root["hooks"]?["PreToolUse"]?[0]?["hooks"]?[0]?["command"]?.stringValue?.contains("--source qwen") ?? false)
+        XCTAssertNil(root["hooks"]?["PermissionRequest"], "approvals are only wired where the agent documents the contract")
         XCTAssertNil(root["statusLine"])
-        XCTAssertTrue(run(.uninstall, agents: ["codex"], at: 60).succeeded)
-        XCTAssertEqual(scratch.read("home/.codex/hooks.json"), original)
+        XCTAssertTrue(run(.uninstall, agents: ["qwen"], at: 60).succeeded)
+        XCTAssertEqual(scratch.read("home/.qwen/settings.json"), original)
         XCTAssertTrue(FileManager.default.isExecutableFile(atPath: scratch.paths.bridgeShim.path), "partial uninstall keeps the shims for other agents")
+    }
+
+    // MARK: Agents with their own config dialect
+
+    private func json(_ relative: String) throws -> JSONObject {
+        try XCTUnwrap(JSONValue.parse(Data(contentsOf: scratch.file(relative))).objectValue, relative)
+    }
+
+    func testCodexGetsApprovalsWithoutMatchersAndAfterForeignEntries() throws {
+        // Codex remembers trust per position in the file, so nothing of ours may be inserted before an existing entry.
+        let original = #"{"hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"theirs","timeout":30}]}]}}"#
+        scratch.write("home/.codex/hooks.json", original)
+        XCTAssertTrue(run(.install, agents: ["codex"]).applied)
+        let hooks = try XCTUnwrap(json("home/.codex/hooks.json")["hooks"])
+        XCTAssertEqual(hooks["PreToolUse"]?[0]?["hooks"]?[0]?["command"]?.stringValue, "theirs")
+        let ours = try XCTUnwrap(hooks["PreToolUse"]?[1])
+        XCTAssertNil(ours["matcher"], "no matcher: every tool")
+        XCTAssertTrue(ours["hooks"]?[0]?["command"]?.stringValue?.contains("--source codex --reply json-strict") ?? false)
+        XCTAssertEqual(hooks["PermissionRequest"]?[0]?["hooks"]?[0]?["timeout"]?.intValue, HookSpec.approvalTimeout)
+        XCTAssertNil(hooks["SessionEnd"]?[0]?["hooks"]?[0]?["timeout"], "Codex caps SessionEnd hooks at three seconds")
+        XCTAssertNil(hooks["Notification"], "not a Codex event")
+        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
+        XCTAssertEqual(scratch.read("home/.codex/hooks.json"), original)
+    }
+
+    func testZCodeHooksLiveUnderEventsAndNeedTheSwitch() throws {
+        let original = #"{"mcp":{"servers":{}},"hooks":{"enabled":false,"timeoutMs":600000,"events":{"Stop":[{"matcher":".*","hooks":[{"type":"command","command":"theirs","async":false}]}]}}}"#
+        scratch.write("home/.zcode/cli/config.json", original)
+        XCTAssertTrue(run(.install, agents: ["zcode"]).applied)
+        let root = try json("home/.zcode/cli/config.json")
+        XCTAssertEqual(root["hooks"]?["enabled"]?.boolValue, true, "hooks that are switched off would never run")
+        XCTAssertEqual(root["hooks"]?["timeoutMs"]?.intValue, 600_000)
+        XCTAssertNotNil(root["mcp"])
+        let events = try XCTUnwrap(root["hooks"]?["events"])
+        XCTAssertEqual(events["Stop"]?[0]?["hooks"]?[0]?["command"]?.stringValue, "theirs")
+        let permission = try XCTUnwrap(events["PermissionRequest"]?[0])
+        XCTAssertEqual(permission["matcher"]?.stringValue, ".*")
+        XCTAssertEqual(permission["hooks"]?[0]?["type"]?.stringValue, "command")
+        XCTAssertEqual(permission["hooks"]?[0]?["async"]?.boolValue, false)
+        XCTAssertEqual(permission["hooks"]?[0]?["timeoutMs"]?.intValue, HookSpec.approvalTimeout * 1000)
+        XCTAssertTrue(permission["hooks"]?[0]?["command"]?.stringValue?.contains("--source zcode --reply json-strict") ?? false)
+        XCTAssertNotNil(events["PostToolUseFailure"])
+        XCTAssertTrue(run(.install, agents: ["zcode"], at: 30).succeeded, "idempotent")
+        XCTAssertEqual(try json("home/.zcode/cli/config.json")["hooks"]?["events"]?["Stop"]?.arrayValue?.count, 2)
+        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
+        XCTAssertEqual(scratch.read("home/.zcode/cli/config.json"), original, "the switch goes back to how the user had it")
+    }
+
+    func testCursorGetsFlatEntriesThatOnlyObserve() throws {
+        let original = #"{"version":1,"hooks":{"stop":[{"command":"theirs"}],"beforeShellExecution":[{"command":"their-guard"}]}}"#
+        scratch.write("home/.cursor/hooks.json", original)
+        XCTAssertTrue(run(.install, agents: ["cursor"]).applied)
+        let hooks = try XCTUnwrap(json("home/.cursor/hooks.json")["hooks"])
+        XCTAssertEqual(hooks["stop"]?[0]?["command"]?.stringValue, "theirs")
+        let ours = try XCTUnwrap(hooks["stop"]?[1])
+        XCTAssertNil(ours["hooks"], "flat: the entry is the hook")
+        XCTAssertNil(ours["type"])
+        XCTAssertTrue(ours["command"]?.stringValue?.contains("--source cursor") ?? false)
+        XCTAssertEqual(ours["timeout"]?.intValue, HookSpec.quickTimeout)
+        // Cursor's permission hooks must answer with a decision. The island does not decide for Cursor, so it stays out of them.
+        for event in ["beforeShellExecution", "beforeMCPExecution", "beforeReadFile", "preToolUse", "subagentStart"] {
+            XCTAssertFalse((hooks[event]?.arrayValue ?? []).contains { $0["command"]?.stringValue?.contains("niko-bridge") ?? false }, event)
+        }
+        XCTAssertNotNil(hooks["beforeSubmitPrompt"])
+        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
+        XCTAssertEqual(scratch.read("home/.cursor/hooks.json"), original)
+
+        // A fresh file gets the version Cursor requires.
+        scratch.write("home/.cursor/hooks.json", "")
+        XCTAssertTrue(run(.install, agents: ["cursor"], at: 120).applied)
+        XCTAssertEqual(try json("home/.cursor/hooks.json")["version"]?.intValue, 1)
+    }
+
+    func testWindsurfGeminiAndTraeUseTheirOwnSpelling() throws {
+        scratch.write("home/.codeium/windsurf/hooks.json", #"{"hooks":{"pre_run_command":[{"command":"theirs","show_output":true}]}}"#)
+        scratch.write("home/.gemini/settings.json", #"{"theme":"dark"}"#)
+        scratch.write("home/.trae/hooks.json", "{}")
+        XCTAssertTrue(run(.install, agents: ["windsurf", "gemini", "trae"]).applied)
+
+        let windsurf = try XCTUnwrap(json("home/.codeium/windsurf/hooks.json")["hooks"])
+        XCTAssertEqual(windsurf["pre_run_command"]?[0]?["show_output"]?.boolValue, true)
+        XCTAssertEqual(windsurf["pre_run_command"]?[1]?["show_output"]?.boolValue, false)
+        XCTAssertNil(windsurf["pre_run_command"]?[1]?["timeout"])
+        XCTAssertNotNil(windsurf["post_cascade_response"])
+
+        let gemini = try json("home/.gemini/settings.json")
+        XCTAssertEqual(gemini["theme"]?.stringValue, "dark")
+        let before = try XCTUnwrap(gemini["hooks"]?["BeforeTool"]?[0])
+        XCTAssertNil(before["matcher"])
+        XCTAssertEqual(before["hooks"]?[0]?["timeout"]?.intValue, 5000, "milliseconds")
+        XCTAssertEqual(before["hooks"]?[0]?["name"]?.stringValue, "niko-island")
+        XCTAssertNil(gemini["hooks"]?["PreToolUse"], "Gemini has its own event names")
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.gemini/config").path), "the 0.2.0 plugin directory is no longer written")
+
+        let trae = try json("home/.trae/hooks.json")
+        XCTAssertEqual(trae["version"]?.intValue, 1)
+        XCTAssertNotNil(trae["hooks"]?["UserPromptSubmit"])
+
+        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
+        XCTAssertEqual(scratch.read("home/.codeium/windsurf/hooks.json"), #"{"hooks":{"pre_run_command":[{"command":"theirs","show_output":true}]}}"#)
+        XCTAssertEqual(scratch.read("home/.gemini/settings.json"), #"{"theme":"dark"}"#)
+        XCTAssertEqual(scratch.read("home/.trae/hooks.json"), "{}")
+    }
+
+    func testLeftoversOfAnEarlierVersionAreRemoved() throws {
+        // 0.2.0 wrote a plugin directory for Gemini CLI.
+        scratch.write("home/.gemini/settings.json", "{}")
+        scratch.write("home/.gemini/config/plugins/niko/hooks.json", #"{"hooks":{"Stop":[{"hooks":[{"type":"command","command":"niko-bridge --source gemini"}]}]}}"#)
+        scratch.write("home/.gemini/config/plugins/niko/plugin.json", #"{"name":"niko","description":"Niko Island status bridge (niko-bridge)."}"#)
+        scratch.write("home/.gemini/config/plugins/other/plugin.json", #"{"name":"someone else's"}"#)
+        XCTAssertTrue(run(.install, agents: ["gemini"]).applied)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.gemini/config/plugins/niko/hooks.json").path))
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.gemini/config/plugins/niko/plugin.json").path))
+        XCTAssertNotNil(scratch.read("home/.gemini/config/plugins/other/plugin.json"))
+        XCTAssertNotNil(try json("home/.gemini/settings.json")["hooks"]?["BeforeTool"])
+        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.gemini/config/plugins/niko").path), "the empty directory goes too")
+        XCTAssertEqual(scratch.read("home/.gemini/settings.json"), "{}")
+    }
+
+    func testRecommendedAgentsAreTheOnesWeCanVouchFor() {
+        XCTAssertEqual(AgentRegistry.defaultIDs, ["claude"])
+        let recommended = Set(AgentRegistry.recommendedIDs)
+        XCTAssertTrue(recommended.isSuperset(of: ["claude", "codex", "zcode", "cursor", "windsurf", "gemini"]))
+        XCTAssertFalse(recommended.contains("copilot"), "format taken on trust: opt-in only")
+        XCTAssertEqual(AgentRegistry.all.filter(\.approvals).map(\.id), ["claude", "codex", "zcode"])
+        XCTAssertEqual(AgentRegistry.agent(forApp: "com.openai.codex")?.id, "codex")
+        XCTAssertEqual(AgentRegistry.agent(forApp: "dev.zcode.app")?.id, "zcode")
+        XCTAssertEqual(AgentRegistry.agent(forApp: "com.anthropic.claudefordesktop")?.id, "claude")
+        // Ids are unique, and every agent the island can decide for says how to phrase the decision.
+        XCTAssertEqual(Set(AgentRegistry.all.map(\.id)).count, AgentRegistry.all.count)
     }
 
     func testOwnedHookFileNeverClobbersAForeignFile() throws {
@@ -537,16 +668,6 @@ final class InstallerTests: XCTestCase {
         XCTAssertTrue(why.contains("not ours"))
         XCTAssertTrue(run(.uninstall, at: 180).succeeded)
         XCTAssertEqual(scratch.read("home/.copilot/hooks/niko.json"), "{\"note\":\"a user's own file that happens to have this name\"}")
-    }
-
-    func testGeminiPluginDirectoryIsCreatedAndRemoved() throws {
-        scratch.write("home/.gemini/settings.json", "{\"theme\":\"dark\"}")
-        XCTAssertTrue(run(.install, agents: ["gemini"]).applied)
-        let directory = scratch.file("home/.gemini/config/plugins/niko")
-        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).sorted(), ["hooks.json", "plugin.json"])
-        XCTAssertTrue(run(.uninstall, at: 60).succeeded)
-        XCTAssertFalse(FileManager.default.fileExists(atPath: directory.path))
-        XCTAssertEqual(scratch.read("home/.gemini/settings.json"), "{\"theme\":\"dark\"}")
     }
 
     func testOpenCodePluginEnablesLoopbackIngress() throws {
@@ -611,7 +732,7 @@ final class ScanProbeTests: XCTestCase {
         XCTAssertEqual(report.file(".codex/hooks.json", agent: "codex"), .missing)
         XCTAssertEqual(report.agents["cursor"]?.directory, .unknown)
         XCTAssertEqual(report.agents["gemini"]?.directory, .missing)
-        XCTAssertEqual(report.file(".gemini/config/plugins/niko/hooks.json", agent: "gemini"), .missing)
+        XCTAssertEqual(report.file(".gemini/settings.json", agent: "gemini"), .missing)
     }
 
     func testProbeIsReadOnlyAndPortable() throws {

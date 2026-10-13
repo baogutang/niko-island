@@ -62,6 +62,58 @@ final class EventTests: XCTestCase {
         XCTAssertThrowsError(try AgentEvent(json: .object(["session_id": .string("x")])))
     }
 
+    func testNativeEventNamesAreTranslated() throws {
+        func event(_ source: String, _ json: String) throws -> AgentEvent {
+            try AgentEvent(json: JSONValue.parse(json), defaultSource: source)
+        }
+        // Cursor
+        let table: [(String, String)] = [
+            ("sessionStart", HookEvent.sessionStart), ("sessionEnd", HookEvent.sessionEnd),
+            ("beforeSubmitPrompt", HookEvent.userPromptSubmit), ("afterAgentThought", HookEvent.postToolUse),
+            ("afterShellExecution", HookEvent.postToolUse), ("afterFileEdit", HookEvent.postToolUse),
+            ("postToolUseFailure", HookEvent.postToolUse), ("subagentStop", HookEvent.subagentStop),
+            ("preCompact", HookEvent.preCompact), ("stop", HookEvent.stop),
+        ]
+        for (native, canonical) in table {
+            let parsed = try event("cursor", #"{"hook_event_name":"\#(native)","conversation_id":"c1"}"#)
+            XCTAssertEqual(parsed.name, canonical, native)
+            XCTAssertEqual(parsed.raw["native_event"]?.stringValue, native)
+            XCTAssertEqual(parsed.sessionID, "c1")
+        }
+        XCTAssertEqual(try event("cursor", #"{"hook_event_name":"stop","status":"error","conversation_id":"c1"}"#).name, HookEvent.stopFailure)
+        let shell = try event("cursor", #"{"hook_event_name":"beforeShellExecution","conversation_id":"c1","command":"make","cwd":"/w"}"#)
+        XCTAssertEqual(shell.name, HookEvent.preToolUse)
+        XCTAssertEqual(shell.toolName, "Bash")
+        XCTAssertEqual(shell.toolInput?["command"]?.stringValue, "make")
+        XCTAssertEqual(try event("cursor", #"{"hook_event_name":"somethingNew","conversation_id":"c1"}"#).name, "somethingNew", "unknown events pass through")
+
+        // Windsurf
+        XCTAssertEqual(try event("windsurf", #"{"agent_action_name":"post_cascade_response","trajectory_id":"t"}"#).name, HookEvent.stop)
+        let write = try event("windsurf", #"{"agent_action_name":"pre_write_code","trajectory_id":"t","tool_info":{"file_path":"/w/a.ts"}}"#)
+        XCTAssertEqual(Activity.forTool(write.toolName, input: write.toolInput), Activity(verb: "editing", detail: "a.ts"))
+        let asked = try event("windsurf", #"{"agent_action_name":"pre_user_prompt","trajectory_id":"t","tool_info":{"user_prompt":"Rename it"}}"#)
+        XCTAssertEqual(asked.name, HookEvent.userPromptSubmit)
+        XCTAssertEqual(asked.raw["prompt"]?.stringValue, "Rename it")
+        XCTAssertThrowsError(try event("windsurf", #"{"trajectory_id":"t"}"#), "no event name at all")
+
+        // Gemini CLI and Codex
+        XCTAssertEqual(try event("gemini", #"{"hook_event_name":"AfterAgent","session_id":"g"}"#).name, HookEvent.stop)
+        XCTAssertEqual(try event("gemini", #"{"hook_event_name":"BeforeAgent","session_id":"g","prompt":"hi"}"#).name, HookEvent.userPromptSubmit)
+        XCTAssertEqual(try event("gemini", #"{"hook_event_name":"Notification","session_id":"g"}"#).name, HookEvent.notification)
+        XCTAssertEqual(try event("codex", #"{"hook_event_name":"Interrupt","session_id":"x"}"#).name, HookEvent.stop)
+        // Claude's own names are never rewritten, whatever the source.
+        XCTAssertEqual(try event("claude", #"{"hook_event_name":"stop","session_id":"x"}"#).name, "stop")
+    }
+
+    func testAdapterIdComesFromTheEnvelopeNotTheAgentsPayload() throws {
+        let enveloped = try AgentEvent(json: JSONValue.parse(#"{"hook_event_name":"SessionStart","session_id":"s","source":"resume","_niko":{"source":"codex"}}"#))
+        XCTAssertEqual(enveloped.source, "codex")
+        // In-process plugins have no envelope: the header value, then their own field.
+        XCTAssertEqual(try AgentEvent(json: JSONValue.parse(#"{"hook_event_name":"Stop","session_id":"s","source":"opencode"}"#)).source, "opencode")
+        XCTAssertEqual(try AgentEvent(json: JSONValue.parse(#"{"hook_event_name":"Stop","session_id":"s","source":"startup"}"#),
+                                      defaultSource: "mimocode").source, "mimocode")
+    }
+
     func testActivityMappingMatchesProtocolTable() {
         let table: [(String?, String)] = [
             ("Bash", "running"), ("Read", "reading"), ("Write", "editing"), ("Edit", "editing"),

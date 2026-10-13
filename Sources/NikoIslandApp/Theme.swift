@@ -45,6 +45,8 @@ enum AgentTint {
         case "codex": return Color(red: 0.47, green: 0.74, blue: 1.00)
         case "cursor": return Color(red: 0.80, green: 0.83, blue: 0.88)
         case "copilot": return Color(red: 0.72, green: 0.62, blue: 1.00)
+        case "zcode": return Color(red: 0.96, green: 0.50, blue: 0.48)
+        case "codebuddy": return Color(red: 0.60, green: 0.78, blue: 1.00)
         case "gemini": return Color(red: 0.62, green: 0.70, blue: 1.00)
         case "grok": return Color(red: 0.96, green: 0.83, blue: 0.40)
         case "opencode", "mimocode": return Color(red: 0.50, green: 0.86, blue: 0.62)

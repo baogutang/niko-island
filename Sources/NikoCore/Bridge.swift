@@ -3,7 +3,13 @@ import Foundation
 
 /// Parsed `niko-bridge` command line (PROTOCOLS §3).
 public struct BridgeInvocation: Sendable, Equatable {
-    public enum ReplyMode: String, Sendable { case json, exitCode = "exit-code" }
+    public enum ReplyMode: String, Sendable {
+        case json
+        /// Only `behavior` (and a message on deny): for agents that fail
+        /// closed on anything more (Codex, ZCode).
+        case jsonStrict = "json-strict"
+        case exitCode = "exit-code"
+    }
 
     public var source = "unknown"
     public var task: String?
@@ -132,14 +138,19 @@ public enum BridgeRunner {
 
     static func forward(_ invocation: BridgeInvocation, stdin: Data, configuration: BridgeConfiguration) -> BridgeResult {
         guard let parsed = try? JSONValue.parse(stdin), var object = parsed.objectValue else { return .silentSuccess }
-        guard let name = object["hook_event_name"]?.stringValue, !name.isEmpty else { return .silentSuccess }
+        // Most agents name the event `hook_event_name`; Cascade calls it `agent_action_name`.
+        guard let name = (object["hook_event_name"] ?? object["agent_action_name"])?.stringValue, !name.isEmpty else {
+            return .silentSuccess
+        }
 
-        if object["source"]?.stringValue?.isEmpty ?? true { object["source"] = .string(invocation.source) }
         object["ts"] = .number(String(Int64(Date().timeIntervalSince1970 * 1000)))
         if invocation.forceBlocking { object[AgentEvent.blockingKey] = .bool(true) }
         let blocking = name == HookEvent.permissionRequest || invocation.forceBlocking
 
         var meta = terminalContext(environment: configuration.environment).json.objectValue ?? JSONObject()
+        // Which adapter this is travels in our own envelope: agents use a
+        // top-level "source" for other things (how a session started, for one).
+        meta["source"] = .string(invocation.source)
         object = slim(object, blocking: blocking)
         object[AgentEvent.metaKey] = .object(meta)
 
@@ -215,8 +226,15 @@ public enum BridgeRunner {
     /// `tool_input` must stay intact so an answer can be merged into it.
     static func slim(_ object: JSONObject, blocking: Bool) -> JSONObject {
         var out = object
-        out["tool_response"] = nil
-        out["tool_result"] = nil
+        // Results, file contents and model traffic: never needed for a status line.
+        for key in ["tool_response", "tool_result", "tool_output", "output", "content", "edits", "result_json",
+                    "attachments", "llm_request", "llm_response", "prompt_response", "model_params", "user_email"] {
+            out[key] = nil
+        }
+        if var info = out["tool_info"]?.objectValue {
+            for key in ["edits", "mcp_result", "response", "mcp_tool_arguments"] { info[key] = nil }
+            out["tool_info"] = .object(info)
+        }
         if let prompt = out["prompt"]?.stringValue, prompt.count > promptLimit {
             out["prompt"] = .string(String(prompt.prefix(promptLimit)))
         }
@@ -279,7 +297,7 @@ public enum BridgeRunner {
             }
         }
 
-        var updatedInput = decision.updatedInput
+        var updatedInput = mode == .jsonStrict ? nil : decision.updatedInput
         if let input = updatedInput, event["tool_name"]?.stringValue == "AskUserQuestion" {
             updatedInput = claudeQuestionAnswers(input)
         }
@@ -295,7 +313,7 @@ public enum BridgeRunner {
             case .deny:
                 body["behavior"] = .string("deny")
                 body["message"] = .string(denyMessage)
-                if decision.interrupt { body["interrupt"] = .bool(true) }
+                if decision.interrupt, mode != .jsonStrict { body["interrupt"] = .bool(true) }
             }
             output = .object(["hookSpecificOutput": .object([
                 "hookEventName": .string(HookEvent.permissionRequest),

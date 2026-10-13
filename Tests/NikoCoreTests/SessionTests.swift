@@ -104,7 +104,7 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(AutoNamer.keywords(from: "Can you please fix the flaky upload-retry test in CI?"), ["fix", "flaky", "upload-retry", "test"])
         XCTAssertEqual(AutoNamer.keywords(from: "修复 上传 重试 的 问题"), ["修复", "上传", "重试", "问题"])
         XCTAssertEqual(AutoNamer.keywords(from: "   \n"), [])
-        XCTAssertEqual(AutoNamer.title(cwd: nil, prompt: nil, source: "codex"), "Codex CLI")
+        XCTAssertEqual(AutoNamer.title(cwd: nil, prompt: nil, source: "codex"), "Codex")
         XCTAssertEqual(AutoNamer.title(cwd: "/x/proj", prompt: "the a an", source: "claude"), "proj")
     }
 }

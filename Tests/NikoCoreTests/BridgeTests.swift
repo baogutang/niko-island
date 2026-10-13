@@ -89,6 +89,60 @@ final class BridgeBinaryTests: XCTestCase {
                        "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"Denied in Niko Island\",\"interrupt\":true}}}\n")
     }
 
+    func testTheAgentsOwnSourceFieldIsNotMistakenForTheAdapter() throws {
+        // Claude Code and Codex say how a session started in a top-level "source".
+        let island = try TestIsland()
+        _ = island.bridge(stdin: #"{"hook_event_name":"SessionStart","session_id":"s9","cwd":"/tmp","source":"startup"}"#)
+        let event = try XCTUnwrap(island.collector.wait(count: 1).first?.event)
+        XCTAssertEqual(event.source, "claude", "the adapter id travels in the bridge's own envelope")
+        XCTAssertEqual(event.key, SessionKey(source: "claude", sessionID: "s9"))
+        XCTAssertEqual(event.raw["source"]?.stringValue, "startup", "the agent's field is passed through untouched")
+    }
+
+    func testStrictRepliesCarryNothingButTheDecision() throws {
+        // Codex and ZCode fail closed on updatedInput and interrupt.
+        let allow = try TestIsland { _ in .object(["reply": .object(["behavior": .string("allow"), "updatedInput": .object(["command": .string("ls")])])]) }
+        XCTAssertEqual(allow.bridge(["--source", "codex", "--reply", "json-strict"], stdin: permission).stdout,
+                       "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}\n")
+        let block = try TestIsland { _ in decisionReply("block", reason: "no") }
+        XCTAssertEqual(block.bridge(["--source", "zcode", "--reply", "json-strict"], stdin: permission).stdout,
+                       "{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"deny\",\"message\":\"no\"}}}\n")
+        XCTAssertEqual(try XCTUnwrap(block.collector.all.first?.event).source, "zcode")
+    }
+
+    func testOtherAgentsDialectsArriveInOneVocabulary() throws {
+        let island = try TestIsland()
+        // Cascade names the event "agent_action_name" and keeps details in tool_info.
+        var output = island.bridge(["--source", "windsurf"], stdin: #"{"agent_action_name":"pre_run_command","trajectory_id":"traj-1","execution_id":"e","tool_info":{"command_line":"npm test","cwd":"/w/app","mcp_result":"big"}}"#)
+        XCTAssertEqual(output.status, 0)
+        XCTAssertEqual(output.stdout, "", "a pre-hook that says nothing lets the action through")
+        // Cursor: camel-case events, conversation ids, workspace roots.
+        output = island.bridge(["--source", "cursor"], stdin: #"{"hook_event_name":"beforeSubmitPrompt","conversation_id":"conv-1","workspace_roots":["/w/site"],"prompt":"Tidy the header","user_email":"someone@example.com"}"#)
+        XCTAssertEqual(output.stdout, "")
+        // Gemini CLI: its own event names.
+        _ = island.bridge(["--source", "gemini"], stdin: #"{"hook_event_name":"BeforeTool","session_id":"g-1","cwd":"/w/g","tool_name":"run_shell_command","tool_input":{"command":"ls"}}"#)
+        let events = island.collector.wait(count: 3).map(\.event)
+        XCTAssertEqual(events.count, 3)
+
+        let windsurf = try XCTUnwrap(events.first { $0.source == "windsurf" })
+        XCTAssertEqual(windsurf.name, HookEvent.preToolUse)
+        XCTAssertEqual(windsurf.sessionID, "traj-1")
+        XCTAssertEqual(windsurf.cwd, "/w/app")
+        XCTAssertEqual(Activity.forTool(windsurf.toolName, input: windsurf.toolInput), Activity(verb: "running", detail: "npm test"))
+        XCTAssertNil(windsurf.raw["tool_info"]?["mcp_result"], "results are dropped before they leave the agent")
+
+        let cursor = try XCTUnwrap(events.first { $0.source == "cursor" })
+        XCTAssertEqual(cursor.name, HookEvent.userPromptSubmit)
+        XCTAssertEqual(cursor.sessionID, "conv-1")
+        XCTAssertEqual(cursor.cwd, "/w/site")
+        XCTAssertEqual(cursor.raw["prompt"]?.stringValue, "Tidy the header")
+        XCTAssertNil(cursor.raw["user_email"], "nothing personal travels")
+
+        let gemini = try XCTUnwrap(events.first { $0.source == "gemini" })
+        XCTAssertEqual(gemini.name, HookEvent.preToolUse)
+        XCTAssertEqual(Activity.forTool(gemini.toolName, input: gemini.toolInput), Activity(verb: "running", detail: "ls"))
+    }
+
     func testQuestionAnswersAreTranslatedForClaude() throws {
         let question = """
         {"hook_event_name":"PermissionRequest","session_id":"s1","cwd":"/tmp","tool_name":"AskUserQuestion",

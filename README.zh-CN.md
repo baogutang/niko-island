@@ -135,21 +135,23 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 <a id="supported-agents"></a>
 ## 支持的代理
 
-| 代理 | 小生物 | 状态 | 你能得到什么 | `install` 会改动什么 |
+| 代理 | 小生物 | 状态 | 你能得到什么 | 接入时会改动什么 |
 |---|---|---|---|---|
-| **Claude Code** | 海星 | 稳定 | 实时状态、审批、提问、用量、速率限制 | `~/.claude/settings.json`（钩子条目 + 状态栏包装） |
-| Codex CLI | 鲸鱼 | 实验性 | 实时状态；用量来自会话日志 | `~/.codex/hooks.json` |
-| Cursor CLI | 小船 | 实验性 | 实时状态 | `~/.cursor/hooks.json` |
-| Copilot CLI | 海鸥 | 实验性 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
-| Gemini CLI | 水母 | 实验性 | 实时状态 | `~/.gemini/config/plugins/niko/`（独立目录） |
-| Grok CLI | 河豚 | 实验性 | 实时状态 | `~/.grok/hooks/niko.json`（独立文件） |
-| Trae | 章鱼 | 实验性 | 实时状态 | `~/.trae/hooks.json`、`~/.trae-cn/hooks.json` |
-| Windsurf | 小船 | 实验性 | 实时状态 | `~/.codeium/windsurf/hooks.json` |
+| **Claude Code**（终端与桌面端） | 海星 | 稳定 | 实时状态、审批、提问、用量、速率限制 | `~/.claude/settings.json`（钩子条目 + 状态栏包装） |
+| Codex（CLI、IDE 扩展、桌面端） | 鲸鱼 | 测试版 | 实时状态、审批、用量。Codex 会要求你信任一次新钩子 | `~/.codex/hooks.json` |
+| ZCode | 螃蟹 | 测试版 | 实时状态、审批 | `~/.zcode/cli/config.json` |
+| Cursor | 小船 | 测试版 | 实时状态 | `~/.cursor/hooks.json` |
+| Windsurf | 小船 | 测试版 | 实时状态 | `~/.codeium/windsurf/hooks.json` |
+| Gemini CLI | 水母 | 测试版 | 实时状态 | `~/.gemini/settings.json` |
+| Trae | 章鱼 | 测试版 | 实时状态 | `~/.trae/hooks.json`、`~/.trae-cn/hooks.json` |
+| Qwen Code | 水母 | 测试版 | 实时状态 | `~/.qwen/settings.json` |
+| CodeBuddy | 海鸥 | 测试版 | 实时状态 | `~/.codebuddy/settings.json` |
+| Factory | 河豚 | 测试版 | 实时状态 | `~/.factory/settings.json` |
+| Grok CLI | 河豚 | 测试版 | 实时状态 | `~/.grok/hooks/niko.json`（独立文件） |
 | OpenCode、MiMoCode | 海龟 | 实验性 | 通过一个小插件提供实时状态；用量为尽力而为 | `~/.config/opencode/plugins/niko.js`、`~/.config/mimocode/plugins/niko.js`（独立文件） |
-| Qwen Code、QwenWork | 水母 | 实验性 | 实时状态 | `~/.qwen/settings.json`、`~/.qwenwork/settings.json` |
-| Kiro | 章鱼 | 实验性 | 实时状态 | `~/.kiro/settings/cli.json` |
-| Factory | 河豚 | 实验性 | 实时状态 | `~/.factory/settings.json` |
-| Kimi Code、DeepSeek CLI、Droid、Pi / OhMyPi、OpenClaw、Amp | — | 计划中 | — | — |
+| Copilot CLI | 海鸥 | 实验性 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
+| QwenWork、Kiro | 水母、章鱼 | 实验性 | 实时状态 | `~/.qwenwork/settings.json`、`~/.kiro/settings/cli.json` |
+| Kimi Code、Devin、Mistral Vibe、DeepSeek CLI、Pi / OhMyPi、OpenClaw、Amp | — | 计划中 | — | — |
 
 **稳定**表示端到端打通并有测试覆盖。**实验性**表示适配器遵循 [INTEGRATIONS.md](INTEGRATIONS.md) 中列出的配置位置和格式，但**尚未在该代理的真实环境里验证过**。实验性适配器绝不会默认安装：
 
