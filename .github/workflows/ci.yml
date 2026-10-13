@@ -38,19 +38,11 @@ jobs:
           shellcheck --shell=bash "$RUNNER_TEMP"/scripts/*.bash || status=1
           shellcheck scripts/*.sh || status=1
           exit "$status"
-      - name: Assemble app and disk image (host architecture)
-        run: scripts/make-app.sh --dmg
-      - name: Bundle self-check
-        run: |
-          APP="dist/Niko Island.app"
-          codesign --verify --deep --strict "$APP"
-          "$APP/Contents/Helpers/niko-bridge" --integrity-check "$APP"
-          "$APP/Contents/MacOS/niko-island" --version
-          mkdir -p "$RUNNER_TEMP/dmg"
-          hdiutil attach -nobrowse -readonly -quiet -mountpoint "$RUNNER_TEMP/dmg" dist/*.dmg
-          codesign --verify --deep --strict "$RUNNER_TEMP/dmg/Niko Island.app"
-          test "$(readlink "$RUNNER_TEMP/dmg/Applications")" = "/Applications"
-          hdiutil detach -quiet "$RUNNER_TEMP/dmg"
-          (cd dist && shasum -a 256 -c SHA256SUMS)
-      - name: Launch smoke test
-        run: scripts/smoke-launch.sh
+      - name: Rosetta (to start the Intel build on this arm64 runner)
+        run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license >/dev/null 2>&1 || true
+      - name: Build and verify the release packages (Apple silicon and Intel)
+        run: scripts/make-release.sh
+      - name: Launch smoke test (Apple silicon build)
+        run: scripts/smoke-launch.sh "dist/apple-silicon/Niko Island.app"
+      - name: Launch smoke test (Intel build, under Rosetta)
+        run: scripts/smoke-launch.sh "dist/intel/Niko Island.app"

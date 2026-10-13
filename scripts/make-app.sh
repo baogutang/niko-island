@@ -2,7 +2,9 @@
 # Assemble "Niko Island.app" from SwiftPM build products and ad-hoc sign it.
 #
 #   scripts/make-app.sh                 release build for the host architecture
-#   scripts/make-app.sh --universal     arm64 + x86_64, merged with lipo
+#   scripts/make-app.sh --arch arm64    build for one architecture (arm64 or x86_64);
+#                                       releases ship one package per architecture
+#                                       (scripts/make-release.sh builds both)
 #   scripts/make-app.sh --debug         debug configuration
 #   scripts/make-app.sh --zip           also write dist/Niko-Island-<version>-<arch>.zip
 #   scripts/make-app.sh --dmg           also write dist/Niko-Island-<version>-<arch>.dmg
@@ -18,7 +20,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG="release"
-UNIVERSAL=0
+ONE_ARCH=""
 MAKE_ZIP=0
 MAKE_DMG=0
 SKIP_BUILD=0
@@ -26,14 +28,14 @@ OUT="$ROOT/dist"
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        --universal) UNIVERSAL=1 ;;
+        --arch) shift; ONE_ARCH="${1:?--arch needs arm64 or x86_64}" ;;
         --debug) CONFIG="debug" ;;
         --release) CONFIG="release" ;;
         --zip) MAKE_ZIP=1 ;;
         --dmg) MAKE_DMG=1 ;;
         --skip-build) SKIP_BUILD=1 ;;
         --out) shift; OUT="${1:?--out needs a directory}" ;;
-        -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
         *) echo "make-app.sh: unknown option '$1'" >&2; exit 64 ;;
     esac
     shift
@@ -47,36 +49,26 @@ VERSION="${NIKO_VERSION:-$(sed -n 's/.*static let current = "\(.*\)".*/\1/p' Sou
 BUILD_NUMBER="${NIKO_BUILD_NUMBER:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 [ -n "$VERSION" ] || { echo "make-app.sh: could not determine version" >&2; exit 1; }
 
-if [ "$UNIVERSAL" -eq 1 ]; then
-    ARCHS=(arm64 x86_64)
-    ARCH_LABEL="universal"
-else
-    ARCHS=("$(uname -m)")
-    ARCH_LABEL="${ARCHS[0]}"
-fi
+ARCH="${ONE_ARCH:-$(uname -m)}"
+# File names say what people look for when they choose a download.
+case "$ARCH" in
+    arm64) ARCH_LABEL="apple-silicon" ;;
+    x86_64) ARCH_LABEL="intel" ;;
+    *) echo "make-app.sh: --arch must be arm64 or x86_64" >&2; exit 64 ;;
+esac
 
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/niko-app.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
 
-for arch in "${ARCHS[@]}"; do
-    if [ "$SKIP_BUILD" -eq 0 ]; then
-        echo "==> swift build ($CONFIG, $arch)"
-        swift build -c "$CONFIG" --arch "$arch" --product niko-island
-        swift build -c "$CONFIG" --arch "$arch" --product niko-bridge
-    fi
-    BIN_DIR="$(swift build -c "$CONFIG" --arch "$arch" --show-bin-path)"
-    for product in niko-island niko-bridge; do
-        [ -x "$BIN_DIR/$product" ] || { echo "make-app.sh: missing $BIN_DIR/$product" >&2; exit 1; }
-        cp "$BIN_DIR/$product" "$STAGE/$product.$arch"
-    done
-done
-
+if [ "$SKIP_BUILD" -eq 0 ]; then
+    echo "==> swift build ($CONFIG, $ARCH)"
+    swift build -c "$CONFIG" --arch "$ARCH" --product niko-island
+    swift build -c "$CONFIG" --arch "$ARCH" --product niko-bridge
+fi
+BIN_DIR="$(swift build -c "$CONFIG" --arch "$ARCH" --show-bin-path)"
 for product in niko-island niko-bridge; do
-    if [ "$UNIVERSAL" -eq 1 ]; then
-        lipo -create "$STAGE/$product.arm64" "$STAGE/$product.x86_64" -output "$STAGE/$product"
-    else
-        cp "$STAGE/$product.${ARCHS[0]}" "$STAGE/$product"
-    fi
+    [ -x "$BIN_DIR/$product" ] || { echo "make-app.sh: missing $BIN_DIR/$product" >&2; exit 1; }
+    cp "$BIN_DIR/$product" "$STAGE/$product"
 done
 
 APP="$OUT/$APP_NAME.app"
