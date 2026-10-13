@@ -12,6 +12,8 @@ public enum HookEvent {
     public static let subagentStop = "SubagentStop"
     public static let preCompact = "PreCompact"
     public static let postCompact = "PostCompact"
+    /// The turn ended because of an error (reported by agents that have such a hook).
+    public static let stopFailure = "StopFailure"
     /// Extension: same payload as PreToolUse, but the sender blocks for a reply.
     public static let permissionRequest = "PermissionRequest"
 

@@ -24,6 +24,8 @@ public struct Session: Identifiable, Sendable, Equatable {
     public var terminal: TerminalContext
     public var ancestors: [ProcessNode]
     public var firstPrompt: String?
+    /// The most recent prompt (the row shows it when it differs from the first).
+    public var lastPrompt: String?
     public var toolCalls = 0
 
     public var source: String { key.source }
@@ -36,6 +38,10 @@ public struct SessionStore: Sendable {
         case ended(SessionKey)
         /// The agent stopped and is waiting for input (worth a notification).
         case becameIdle(SessionKey)
+        /// The agent picked up a prompt.
+        case started(SessionKey)
+        /// The turn ended in an error.
+        case failed(SessionKey)
     }
 
     public static let idleExpiry: TimeInterval = 12 * 3600
@@ -94,9 +100,12 @@ public struct SessionStore: Sendable {
         case HookEvent.userPromptSubmit:
             session.phase = .working
             session.activity = .thinking
-            if session.firstPrompt == nil, let prompt = event.raw["prompt"]?.stringValue, !prompt.isEmpty {
-                session.firstPrompt = prompt
-                session.title = AutoNamer.title(cwd: session.cwd, prompt: prompt, source: event.source)
+            if let prompt = event.raw["prompt"]?.stringValue, !prompt.isEmpty {
+                session.lastPrompt = prompt
+                if session.firstPrompt == nil {
+                    session.firstPrompt = prompt
+                    session.title = AutoNamer.title(cwd: session.cwd, prompt: prompt, source: event.source)
+                }
             }
         case HookEvent.preToolUse:
             session.phase = .working
@@ -125,6 +134,10 @@ public struct SessionStore: Sendable {
         case HookEvent.stop:
             session.phase = .waiting
             session.activity = .waiting
+        case HookEvent.stopFailure:
+            session.phase = .waiting
+            session.activity = Activity(verb: "hit an error", detail: (event.raw["error"] ?? event.raw["message"])?.stringValue
+                .map { Activity.oneLine($0, limit: 96) })
         case HookEvent.subagentStop:
             break
         case HookEvent.preCompact:
@@ -139,7 +152,9 @@ public struct SessionStore: Sendable {
 
         if session.phase != previousPhase || sessions[key] == nil { session.phaseSince = now }
         sessions[key] = session
+        if event.name == HookEvent.stopFailure { return .failed(key) }
         if session.phase == .waiting, previousPhase != .waiting { return .becameIdle(key) }
+        if event.name == HookEvent.userPromptSubmit { return .started(key) }
         return .updated(key)
     }
 

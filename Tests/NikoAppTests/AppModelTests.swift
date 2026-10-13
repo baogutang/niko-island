@@ -3,6 +3,12 @@ import XCTest
 @testable import NikoIslandApp
 
 @MainActor
+final class RecordingSoundPlayer: SoundPlaying {
+    var played: [SoundEvent] = []
+    func play(_ event: SoundEvent) { played.append(event) }
+}
+
+@MainActor
 final class RecordingNotifier: AttentionNotifying {
     var notes: [(kind: NikoSettings.EventKind, key: SessionKey, body: String)] = []
     var cleared: [SessionKey] = []
@@ -109,7 +115,7 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(request.summary.detail, "rm -rf build")
         XCTAssertEqual(model.sessions.first?.phase, .needsAttention)
         XCTAssertEqual(model.badge.pending, 1)
-        XCTAssertEqual(attentionRequests, 1, "the panel is asked to show itself")
+        XCTAssertEqual(attentionRequests, 1, "the island is asked to show itself")
         XCTAssertEqual(notifier.notes.map(\.kind), [.permission])
 
         model.decide(request.id, .allowOnce)
@@ -248,8 +254,8 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(notifier.notes.last?.body, "Which database?")
 
         let selections = [
-            QuestionWizardView.answer(for: request.questions[0], selected: ["SQLite"], custom: ""),
-            QuestionWizardView.answer(for: request.questions[1], selected: ["Search", "Auth"], custom: ""),
+            QuestionAnswers.answer(for: request.questions[0], selected: ["SQLite"], custom: ""),
+            QuestionAnswers.answer(for: request.questions[1], selected: ["Search", "Auth"], custom: ""),
         ]
         XCTAssertEqual(selections, [["SQLite"], ["Auth", "Search"]], "multi-select answers keep option order")
         model.decide(request.id, .answer(selections))
@@ -265,10 +271,10 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
     func testWizardAnswerRules() {
         let single = AgentQuestion(id: 0, text: "q", header: nil, options: [.init(label: "A", detail: nil), .init(label: "B", detail: nil)], multiSelect: false)
         let multi = AgentQuestion(id: 1, text: "q", header: nil, options: single.options, multiSelect: true)
-        XCTAssertEqual(QuestionWizardView.answer(for: single, selected: ["B"], custom: ""), ["B"])
-        XCTAssertEqual(QuestionWizardView.answer(for: single, selected: ["B"], custom: "  my own  "), ["my own"], "free text replaces a single choice")
-        XCTAssertEqual(QuestionWizardView.answer(for: multi, selected: ["B", "A"], custom: "C"), ["A", "B", "C"])
-        XCTAssertEqual(QuestionWizardView.answer(for: multi, selected: [], custom: "   "), [])
+        XCTAssertEqual(QuestionAnswers.answer(for: single, selected: ["B"], custom: ""), ["B"])
+        XCTAssertEqual(QuestionAnswers.answer(for: single, selected: ["B"], custom: "  my own  "), ["my own"], "free text replaces a single choice")
+        XCTAssertEqual(QuestionAnswers.answer(for: multi, selected: ["B", "A"], custom: "C"), ["A", "B", "C"])
+        XCTAssertEqual(QuestionAnswers.answer(for: multi, selected: [], custom: "   "), [])
     }
 
     // MARK: Requests that go away on their own
@@ -333,12 +339,176 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         let idle = await eventually { self.model.sessions.first?.phase == .waiting }
         XCTAssertTrue(idle)
         XCTAssertTrue(notifier.notes.isEmpty)
-        model.settings.setSound(true, for: .idle)
+        XCTAssertFalse(NikoSettings.load(paths: scratch.paths).notificationsEnabled(for: .idle), "settings are persisted")
+        model.settings.setNotifications(true, for: .idle)
         _ = await bridge(event("UserPromptSubmit"))
         _ = await bridge(event("Stop"))
         let notified = await eventually { self.notifier.notes.count == 1 }
-        XCTAssertTrue(notified, "a sound-only preference still reaches the notifier")
-        XCTAssertFalse(NikoSettings.load(paths: scratch.paths).notificationsEnabled(for: .idle), "settings are persisted")
+        XCTAssertTrue(notified)
+    }
+
+    // MARK: Sounds (SPEC §4: none by default)
+
+    func testSoundsAreSilentUntilSwitchedOn() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        let idle = await eventually { self.model.sessions.first?.phase == .waiting }
+        XCTAssertTrue(idle)
+        XCTAssertTrue(sounds.played.isEmpty, "nothing plays out of the box")
+
+        model.settings.soundsEnabled = true
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        let finished = await eventually { sounds.played == [.completed] }
+        XCTAssertTrue(finished, "\(sounds.played): 'started' stays off until it is ticked, 'completed' is on")
+
+        model.settings.setSound(true, for: .started)
+        model.settings.setSound(false, for: .completed)
+        sounds.played = []
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        let started = await eventually { sounds.played == [.started] }
+        XCTAssertTrue(started, "\(sounds.played)")
+        XCTAssertTrue(NikoSettings.load(paths: scratch.paths).soundsEnabled)
+    }
+
+    func testAttentionErrorAndLimitCues() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        XCTAssertEqual(sounds.played, [.attention])
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+
+        _ = await bridge(event("StopFailure", extra: ",\"error\":\"overloaded\""))
+        let failed = await eventually { sounds.played.contains(.error) }
+        XCTAssertTrue(failed)
+        XCTAssertEqual(model.sessions.first?.activity, Activity(verb: "hit an error", detail: "overloaded"))
+        XCTAssertEqual(model.toast?.kind, .failed)
+
+        // One warning when a window crosses 90 %, none while it stays there.
+        var usage = UsageSnapshot()
+        usage.rateLimits = [RateLimitWindow(id: "five_hour", usedPercent: 60, resetsAt: nil)]
+        model.usage = usage
+        usage.rateLimits[0].usedPercent = 93
+        model.usage = usage
+        usage.rateLimits[0].usedPercent = 96
+        model.usage = usage
+        XCTAssertEqual(sounds.played.filter { $0 == .limit }.count, 1)
+    }
+
+    func testRepeatedCuesAreThrottled() {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        let t0 = Date()
+        model.play(.attention, now: t0)
+        model.play(.attention, now: t0.addingTimeInterval(0.4))
+        model.play(.completed, now: t0.addingTimeInterval(0.5))
+        model.play(.attention, now: t0.addingTimeInterval(2))
+        XCTAssertEqual(sounds.played, [.attention, .completed, .attention])
+    }
+
+    // MARK: Island state
+
+    func testIslandOpensForARequestAndClosesWhenItIsSettled() async throws {
+        XCTAssertFalse(model.isExpanded)
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash"))
+        let opened = await eventually { self.model.isExpanded }
+        XCTAssertTrue(opened, "a request opens the island")
+        XCTAssertEqual(model.expandReason, .attention)
+        XCTAssertEqual(model.focusedRequest?.id, model.pending.first?.id)
+        model.expand(.hover)
+        XCTAssertEqual(model.expandReason, .attention, "a hover never downgrades an open island")
+        model.decide(model.pending[0].id, .allowOnce)
+        _ = await waiting
+        XCTAssertFalse(model.isExpanded, "opened for the request, so it closes with it")
+
+        // Opened by the user: deciding does not close it.
+        model.expand(.click)
+        async let second = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        XCTAssertEqual(model.expandReason, .attention)
+        model.collapse()
+        XCTAssertEqual(model.pending.count, 1, "putting the island away decides nothing")
+        model.toggleExpanded()
+        XCTAssertEqual(model.expandReason, .click)
+        model.decide(model.pending[0].id, .deny)
+        _ = await second
+        XCTAssertTrue(model.isExpanded)
+    }
+
+    func testAttentionCanBeToldNotToOpenTheIsland() async throws {
+        model.settings.expandOnAttention = false
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        XCTAssertFalse(model.isExpanded)
+        XCTAssertEqual(IslandGlance(model: model).tone, .attention)
+        XCTAssertEqual(IslandGlance(model: model).text, "demo-project needs you")
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+    }
+
+    func testFocusMovesBetweenQueuedRequests() async throws {
+        async let first = bridge(event("PermissionRequest", session: "s1", tool: "Bash"))
+        let one = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(one)
+        async let second = bridge(event("PermissionRequest", session: "s2", tool: "Edit"))
+        let two = await eventually { self.model.pending.count == 2 }
+        XCTAssertTrue(two)
+        XCTAssertEqual(model.focusedRequest?.event.sessionID, "s1", "oldest first")
+        model.focusedRequestID = model.pending[1].id
+        XCTAssertEqual(model.focusedRequest?.event.sessionID, "s2")
+        model.decide(model.pending[1].id, .deny)
+        XCTAssertEqual(model.focusedRequest?.event.sessionID, "s1", "focus falls back to what is still waiting")
+        XCTAssertTrue(model.isExpanded, "still one request open")
+        model.decide(model.pending[0].id, .deny)
+        _ = await (first, second)
+        XCTAssertNil(model.focusedRequest)
+    }
+
+    func testCompletionToastAndGlance() async throws {
+        XCTAssertEqual(IslandGlance(model: model).tone, .idle)
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\""))
+        _ = await bridge(event("PreToolUse", tool: "Bash"))
+        let working = await eventually { IslandGlance(model: self.model).tone == .working }
+        XCTAssertTrue(working)
+        XCTAssertEqual(IslandGlance(model: model).text, "running make test")
+        _ = await bridge(event("Stop"))
+        let toasted = await eventually { self.model.toast != nil }
+        XCTAssertTrue(toasted)
+        XCTAssertEqual(model.toast, AppModel.Toast(key: key, title: "demo-project · ship fix", kind: .completed))
+        XCTAssertEqual(IslandGlance(model: model).tone, .done)
+        model.expand(.click)
+        XCTAssertNil(model.toast, "opening the island replaces the notice")
+        model.collapse()
+        XCTAssertEqual(IslandGlance(model: model).tone, .waiting)
+
+        model.settings.showCompletionToast = false
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        let idle = await eventually { self.model.sessions.first?.phase == .waiting }
+        XCTAssertTrue(idle)
+        XCTAssertNil(model.toast)
+    }
+
+    func testRowsShowTheConversationAndItsHost() async throws {
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"Add retries to the uploader\\nsecond line\""))
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"and keep the old timeout\""))
+        let two = await eventually { self.model.sessions.first?.lastPrompt == "and keep the old timeout" }
+        XCTAssertTrue(two)
+        let session = try XCTUnwrap(model.sessions.first)
+        XCTAssertEqual(session.projectName, "demo-project")
+        XCTAssertEqual(session.headline, "Add retries to the uploader")
+        XCTAssertEqual(session.followUp, "and keep the old timeout")
     }
 
     func testDenyListedBundleIsNotAdmitted() async throws {
@@ -446,7 +616,7 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
 
     // MARK: Views render
 
-    func testEveryPanelSceneRenders() throws {
+    func testEverySceneRenders() throws {
         for scene in PreviewRenderer.Scene.allCases {
             let url = scratch.file("render/\(scene.rawValue).png")
             guard PreviewRenderer.render(scene, to: url, scale: 1) else {
@@ -456,9 +626,19 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
             let size = (try? FileManager.default.attributesOfItem(atPath: url.path)[.size] as? Int) ?? 0
             XCTAssertGreaterThan(size, 3000, "\(scene) rendered an empty image")
         }
-        let demo = PreviewRenderer.demoModel(.sessions)
-        XCTAssertEqual(demo.sessions.count, 3)
-        XCTAssertEqual(demo.pending.count, 1)
-        XCTAssertEqual(demo.sessions.first?.phase, .needsAttention, "sessions needing attention sort first")
+        XCTAssertTrue(PreviewRenderer.render(.sessions, to: scratch.file("render/plain.png"), scale: 1, metrics: .plain))
+        XCTAssertTrue(PreviewRenderer.renderDemo(to: scratch.file("render/demo.gif")))
+        XCTAssertTrue(PreviewRenderer.renderMascots(to: scratch.file("render/mascots")))
+        XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: scratch.file("render/mascots").path).filter { $0.hasSuffix(".gif") }.count,
+                       Mascots.all.count)
+
+        let list = PreviewRenderer.demoModel(.sessions)
+        XCTAssertEqual(list.sessions.count, 5)
+        XCTAssertTrue(list.isExpanded)
+        XCTAssertEqual(list.sessions.first?.phase, .needsAttention, "sessions needing attention sort first")
+        XCTAssertEqual(Set(list.sessions.compactMap(\.hostName)), ["iTerm2", "Ghostty", "Terminal", "Cursor", "WezTerm"])
+        let permission = PreviewRenderer.demoModel(.permission)
+        XCTAssertEqual(permission.pending.count, 1)
+        XCTAssertFalse(PreviewRenderer.demoModel(.attention).isExpanded)
     }
 }

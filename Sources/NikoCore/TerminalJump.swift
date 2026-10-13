@@ -47,6 +47,45 @@ public struct JumpTarget: Sendable, Equatable {
         case .other(let bundleID): return bundleID
         }
     }
+
+    static let namesByBundlePrefix: [(String, String)] = [
+        ("com.mitchellh.ghostty", "Ghostty"), ("dev.warp.", "Warp"), ("net.kovidgoyal.kitty", "kitty"),
+        ("org.alacritty", "Alacritty"), ("io.alacritty", "Alacritty"), ("com.github.wez.wezterm", "WezTerm"),
+        ("co.zeit.hyper", "Hyper"), ("com.todesktop.230313mzl4w4u92", "Cursor"), ("com.exafunction.windsurf", "Windsurf"),
+        ("com.microsoft.VSCode", "VS Code"), ("com.vscodium", "VSCodium"), ("dev.zed.", "Zed"),
+        ("com.jetbrains.", "JetBrains"), ("com.apple.dt.Xcode", "Xcode"), ("com.trae.", "Trae"), ("org.tabby", "Tabby"),
+    ]
+
+    static let namesByTermProgram: [String: String] = [
+        "ghostty": "Ghostty", "WarpTerminal": "Warp", "WezTerm": "WezTerm", "vscode": "VS Code", "zed": "Zed",
+        "kitty": "kitty", "alacritty": "Alacritty", "Hyper": "Hyper", "Tabby": "Tabby",
+    ]
+
+    /// Short name of the app hosting the session, for the chip on a session row
+    /// ("iTerm2", "Terminal", "Ghostty · tmux", …). Nil when we cannot tell.
+    public func hostName(termProgram: String?) -> String? {
+        var name: String?
+        switch app {
+        case .iterm2: name = "iTerm2"
+        case .appleTerminal: name = "Terminal"
+        case .other(let bundleID):
+            if let bundleID {
+                name = JumpTarget.namesByBundlePrefix.first { bundleID.hasPrefix($0.0) }?.1
+            }
+            if name == nil, let termProgram, termProgram != "tmux" {
+                name = JumpTarget.namesByTermProgram[termProgram]
+            }
+        }
+        if tmuxPane != nil { return name.map { $0 + " · tmux" } ?? "tmux" }
+        return name
+    }
+}
+
+extension Session {
+    /// The terminal (or IDE) this session lives in, as shown on its row.
+    public var hostName: String? {
+        JumpTarget(terminal: terminal, ancestors: ancestors).hostName(termProgram: terminal.termProgram)
+    }
 }
 
 public enum TerminalJump {

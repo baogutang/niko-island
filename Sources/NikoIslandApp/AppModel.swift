@@ -9,7 +9,13 @@ public protocol AttentionNotifying: AnyObject {
     func clear(session: SessionKey)
 }
 
-/// Main-actor state behind the panel: sessions, pending approvals, settings.
+/// Plays (or, in tests, records) the cue for an event.
+@MainActor
+public protocol SoundPlaying: AnyObject {
+    func play(_ event: SoundEvent)
+}
+
+/// Main-actor state behind the island: sessions, pending approvals, settings.
 @MainActor
 public final class AppModel: ObservableObject {
     public struct Badge: Equatable, Sendable {
@@ -17,7 +23,26 @@ public final class AppModel: ObservableObject {
         public var pending = 0
     }
 
-    public enum Tab: String, Sendable, CaseIterable { case sessions, usage, settings }
+    /// What the expanded island is showing.
+    public enum Route: String, Sendable { case sessions, usage }
+
+    /// Why the island is open; decides when it closes again.
+    public enum ExpandReason: Sendable, Equatable {
+        /// The pointer is resting on it: closes when the pointer leaves.
+        case hover
+        /// The user opened it: stays until they click elsewhere.
+        case click
+        /// An agent needs a decision: stays until the user clicks elsewhere.
+        case attention
+    }
+
+    /// A short notice shown in the collapsed island.
+    public struct Toast: Equatable, Sendable {
+        public enum Kind: Sendable { case completed, failed }
+        public var key: SessionKey
+        public var title: String
+        public var kind: Kind
+    }
 
     /// A blocking request waiting for an explicit user decision. Never auto-dismissed.
     public struct PendingRequest: Identifiable {
@@ -49,7 +74,12 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var grantedSessions: Set<SessionKey> = []
     @Published public private(set) var startFailure: StartFailure?
     @Published public private(set) var httpPort: UInt16 = 0
-    @Published public var selectedTab: Tab = .sessions
+    @Published public private(set) var isExpanded = false
+    @Published public private(set) var expandReason: ExpandReason = .click
+    @Published public var route: Route = .sessions
+    @Published public private(set) var toast: Toast?
+    /// The pending request whose details are open (the oldest one unless the user picked another).
+    @Published public var focusedRequestID: UInt64?
     @Published public var settings: NikoSettings {
         didSet {
             guard settings != oldValue else { return }
@@ -59,12 +89,21 @@ public final class AppModel: ObservableObject {
             if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
         }
     }
-    @Published public internal(set) var usage = UsageSnapshot()
+    @Published public internal(set) var usage = UsageSnapshot() {
+        didSet { noteRateLimits(previous: oldValue) }
+    }
     @Published public internal(set) var maintenance = MaintenanceState()
 
-    /// The panel wants to be shown (a request arrived).
+    /// The island wants to be shown (a request arrived).
     public var onAttentionNeeded: (() -> Void)?
     public weak var notifier: AttentionNotifying?
+    public weak var soundPlayer: SoundPlaying?
+    /// Opens the settings window (set by the app delegate).
+    public var onOpenSettings: (() -> Void)?
+    /// Plays a cue regardless of the switches (the preview buttons in Settings).
+    public var onPreviewSound: ((SoundEvent) -> Void)?
+    /// The settings page that is showing (raw value of `SettingsPage`).
+    @Published public var settingsPage = "general"
     /// Brings the session's terminal to the front; replaced in tests.
     public var jumpHandler: (Session) -> Void = { TerminalJumper.jump(to: $0) }
 
@@ -74,6 +113,8 @@ public final class AppModel: ObservableObject {
     private var unixServer: UnixIngressServer?
     private var httpServer: HTTPIngressServer?
     private var pruneTimer: Timer?
+    private var toastTask: Task<Void, Never>?
+    private var lastPlayed: [SoundEvent: Date] = [:]
     var usageEngine: UsageEngine?
 
     public init(paths: NikoPaths, home: URL = NikoPaths.userHome(), log: NikoLog = .shared) {
@@ -142,6 +183,7 @@ public final class AppModel: ObservableObject {
     public func stop() {
         pruneTimer?.invalidate()
         pruneTimer = nil
+        toastTask?.cancel()
         usageEngine?.stop()
         usageEngine = nil
         httpServer?.stop()
@@ -229,11 +271,13 @@ public final class AppModel: ObservableObject {
                     pending.removeAll { $0.id == id }   // the sender left before we could even show it
                     store.resolveAttention(event.key, activity: .thinking, now: now)
                 } else {
-                    selectedTab = .sessions
+                    route = .sessions
                     if let session = store[event.key] {
                         announce(request.isQuestion ? .question : .permission, session: session,
                                  body: request.isQuestion ? (request.questions.first?.text ?? "") : (event.toolName ?? ""))
                     }
+                    play(.attention)
+                    if settings.expandOnAttention { expand(.attention) }
                     onAttentionNeeded?()
                 }
             }
@@ -244,20 +288,95 @@ public final class AppModel: ObservableObject {
             grants.revoke(key)
             notifier?.clear(session: key)
         case .becameIdle(let key):
-            if let session = store[key] { announce(.idle, session: session, body: "") }
+            if let session = store[key] {
+                announce(.idle, session: session, body: "")
+                show(Toast(key: key, title: session.title, kind: .completed))
+            }
+            play(.completed)
+        case .failed(let key):
+            if let session = store[key] {
+                announce(.idle, session: session, body: session.activity.detail ?? L("Stopped with an error"))
+                show(Toast(key: key, title: session.title, kind: .failed))
+            }
+            play(.error)
+        case .started(let key):
+            notifier?.clear(session: key)
+            play(.started)
         case .updated(let key):
             if store[key]?.phase == .working { notifier?.clear(session: key) }
         }
     }
 
     private func announce(_ kind: NikoSettings.EventKind, session: Session, body: String) {
-        guard settings.notificationsEnabled(for: kind) || settings.soundEnabled(for: kind) else { return }
+        guard settings.notificationsEnabled(for: kind) else { return }
         notifier?.notify(kind: kind, session: session, body: body)
+    }
+
+    // MARK: Sounds
+
+    /// Plays a cue if the user has it switched on. The same cue is not repeated
+    /// within a second and a half, so a burst of events is one sound, not ten.
+    func play(_ event: SoundEvent, now: Date = Date()) {
+        guard settings.shouldPlay(event) else { return }
+        if let last = lastPlayed[event], now.timeIntervalSince(last) < 1.5 { return }
+        lastPlayed[event] = now
+        soundPlayer?.play(event)
+    }
+
+    /// One warning when a rate-limit window crosses 90 %.
+    private func noteRateLimits(previous: UsageSnapshot) {
+        let threshold = 90.0
+        let before = previous.rateLimits.map(\.usedPercent).max() ?? 0
+        let after = usage.rateLimits.map(\.usedPercent).max() ?? 0
+        if after >= threshold, before < threshold { play(.limit) }
+    }
+
+    // MARK: Island state
+
+    public func expand(_ reason: ExpandReason) {
+        // A deliberate open is never downgraded to a hover that closes by itself.
+        if isExpanded, reason == .hover { return }
+        expandReason = reason
+        isExpanded = true
+        toast = nil
+    }
+
+    public func collapse() {
+        guard isExpanded else { return }
+        isExpanded = false
+        route = .sessions
+    }
+
+    public func toggleExpanded() {
+        if isExpanded { collapse() } else { expand(.click) }
+    }
+
+    /// The request shown in detail.
+    public var focusedRequest: PendingRequest? {
+        pending.first { $0.id == focusedRequestID } ?? pending.first
+    }
+
+    private func show(_ toast: Toast) {
+        guard settings.showCompletionToast, !isExpanded else { return }
+        self.toast = toast
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 4_500_000_000)
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
+
+    public func dismissToast() {
+        toastTask?.cancel()
+        toast = nil
     }
 
     private func requestWithdrawn(_ id: UInt64) {
         guard let index = pending.firstIndex(where: { $0.id == id }) else { return }
         let request = pending.remove(at: index)
+        if focusedRequestID == id { focusedRequestID = nil }
+        if pending.isEmpty, expandReason == .attention { collapse() }
         if !pending.contains(where: { $0.sessionKey == request.sessionKey }) {
             store.resolveAttention(request.sessionKey, activity: .thinking)
             notifier?.clear(session: request.sessionKey)
@@ -283,6 +402,7 @@ public final class AppModel: ObservableObject {
     public func decide(_ requestID: UInt64, _ decision: UserDecision) {
         guard let index = pending.firstIndex(where: { $0.id == requestID }) else { return }
         let request = pending.remove(at: index)
+        if focusedRequestID == requestID { focusedRequestID = nil }
         request.replier.send(ReplyBuilder.line(for: decision, event: request.event))
         grants.record(decision, for: request.event)
 
@@ -308,6 +428,8 @@ public final class AppModel: ObservableObject {
             }
         }
         if !stillWaiting { notifier?.clear(session: request.sessionKey) }
+        // Opened for this request and nothing else is waiting: get out of the way.
+        if pending.isEmpty, expandReason == .attention { collapse() }
         publish()
     }
 

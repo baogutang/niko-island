@@ -350,11 +350,19 @@ public enum NikoCLI {
             }
             // Called from main.swift, i.e. on the main thread.
             return MainActor.assumeIsolated {
+                let root = URL(fileURLWithPath: directory)
                 var failed = 0
                 for scene in PreviewRenderer.Scene.allCases {
-                    let url = URL(fileURLWithPath: directory).appendingPathComponent("panel-\(scene.rawValue).png")
+                    let url = root.appendingPathComponent("island-\(scene.rawValue).png")
                     if PreviewRenderer.render(scene, to: url) { print("wrote \(url.path)") } else { failed += 1 }
                 }
+                // The same scenes as they look on a display without a camera housing.
+                for scene in [PreviewRenderer.Scene.working, .attention, .sessions] {
+                    let url = root.appendingPathComponent("plain/island-\(scene.rawValue).png")
+                    if PreviewRenderer.render(scene, to: url, metrics: .plain) { print("wrote \(url.path)") } else { failed += 1 }
+                }
+                if PreviewRenderer.renderDemo(to: root.appendingPathComponent("island-demo.gif")) { print("wrote island-demo.gif") } else { failed += 1 }
+                if PreviewRenderer.renderMascots(to: root.appendingPathComponent("mascots")) { print("wrote mascots/") } else { failed += 1 }
                 return failed == 0 ? 0 : 1
             }
         default:

@@ -5,8 +5,9 @@
 #   scripts/smoke-launch.sh [path/to/Niko Island.app]
 #
 # Checks: the app starts, the ingress socket answers, the bundled bridge can
-# deliver an event, a pending approval is released when the app quits, and how
-# long a cold start takes until the first event is accepted.
+# deliver an event, the island window lays out collapsed and opens for a
+# request, a pending approval is released when the app quits, and how long a
+# cold start takes until the first event is accepted.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 APP="${1:-$ROOT/dist/Niko Island.app}"
@@ -29,7 +30,7 @@ trap cleanup EXIT
 EVENT='{"hook_event_name":"SessionStart","session_id":"smoke","cwd":"'"$ROOT"'"}'
 
 START="$(now_ms)"
-"$BIN" -NikoNotificationsDisabled YES >"$WORK/out.log" 2>&1 &
+NIKO_ISLAND_DEBUG=1 "$BIN" -NikoNotificationsDisabled YES >"$WORK/out.log" 2>&1 &
 PID=$!
 
 # Cold start: keep offering an event until the app has accepted one.
@@ -51,11 +52,30 @@ MODE="$(stat -f '%Lp' "$NIKO_ISLAND_HOME/run")"
 [ "$MODE" = "700" ] || { echo "smoke: run dir mode is $MODE, expected 700" >&2; exit 1; }
 echo "smoke: socket present, run dir 0700"
 
-# A pending approval must be released (exit 0, no output) when the app goes away.
+# The island window: collapsed it is a small tab at the top of its canvas.
+wait_for() {
+    for _ in $(seq 1 60); do
+        if grep -q "$1" "$WORK/out.log"; then return 0; fi
+        sleep 0.05
+    done
+    return 1
+}
+wait_for "island frame .*expanded=false" || { echo "smoke: the island never laid itself out" >&2; cat "$WORK/out.log" >&2; exit 1; }
+COLLAPSED="$(grep "island frame .*expanded=false" "$WORK/out.log" | tail -n 1 | sed 's/.*island frame //')"
+case "$COLLAPSED" in
+    *" y=0 "*) ;;
+    *) echo "smoke: collapsed island is not flush with the top: $COLLAPSED" >&2; exit 1 ;;
+esac
+echo "smoke: island collapsed  ($COLLAPSED)"
+
+# A pending approval opens the island, and must be released (exit 0, no output)
+# when the app goes away.
 REQUEST='{"hook_event_name":"PermissionRequest","session_id":"smoke","cwd":"'"$ROOT"'","tool_name":"Bash","tool_input":{"command":"true"}}'
 (printf '%s' "$REQUEST" | "$BRIDGE" --source claude >"$WORK/reply.txt" 2>&1; echo $? >"$WORK/reply.status") &
 BRIDGE_JOB=$!
-sleep 0.5
+wait_for "island frame .* w=640 .*expanded=true" || { echo "smoke: the island did not open for a permission request" >&2; cat "$WORK/out.log" >&2; exit 1; }
+echo "smoke: island expanded   ($(grep "expanded=true" "$WORK/out.log" | tail -n 1 | sed 's/.*island frame //'))"
+sleep 0.3
 kill "$PID"
 wait "$PID" 2>/dev/null || true
 PID=""

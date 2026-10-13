@@ -64,6 +64,8 @@ public struct NikoPaths: Sendable, Equatable {
     public var data: URL { root.appendingPathComponent("data") }
     public var usageDir: URL { data.appendingPathComponent("usage") }
     public var logs: URL { root.appendingPathComponent("logs") }
+    /// The user's own sound files and sound packs (created on demand, not part of the tree).
+    public var sounds: URL { root.appendingPathComponent("sounds") }
 
     public var socket: URL { run.appendingPathComponent("niko-island.sock") }
     public var ingressToken: URL { run.appendingPathComponent("ingress-token") }

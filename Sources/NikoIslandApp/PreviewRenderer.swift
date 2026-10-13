@@ -1,104 +1,303 @@
 import AppKit
+import ImageIO
 import NikoCore
 import SwiftUI
+import UniformTypeIdentifiers
 
-/// Renders the real panel views with made-up sessions into a PNG. Used for the
-/// README screenshot (`niko-island internal render-preview`) and to eyeball
-/// layout without a display session. Nothing here touches the user's data.
+/// Renders the real views with made-up sessions into images: the README and
+/// website pictures, the demo GIF and the mascot strip all come from here
+/// (`niko-island internal render-preview <dir>`). Nothing touches user data.
 @MainActor
 enum PreviewRenderer {
-    enum Scene: String, CaseIterable { case sessions, question, empty, settings, usage }
+    enum Scene: String, CaseIterable {
+        case idle, working, attention, toast
+        case sessions, permission, question, usage, empty
+        case settingsSounds = "settings-sounds"
+        case settingsAgents = "settings-agents"
+
+        var isSettings: Bool { self == .settingsSounds || self == .settingsAgents }
+    }
+
+    // MARK: Sample data
+
+    private static func event(_ fields: [String: String], input: JSONObject? = nil, host: (program: String, bundle: String?)? = nil) -> AgentEvent? {
+        var object = JSONObject()
+        for key in fields.keys.sorted() { object[key] = .string(fields[key] ?? "") }
+        if let input { object["tool_input"] = .object(input) }
+        if let host {
+            var meta = JSONObject(["term_program": .string(host.program)])
+            if let bundle = host.bundle { meta["bundle_id"] = .string(bundle) }
+            object[AgentEvent.metaKey] = .object(meta)
+        }
+        return try? AgentEvent(json: .object(object))
+    }
 
     static func demoModel(_ scene: Scene) -> AppModel {
         let scratch = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("niko-preview-\(getpid())")
         let model = AppModel(paths: NikoPaths(root: scratch.appendingPathComponent("ni")), home: scratch, log: .inMemory())
-        let now = Date()
-        var nextReplier: UInt64 = 1
+        let now = PreviewClock.now
+        var replierID: UInt64 = 1
 
-        func send(_ json: String, secondsAgo: TimeInterval, blocking: Bool = false) {
-            guard let value = try? JSONValue.parse(json), let event = try? AgentEvent(json: value) else { return }
-            let evidence = AdmissionEvidence(channel: .unixSocket, peerUID: getuid())
+        func send(_ source: String, _ name: String, session: String, project: String, ago: TimeInterval,
+                  prompt: String? = nil, tool: String? = nil, input: JSONObject? = nil,
+                  host: (program: String, bundle: String?)? = ("iTerm.app", nil), extra: [String: String] = [:], blocking: Bool = false) {
+            var fields = ["source": source, "hook_event_name": name, "session_id": session, "cwd": "/Users/dev/code/" + project]
+            if let prompt { fields["prompt"] = prompt }
+            if let tool { fields["tool_name"] = tool }
+            for (key, value) in extra { fields[key] = value }
+            guard let event = event(fields, input: input, host: host) else { return }
             var replier: IngressReplier?
             if blocking {
-                replier = IngressReplier.detached(id: nextReplier)
-                nextReplier += 1
+                replier = IngressReplier.detached(id: replierID)
+                replierID += 1
             }
-            model.handle(IngressDelivery(event: event, evidence: evidence, replier: replier), now: now.addingTimeInterval(-secondsAgo))
+            model.handle(IngressDelivery(event: event, evidence: AdmissionEvidence(channel: .unixSocket, peerUID: getuid()), replier: replier),
+                         now: now.addingTimeInterval(-ago))
+        }
+
+        func fleet() {
+            send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 320, prompt: "Fix the flaky upload retry test")
+            send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 46, tool: "Bash", input: ["command": .string("swift test --filter UploadTests")])
+            send("codex", "UserPromptSubmit", session: "b", project: "storefront", ago: 260, prompt: "Move the checkout form to the new validation hooks",
+                 host: ("ghostty", "com.mitchellh.ghostty"))
+            send("codex", "UserPromptSubmit", session: "b", project: "storefront", ago: 120, prompt: "keep the old error copy for now",
+                 host: ("ghostty", "com.mitchellh.ghostty"))
+            send("codex", "PreToolUse", session: "b", project: "storefront", ago: 32, tool: "Edit",
+                 input: ["file_path": .string("/Users/dev/code/storefront/src/CheckoutForm.tsx")], host: ("ghostty", "com.mitchellh.ghostty"))
+            send("gemini", "UserPromptSubmit", session: "c", project: "docs-site", ago: 900, prompt: "Tighten the install guide", host: ("Apple_Terminal", nil))
+            send("gemini", "Stop", session: "c", project: "docs-site", ago: 372, host: ("Apple_Terminal", nil))
+            send("cursor", "UserPromptSubmit", session: "d", project: "pixel-kit", ago: 75, prompt: "Find where the sprite cache is invalidated",
+                 host: ("vscode", "com.todesktop.230313mzl4w4u92"))
+            send("cursor", "PreToolUse", session: "d", project: "pixel-kit", ago: 18, tool: "Grep", input: ["pattern": .string("invalidate(Cache|Sprites)")],
+                 host: ("vscode", "com.todesktop.230313mzl4w4u92"))
+            send("opencode", "UserPromptSubmit", session: "e", project: "infra", ago: 200, prompt: "Draft the migration plan for the queue workers",
+                 host: ("WezTerm", "com.github.wez.wezterm"))
+            send("opencode", "PreToolUse", session: "e", project: "infra", ago: 12, tool: "Read", input: ["file_path": .string("/Users/dev/code/infra/workers/queue.tf")],
+                 host: ("WezTerm", "com.github.wez.wezterm"))
         }
 
         switch scene {
-        case .empty:
+        case .idle, .empty:
             break
-        case .settings:
-            model.selectedTab = .settings
+        case .working:
+            send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 60, prompt: "Fix the flaky upload retry test")
+            send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 8, tool: "Bash", input: ["command": .string("swift test")])
+            send("codex", "UserPromptSubmit", session: "b", project: "storefront", ago: 40, prompt: "Move the checkout form")
+        case .toast:
+            send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 60, prompt: "Fix the flaky upload retry test")
+            send("claude", "Stop", session: "a", project: "atlas-api", ago: 1)
+        case .attention, .permission:
+            fleet()
+            send("claude", "PermissionRequest", session: "a", project: "atlas-api", ago: 12, tool: "Bash",
+                 input: ["command": .string("git push origin fix/upload-retry-backoff")], blocking: true)
+        case .question:
+            fleet()
+            let questions: JSONValue = .array([
+                .object(["question": .string("Which validation style should the form use?"), "header": .string("Validation"), "multiSelect": .bool(false),
+                         "options": .array([
+                            .object(["label": .string("Validate on blur"), "description": .string("Show errors when a field loses focus")]),
+                            .object(["label": .string("Validate on submit"), "description": .string("Only check when the form is sent")]),
+                            .object(["label": .string("Live validation"), "description": .string("Check on every keystroke")]),
+                            .object(["label": .string("Keep it as it is"), "description": .string("Leave the current behaviour alone")]),
+                         ])]),
+                .object(["question": .string("Which fields need it?"), "header": .string("Fields"), "multiSelect": .bool(true),
+                         "options": .array([.object(["label": .string("Email")]), .object(["label": .string("Card number")])])]),
+            ])
+            send("codex", "PermissionRequest", session: "b", project: "storefront", ago: 9, tool: "AskUserQuestion",
+                 input: ["questions": questions], host: ("ghostty", "com.mitchellh.ghostty"), blocking: true)
+        case .sessions:
+            fleet()
+            send("claude", "Notification", session: "a", project: "atlas-api", ago: 14,
+                 extra: ["notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"])
+        case .usage:
+            fleet()
+            model.usage = UsageSnapshot.demo(now: Date())
+            model.route = .usage
+        case .settingsSounds:
+            model.settings.soundsEnabled = true
+            model.settingsPage = SettingsPage.sounds.rawValue
+        case .settingsAgents:
+            model.settingsPage = SettingsPage.agents.rawValue
             model.maintenance.agents = [
                 .init(id: "claude", name: "Claude Code", stability: .stable, wired: true),
                 .init(id: "codex", name: "Codex CLI", stability: .experimental, wired: false),
+                .init(id: "gemini", name: "Gemini CLI", stability: .experimental, wired: false),
+                .init(id: "opencode", name: "OpenCode", stability: .experimental, wired: false),
             ]
-        case .usage:
-            model.selectedTab = .usage
-            model.usage = UsageSnapshot.demo(now: now)
-        case .sessions, .question:
-            send(#"{"source":"claude","hook_event_name":"UserPromptSubmit","session_id":"a","cwd":"/Users/dev/code/atlas-api","prompt":"fix flaky upload retry"}"#, secondsAgo: 300)
-            send(#"{"source":"claude","hook_event_name":"PreToolUse","session_id":"a","cwd":"/Users/dev/code/atlas-api","tool_name":"Bash","tool_input":{"command":"swift test --filter UploadTests"}}"#, secondsAgo: 134)
-            send(#"{"source":"claude","hook_event_name":"UserPromptSubmit","session_id":"b","cwd":"/Users/dev/code/storefront","prompt":"migrate the checkout form to the new validation hooks"}"#, secondsAgo: 240)
-            send(#"{"source":"claude","hook_event_name":"PreToolUse","session_id":"b","cwd":"/Users/dev/code/storefront","tool_name":"Edit","tool_input":{"file_path":"/Users/dev/code/storefront/src/CheckoutForm.tsx"}}"#, secondsAgo: 41)
-            send(#"{"source":"claude","hook_event_name":"UserPromptSubmit","session_id":"c","cwd":"/Users/dev/code/docs-site","prompt":"tighten the install guide"}"#, secondsAgo: 900)
-            send(#"{"source":"claude","hook_event_name":"Stop","session_id":"c","cwd":"/Users/dev/code/docs-site"}"#, secondsAgo: 372)
-            if scene == .sessions {
-                send(#"{"source":"claude","hook_event_name":"PermissionRequest","session_id":"a","cwd":"/Users/dev/code/atlas-api","tool_name":"Bash","tool_input":{"command":"git push origin feature/retry-backoff"}}"#, secondsAgo: 12, blocking: true)
-            } else {
-                send(#"{"source":"claude","hook_event_name":"PermissionRequest","session_id":"b","cwd":"/Users/dev/code/storefront","tool_name":"AskUserQuestion","tool_input":{"questions":[{"question":"Which validation style should the form use?","header":"Validation","multiSelect":false,"options":[{"label":"Validate on blur","description":"Show errors when a field loses focus"},{"label":"Validate on submit","description":"Only check when the form is sent"},{"label":"Live validation","description":"Check on every keystroke"}]},{"question":"Which fields need it?","header":"Fields","multiSelect":true,"options":[{"label":"Email"},{"label":"Card number"}]}]}}"#, secondsAgo: 8, blocking: true)
-            }
         }
+
+        switch scene {
+        case .sessions, .permission, .question, .usage, .empty: model.expand(.click)
+        case .toast: break
+        default: model.collapse()
+        }
+        if scene != .toast { model.dismissToast() }
         return model
     }
 
-    static func render(_ scene: Scene, to url: URL, scale: CGFloat = 2) -> Bool {
-        let model = demoModel(scene)
-        let content = PanelView(model: model)
+    // MARK: Staging
+
+    /// A stand-in desktop: wallpaper, a hint of a menu bar, and the island on top.
+    private struct Stage: View {
+        @ObservedObject var model: AppModel
+        var metrics: IslandMetrics
+        var width: CGFloat
+        var height: CGFloat?
+
+        var body: some View {
+            ZStack(alignment: .top) {
+                LinearGradient(colors: [Color(red: 0.16, green: 0.22, blue: 0.36), Color(red: 0.30, green: 0.22, blue: 0.40),
+                                        Color(red: 0.72, green: 0.42, blue: 0.36)], startPoint: .topLeading, endPoint: .bottomTrailing)
+                menuBar
+                VStack(spacing: 0) {
+                    IslandBody(model: model, metrics: metrics)
+                    Spacer(minLength: height == nil ? 56 : 0)
+                }
+            }
+            .frame(width: width, height: height)
+            .fixedSize(horizontal: false, vertical: height == nil)
+            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .environment(\.colorScheme, .dark)
+        }
+
+        private var menuBar: some View {
+            HStack(spacing: 14) {
+                ForEach([34, 26, 30, 38, 28], id: \.self) { item in
+                    Capsule().fill(Color.white.opacity(0.55)).frame(width: CGFloat(item), height: 7)
+                }
+                Spacer()
+                ForEach(0..<4, id: \.self) { _ in Circle().fill(Color.white.opacity(0.55)).frame(width: 10, height: 10) }
+                Capsule().fill(Color.white.opacity(0.55)).frame(width: 46, height: 7)
+            }
+            .padding(.horizontal, 20)
+            .frame(height: metrics.bandHeight)
+            .background(Color.black.opacity(0.22))
+        }
+    }
+
+    static func view(for scene: Scene, metrics: IslandMetrics = .notched, width: CGFloat = 860, height: CGFloat? = nil,
+                     mascotFrame: Int = 0, model: AppModel? = nil) -> AnyView {
+        let model = model ?? demoModel(scene)
+        if scene.isSettings {
+            return AnyView(SettingsRootView(model: model).frame(width: 860, height: scene == .settingsSounds ? 760 : 520)
+                .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                .environment(\.isStaticPreview, true))
+        }
+        return AnyView(Stage(model: model, metrics: metrics, width: width, height: height)
             .environment(\.isStaticPreview, true)
-            .padding(28)
-            .background(LinearGradient(colors: [Color(red: 0.13, green: 0.15, blue: 0.20), Color(red: 0.07, green: 0.08, blue: 0.11)],
-                                       startPoint: .top, endPoint: .bottom))
-        let renderer = ImageRenderer(content: content)
+            .environment(\.mascotFrame, mascotFrame))
+    }
+
+    private static func cgImage(of view: AnyView, scale: CGFloat) -> CGImage? {
+        let renderer = ImageRenderer(content: view)
         renderer.scale = scale
-        guard let image = renderer.nsImage, let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff), let png = bitmap.representation(using: .png, properties: [:]) else {
+        return renderer.cgImage
+    }
+
+    private static func writePNG(_ image: CGImage, to url: URL) -> Bool {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard let png = NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]) else { return false }
+        return (try? png.write(to: url)) != nil
+    }
+
+    static func render(_ scene: Scene, to url: URL, scale: CGFloat = 1.5, metrics: IslandMetrics = .notched) -> Bool {
+        guard let image = cgImage(of: view(for: scene, metrics: metrics), scale: scale) else { return false }
+        return writePNG(image, to: url)
+    }
+
+    // MARK: GIFs
+
+    private static func writeGIF(frames: [(image: CGImage, delay: Double)], to url: URL) -> Bool {
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard !frames.isEmpty,
+              let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.gif.identifier as CFString, frames.count, nil) else {
             return false
         }
-        do {
-            try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try png.write(to: url)
-            return true
-        } catch {
-            return false
+        CGImageDestinationSetProperties(destination, [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFLoopCount: 0]] as CFDictionary)
+        for frame in frames {
+            let properties = [kCGImagePropertyGIFDictionary: [kCGImagePropertyGIFUnclampedDelayTime: frame.delay,
+                                                              kCGImagePropertyGIFDelayTime: frame.delay]] as CFDictionary
+            CGImageDestinationAddImage(destination, frame.image, properties)
         }
+        return CGImageDestinationFinalize(destination)
+    }
+
+    /// A short walk through the island's states.
+    static func renderDemo(to url: URL) -> Bool {
+        let storyboard: [(Scene, Int, Double)] = [
+            (.idle, 0, 1.1), (.working, 0, 0.55), (.working, 1, 0.55), (.working, 0, 0.55), (.working, 1, 0.55),
+            (.attention, 0, 1.2), (.permission, 0, 2.6), (.working, 0, 0.5), (.working, 1, 0.5),
+            (.question, 0, 2.6), (.sessions, 0, 2.2), (.usage, 0, 2.0), (.toast, 0, 1.8), (.idle, 0, 0.9),
+        ]
+        var frames: [(CGImage, Double)] = []
+        for (scene, mascotFrame, delay) in storyboard {
+            guard let image = cgImage(of: view(for: scene, width: 760, height: 640, mascotFrame: mascotFrame), scale: 1) else { return false }
+            frames.append((image, delay))
+        }
+        return writeGIF(frames: frames, to: url)
+    }
+
+    /// One PNG and one two-frame GIF per creature, plus a strip with all of them.
+    static func renderMascots(to directory: URL) -> Bool {
+        var ok = true
+        for sprite in Mascots.all {
+            let frames: [(CGImage, Double)] = (0..<2).compactMap { index in
+                let view = AnyView(MascotView(sprite: sprite, size: 72, frame: index).padding(12)
+                    .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black)))
+                return cgImage(of: view, scale: 1).map { ($0, 0.55) }
+            }
+            guard frames.count == 2 else { return false }
+            ok = writeGIF(frames: frames, to: directory.appendingPathComponent("\(sprite.name).gif")) && ok
+            ok = writePNG(frames[0].0, to: directory.appendingPathComponent("\(sprite.name).png")) && ok
+        }
+        let strip = AnyView(HStack(spacing: 14) {
+            ForEach(Array(Mascots.all.enumerated()), id: \.offset) { _, sprite in MascotView(sprite: sprite, size: 56, frame: 0) }
+        }
+        .padding(.horizontal, 26).padding(.vertical, 18)
+        .background(Capsule().fill(Color.black)))
+        if let image = cgImage(of: strip, scale: 2) { ok = writePNG(image, to: directory.appendingPathComponent("strip.png")) && ok }
+        return ok
     }
 }
 
-/// The app icon, drawn in code: the same pill-with-a-dot as the menu-bar
-/// glyph on a dark tile. Original artwork, no third-party assets.
+private struct MascotFrameKey: EnvironmentKey {
+    static let defaultValue = 0
+}
+
+extension EnvironmentValues {
+    /// Which animation frame creatures show in documentation images.
+    var mascotFrame: Int {
+        get { self[MascotFrameKey.self] }
+        set { self[MascotFrameKey.self] = newValue }
+    }
+}
+
+/// The app icon, drawn in code: the island as a black tab hanging from the top
+/// of a dark tile, with a small creature on it. Original artwork.
 @MainActor
 enum IconRenderer {
     private struct IconView: View {
         var body: some View {
-            ZStack {
+            ZStack(alignment: .top) {
                 RoundedRectangle(cornerRadius: 186, style: .continuous)
-                    .fill(LinearGradient(colors: [Color(red: 0.13, green: 0.15, blue: 0.20), Color(red: 0.04, green: 0.05, blue: 0.07)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .overlay(RoundedRectangle(cornerRadius: 186, style: .continuous).strokeBorder(Color.white.opacity(0.10), lineWidth: 6))
-                    .frame(width: 824, height: 824)
-                Capsule()
-                    .fill(LinearGradient(colors: [Color(red: 0.47, green: 0.92, blue: 0.80), Color(red: 0.25, green: 0.74, blue: 0.64)],
-                                         startPoint: .top, endPoint: .bottom))
-                    .frame(width: 560, height: 204)
-                    .shadow(color: Theme.working.opacity(0.45), radius: 70, y: 18)
-                Circle()
-                    .fill(Color(red: 0.05, green: 0.06, blue: 0.08))
-                    .frame(width: 104, height: 104)
-                    .offset(x: 170)
+                    .fill(LinearGradient(colors: [Color(red: 0.20, green: 0.27, blue: 0.44), Color(red: 0.40, green: 0.27, blue: 0.48),
+                                                  Color(red: 0.86, green: 0.50, blue: 0.40)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                    .overlay(RoundedRectangle(cornerRadius: 186, style: .continuous).strokeBorder(Color.white.opacity(0.14), lineWidth: 6))
+                IslandShape(ear: 40, radius: 120)
+                    .fill(Color.black)
+                    .frame(width: 690, height: 440)
+                    .shadow(color: .black.opacity(0.45), radius: 44, y: 24)
+                HStack(spacing: 44) {
+                    MascotView(sprite: Mascots.island, size: 264, frame: 0)
+                    VStack(alignment: .leading, spacing: 34) {
+                        Capsule().fill(Color.white).frame(width: 230, height: 46)
+                        Capsule().fill(Color.white.opacity(0.42)).frame(width: 160, height: 36)
+                    }
+                }
+                .padding(.top, 92)
             }
+            .frame(width: 824, height: 824)
+            .clipShape(RoundedRectangle(cornerRadius: 186, style: .continuous))
             .frame(width: 1024, height: 1024)
         }
     }

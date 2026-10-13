@@ -5,8 +5,10 @@ import SwiftUI
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
-    private var panel: PanelController?
+    private var island: IslandWindowController?
+    private var settingsWindow: SettingsWindowController?
     private var notifier: SystemNotifier?
+    private var sounds: SoundPlayer?
     public let model: AppModel
 
     public override init() {
@@ -15,24 +17,30 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
-        let panel = PanelController(model: model)
-        let statusItem = StatusItemController(model: model) { [weak panel] button in
-            panel?.toggle(relativeTo: button)
-        }
-        self.panel = panel
-        self.statusItem = statusItem
-        model.onAttentionNeeded = { [weak panel, weak statusItem] in
-            panel?.show(relativeTo: statusItem?.button)
-        }
+        let settingsWindow = SettingsWindowController(model: model)
+        self.settingsWindow = settingsWindow
+        model.onOpenSettings = { [weak settingsWindow] in settingsWindow?.show() }
+
         let notifier = SystemNotifier(model: model)
         self.notifier = notifier
         model.notifier = notifier
 
+        let sounds = SoundPlayer(model: model)
+        self.sounds = sounds
+        model.soundPlayer = sounds
+        model.onPreviewSound = { [weak sounds] event in sounds?.preview(event) }
+
         model.start()
         if model.startFailure == .anotherInstanceRunning {
-            // One menu-bar icon is enough: the running instance keeps the socket.
+            // One island is enough: the running instance keeps the socket.
             NSApp.terminate(nil)
+            return
         }
+
+        let island = IslandWindowController(model: model)
+        self.island = island
+        island.show()
+        statusItem = StatusItemController(model: model)
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

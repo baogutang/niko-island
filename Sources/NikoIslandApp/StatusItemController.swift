@@ -2,19 +2,17 @@ import AppKit
 import Combine
 import NikoCore
 
-/// The menu-bar icon. Left click toggles the panel, right click opens a small menu.
+/// The menu-bar icon. Left click toggles the island, right click opens a small menu.
 @MainActor
 final class StatusItemController: NSObject {
     private let item: NSStatusItem
     private let model: AppModel
-    private let onToggle: (NSStatusBarButton?) -> Void
     private var cancellables: Set<AnyCancellable> = []
 
     var button: NSStatusBarButton? { item.button }
 
-    init(model: AppModel, onToggle: @escaping (NSStatusBarButton?) -> Void) {
+    init(model: AppModel) {
         self.model = model
-        self.onToggle = onToggle
         self.item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
         if let button = item.button {
@@ -58,12 +56,13 @@ final class StatusItemController: NSObject {
         if NSApp.currentEvent?.type == .rightMouseUp {
             showMenu()
         } else {
-            onToggle(sender)
+            model.toggleExpanded()
         }
     }
 
     private func showMenu() {
         let menu = NSMenu()
+        menu.addItem(withTitle: L("Settings…"), action: #selector(openSettings), keyEquivalent: ",").target = self
         menu.addItem(withTitle: L("Open Releases Page"), action: #selector(openReleases), keyEquivalent: "").target = self
         menu.addItem(.separator())
         menu.addItem(withTitle: L("Quit Niko Island"), action: #selector(quit), keyEquivalent: "q").target = self
@@ -71,6 +70,8 @@ final class StatusItemController: NSObject {
         item.button?.performClick(nil)
         item.menu = nil
     }
+
+    @objc private func openSettings() { model.onOpenSettings?() }
 
     @objc private func openReleases() {
         if let url = URL(string: NikoVersion.releasesURL) { NSWorkspace.shared.open(url) }

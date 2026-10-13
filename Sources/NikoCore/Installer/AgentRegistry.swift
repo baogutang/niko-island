@@ -77,6 +77,7 @@ public enum AgentRegistry {
         HookSpec(HookEvent.postToolUse),
         HookSpec(HookEvent.notification),
         HookSpec(HookEvent.stop),
+        HookSpec(HookEvent.stopFailure),
         HookSpec(HookEvent.subagentStop),
         HookSpec(HookEvent.preCompact, matcher: "manual|auto"),
         HookSpec(HookEvent.postCompact, matcher: "manual|auto"),

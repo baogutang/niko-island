@@ -2,7 +2,7 @@ import Foundation
 
 public enum NikoVersion {
     /// Marketing version. `scripts/make-app.sh` stamps the same value into Info.plist.
-    public static let current = "0.1.0"
+    public static let current = "0.2.0"
     public static let bundleIdentifier = "app.nikoisland.macos"
     public static let displayName = "Niko Island"
     /// Substring that tags every hook entry we own. Install/uninstall key off this and nothing else.

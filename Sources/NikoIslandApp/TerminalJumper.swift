@@ -51,33 +51,6 @@ enum TerminalJumper {
     }
 }
 
-/// Opt-in sounds (SPEC §4: none by default). A file named after the event in
-/// `~/.niko-island/sounds/` overrides the built-in system sound.
-@MainActor
-enum SoundPlayer {
-    private static var current: NSSound?
-
-    static func play(_ kind: NikoSettings.EventKind, paths: NikoPaths) {
-        let directory = paths.root.appendingPathComponent("sounds")
-        for ext in ["aiff", "wav", "mp3", "m4a", "caf"] {
-            let custom = directory.appendingPathComponent("\(kind.rawValue).\(ext)")
-            if FileManager.default.fileExists(atPath: custom.path), let sound = NSSound(contentsOf: custom, byReference: true) {
-                current = sound
-                sound.play()
-                return
-            }
-        }
-        let name: String
-        switch kind {
-        case .permission: name = "Funk"
-        case .question: name = "Ping"
-        case .idle: name = "Glass"
-        }
-        current = NSSound(named: name)
-        current?.play()
-    }
-}
-
 /// Local notifications. Only available inside a real app bundle.
 @MainActor
 final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCenterDelegate {
@@ -102,7 +75,6 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
 
     func notify(kind: NikoSettings.EventKind, session: Session, body: String) {
         guard let model else { return }
-        if model.settings.soundEnabled(for: kind) { SoundPlayer.play(kind, paths: model.paths) }
         guard model.settings.notificationsEnabled(for: kind), let center else { return }
         // No banner for a session whose terminal is already in front of the user.
         guard !TerminalJumper.isFrontmost(session) else { return }

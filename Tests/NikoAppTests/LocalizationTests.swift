@@ -36,7 +36,7 @@ final class LocalizationTests: XCTestCase {
     func testEveryStringInTheAppIsTranslated() throws {
         let strings = try catalog()
         let verbs: Set<String> = ["starting", "thinking", "running", "reading", "editing", "finding", "fetching", "delegating",
-                                  "working", "compacting", "waiting for you", "needs permission", "has a question"]
+                                  "working", "compacting", "waiting for you", "needs permission", "has a question", "hit an error"]
         let needed = try keysInSources().union(verbs)
         XCTAssertGreaterThan(needed.count, 60)
         for key in needed.sorted() {

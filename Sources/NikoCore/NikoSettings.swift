@@ -56,14 +56,87 @@ public struct NikoSettings: Sendable, Equatable {
         raw["notifications"] = .object(object)
     }
 
-    public func soundEnabled(for kind: EventKind) -> Bool {
-        raw["sounds"]?[kind.rawValue]?.boolValue ?? false
+    // MARK: Sounds (SPEC §4: none by default)
+
+    /// Master switch. Off until the user turns it on. A 0.1.0 settings file that
+    /// had any per-event sound switched on counts as on.
+    public var soundsEnabled: Bool {
+        get {
+            if let value = raw["soundsEnabled"]?.boolValue { return value }
+            return ["permission", "question", "idle"].contains { raw["sounds"]?[$0]?.boolValue == true }
+        }
+        set { raw["soundsEnabled"] = .bool(newValue) }
     }
 
-    public mutating func setSound(_ enabled: Bool, for kind: EventKind) {
+    /// Whether a cue plays once the master switch is on.
+    public func soundEnabled(for event: SoundEvent) -> Bool {
+        if let value = raw["sounds"]?[event.rawValue]?.boolValue { return value }
+        // Keys written by 0.1.0.
+        switch event {
+        case .attention:
+            if let old = raw["sounds"]?["permission"]?.boolValue ?? raw["sounds"]?["question"]?.boolValue { return old }
+        case .completed:
+            if let old = raw["sounds"]?["idle"]?.boolValue { return old }
+        default:
+            break
+        }
+        return event.enabledByDefault
+    }
+
+    public mutating func setSound(_ enabled: Bool, for event: SoundEvent) {
         var object = raw["sounds"]?.objectValue ?? JSONObject()
-        object[kind.rawValue] = .bool(enabled)
+        object[event.rawValue] = .bool(enabled)
         raw["sounds"] = .object(object)
+    }
+
+    /// True when this cue should actually be heard.
+    public func shouldPlay(_ event: SoundEvent) -> Bool { soundsEnabled && soundEnabled(for: event) }
+
+    public var soundSource: SoundSource {
+        get { SoundSource(rawValue: raw["soundSource"]?.stringValue ?? "island") }
+        set { raw["soundSource"] = .string(newValue.rawValue) }
+    }
+
+    /// 0…1.
+    public var soundVolume: Double {
+        get { min(1, max(0, raw["soundVolume"]?.doubleValue ?? 0.7)) }
+        set { raw["soundVolume"] = .number(String(format: "%.2f", min(1, max(0, newValue)))) }
+    }
+
+    public func systemSound(for event: SoundEvent) -> String {
+        raw["systemSounds"]?[event.rawValue]?.stringValue ?? event.defaultSystemSound
+    }
+
+    public mutating func setSystemSound(_ name: String, for event: SoundEvent) {
+        var object = raw["systemSounds"]?.objectValue ?? JSONObject()
+        object[event.rawValue] = .string(name)
+        raw["systemSounds"] = .object(object)
+    }
+
+    // MARK: Island behaviour
+
+    /// Open the island when the pointer rests on it.
+    public var expandOnHover: Bool {
+        get { bool("expandOnHover", default: true) }
+        set { raw["expandOnHover"] = .bool(newValue) }
+    }
+
+    /// Open the island by itself when an agent needs a decision.
+    public var expandOnAttention: Bool {
+        get { bool("expandOnAttention", default: true) }
+        set { raw["expandOnAttention"] = .bool(newValue) }
+    }
+
+    /// Briefly show a finished session in the collapsed island.
+    public var showCompletionToast: Bool {
+        get { bool("showCompletionToast", default: true) }
+        set { raw["showCompletionToast"] = .bool(newValue) }
+    }
+
+    /// Keep the island at the top of the screen even when no agent is running.
+    public var showIslandWhenIdle: Bool {
+        get { bool("showIslandWhenIdle", default: true) }
+        set { raw["showIslandWhenIdle"] = .bool(newValue) }
     }
 
     public var admissionPolicy: AdmissionPolicy {

@@ -115,8 +115,8 @@ final class InstallerTests: XCTestCase {
         XCTAssertTrue(result.applied)
         let root = try settings()
         let ours = ourCommands(in: root)
-        XCTAssertEqual(Set(ours.map(\.event)), Set(HookEvent.canonical + [HookEvent.postCompact]))
-        XCTAssertEqual(ours.count, 11)
+        XCTAssertEqual(Set(ours.map(\.event)), Set(HookEvent.canonical + [HookEvent.postCompact, HookEvent.stopFailure]))
+        XCTAssertEqual(ours.count, 12)
         for entry in ours {
             let command = try XCTUnwrap(entry.hook["command"]?.stringValue)
             XCTAssertTrue(command.contains("niko-bridge"), "every entry of ours carries the marker")
@@ -193,7 +193,7 @@ final class InstallerTests: XCTestCase {
         scratch.write(settingsPath, JSONValue.object(root).serialized(.pretty))
         XCTAssertTrue(run(.install).applied)
         let after = try settings()
-        XCTAssertEqual(ourCommands(in: after).count, 11)
+        XCTAssertEqual(ourCommands(in: after).count, 12)
         XCTAssertNil(after["hooks"]?["LegacyEvent"], "an event that only held our old entry is cleaned up")
         XCTAssertFalse(JSONValue.object(after).serialized().contains("/old/path/niko-bridge"))
     }
@@ -362,7 +362,7 @@ final class InstallerTests: XCTestCase {
         XCTAssertTrue(result.applied)
         XCTAssertEqual(result.plan.changes.first?.kind, .create)
         XCTAssertEqual(mode(of: scratch.file(settingsPath)), 0o600)
-        XCTAssertEqual(ourCommands(in: try settings()).count, 11)
+        XCTAssertEqual(ourCommands(in: try settings()).count, 12)
         XCTAssertTrue(backups().isEmpty, "nothing to back up")
         XCTAssertTrue(run(.uninstall, at: 60).succeeded)
         XCTAssertEqual(scratch.read(settingsPath), "{}\n")
@@ -372,7 +372,7 @@ final class InstallerTests: XCTestCase {
         for blank in ["", "  \n"] {
             scratch.write(settingsPath, blank)
             XCTAssertTrue(run(.install).applied)
-            XCTAssertEqual(ourCommands(in: try settings()).count, 11)
+            XCTAssertEqual(ourCommands(in: try settings()).count, 12)
             XCTAssertEqual(try String(contentsOfFile: try XCTUnwrap(backups().first), encoding: .utf8), blank)
             backups().forEach { unlink($0) }
             Shims.remove(paths: scratch.paths)

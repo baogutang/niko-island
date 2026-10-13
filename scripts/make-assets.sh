@@ -1,9 +1,13 @@
 #!/bin/bash
-# Regenerates the committed artwork from code:
-#   Assets/AppIcon.icns          the app icon (drawn in IconRenderer)
-#   docs/images/panel-*.png      README/website images, rendered from the real
-#                                panel views with sample sessions
-# Needs a debug build; run it after changing the icon or the panel layout.
+# Regenerates the committed artwork from code. Nothing here is drawn by hand
+# or taken from anywhere else:
+#   Assets/AppIcon.icns            the app icon (IconRenderer)
+#   docs/images/island-*.png       the island's states, rendered from the real
+#                                  views with sample sessions (PreviewRenderer)
+#   docs/images/island-demo.gif    a short walk through those states
+#   docs/images/mascots/           one creature per agent (PNG + two-frame GIF)
+#   website/                       the subset the website uses
+# Needs a debug build; run it after changing the icon, the creatures or the layout.
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
@@ -15,13 +19,17 @@ trap 'rm -rf "$WORK"' EXIT
 
 "$BIN" internal render-icon "$WORK/AppIcon.iconset"
 iconutil -c icns "$WORK/AppIcon.iconset" -o "$ROOT/Assets/AppIcon.icns"
-cp "$WORK/AppIcon.iconset/icon_256x256.png" "$ROOT/docs/images/icon.png"
-mkdir -p "$ROOT/website"
-cp "$WORK/AppIcon.iconset/icon_128x128@2x.png" "$ROOT/website/icon.png"
 
+rm -rf "$ROOT/docs/images"
 mkdir -p "$ROOT/docs/images"
-"$BIN" internal render-preview "$ROOT/docs/images" -AppleLanguages "(en)"
-for scene in sessions question usage; do
-    cp "$ROOT/docs/images/panel-$scene.png" "$ROOT/website/panel-$scene.png"
+cp "$WORK/AppIcon.iconset/icon_256x256.png" "$ROOT/docs/images/icon.png"
+"$BIN" internal render-preview "$ROOT/docs/images" -AppleLanguages "(en)" >/dev/null
+
+mkdir -p "$ROOT/website/mascots"
+cp "$WORK/AppIcon.iconset/icon_128x128@2x.png" "$ROOT/website/icon.png"
+for image in island-sessions island-question island-usage island-settings-sounds; do
+    cp "$ROOT/docs/images/$image.png" "$ROOT/website/$image.png"
 done
-ls -la "$ROOT/Assets/AppIcon.icns" "$ROOT/docs/images"
+cp "$ROOT/docs/images/island-demo.gif" "$ROOT/website/island-demo.gif"
+cp "$ROOT"/docs/images/mascots/*.gif "$ROOT/website/mascots/"
+find "$ROOT/docs/images" "$ROOT/website" -type f \( -name '*.png' -o -name '*.gif' \) -exec stat -f '%8z  %N' {} + | sed "s|$ROOT/||"

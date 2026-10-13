@@ -11,6 +11,16 @@
         }
       }
     },
+    "%@ needs you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 在等你"
+          }
+        }
+      }
+    },
     "%@ tokens": {
       "localizations": {
         "zh-Hans": {
@@ -101,6 +111,16 @@
         }
       }
     },
+    "%lld waiting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个在等待"
+          }
+        }
+      }
+    },
     "%lld waiting for your decision": {
       "localizations": {
         "zh-Hans": {
@@ -137,6 +157,86 @@
           "stringUnit": {
             "state": "translated",
             "value": "7 天窗口"
+          }
+        }
+      }
+    },
+    "8-bit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "8-bit"
+          }
+        }
+      }
+    },
+    "A permission request or a question is waiting.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有权限请求或提问在等你处理。"
+          }
+        }
+      }
+    },
+    "A rate-limit window passed 90%.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某个速率限制窗口已用掉 90%。"
+          }
+        }
+      }
+    },
+    "A redacted report you can attach to an issue.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一份已脱敏的报告，可以附在 Issue 里。"
+          }
+        }
+      }
+    },
+    "A turn ended because something failed.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "某一轮因为出错而结束。"
+          }
+        }
+      }
+    },
+    "About": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关于"
+          }
+        }
+      }
+    },
+    "Agents": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理"
+          }
+        }
+      }
+    },
+    "Agents keep working; waiting requests go back to their terminals.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理会继续工作；等待中的请求会回到各自的终端。"
           }
         }
       }
@@ -211,12 +311,52 @@
         }
       }
     },
+    "An agent finished its turn.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理完成了这一轮。"
+          }
+        }
+      }
+    },
     "An agent finishes and waits for me": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "代理完成并等待我时"
+          }
+        }
+      }
+    },
+    "An agent picked up your prompt.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理接到了你的指令并开始工作。"
+          }
+        }
+      }
+    },
+    "Answer here and the agent carries on with the session.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在这里回答，代理就会继续当前会话。"
+          }
+        }
+      }
+    },
+    "Answer in the terminal": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "到终端里回答"
           }
         }
       }
@@ -237,6 +377,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在自动批准：%@"
+          }
+        }
+      }
+    },
+    "Available in the installed app.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仅在已安装的应用中可用。"
           }
         }
       }
@@ -291,6 +441,16 @@
         }
       }
     },
+    "Connect an agent…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "接入一个代理…"
+          }
+        }
+      }
+    },
     "Connecting adds entries tagged niko-bridge to the agent's config after a backup. Removing takes out only those entries.": {
       "localizations": {
         "zh-Hans": {
@@ -311,12 +471,32 @@
         }
       }
     },
+    "Cues for each moment": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为每个时刻配一声提示"
+          }
+        }
+      }
+    },
     "Decide in the agent's own prompt instead": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "改为在代理自己的提示里决定"
+          }
+        }
+      }
+    },
+    "Decide in the terminal instead": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "改到终端里决定"
           }
         }
       }
@@ -331,12 +511,42 @@
         }
       }
     },
+    "Diagnostics": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "诊断信息"
+          }
+        }
+      }
+    },
     "Dismiss": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "移除卡片"
+          }
+        }
+      }
+    },
+    "English and Simplified Chinese are included.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内置英文和简体中文。"
+          }
+        }
+      }
+    },
+    "Everything stays on this Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切都留在这台 Mac 上"
           }
         }
       }
@@ -351,12 +561,52 @@
         }
       }
     },
+    "Files and sound packs": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "文件与音效包"
+          }
+        }
+      }
+    },
+    "Finished": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成"
+          }
+        }
+      }
+    },
     "Finished and waiting for you": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "已完成，正在等你"
+          }
+        }
+      }
+    },
+    "Follows the system language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跟随系统语言"
+          }
+        }
+      }
+    },
+    "General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通用"
           }
         }
       }
@@ -371,12 +621,22 @@
         }
       }
     },
-    "Hooks": {
+    "Hit an error": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "钩子"
+            "value": "出错了"
+          }
+        }
+      }
+    },
+    "Hooks and connections": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "钩子与接入"
           }
         }
       }
@@ -401,12 +661,132 @@
         }
       }
     },
+    "How it opens and closes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "如何展开与收起"
+          }
+        }
+      }
+    },
+    "Island": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "岛屿"
+          }
+        }
+      }
+    },
+    "Island and 8-bit are generated by the app itself; no audio files are bundled.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "“岛屿”和“8-bit”两套音效由应用自己合成，没有打包任何音频文件。"
+          }
+        }
+      }
+    },
+    "It closes again when the pointer leaves.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指针离开后会自动收起。"
+          }
+        }
+      }
+    },
+    "It never takes keyboard focus away from what you are typing.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它不会抢走你正在输入的键盘焦点。"
+          }
+        }
+      }
+    },
+    "Keep the island visible when nothing is running": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有会话时也保持岛屿可见"
+          }
+        }
+      }
+    },
+    "Language": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "语言"
+          }
+        }
+      }
+    },
     "Last 7 days": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最近 7 天"
+          }
+        }
+      }
+    },
+    "Limit close": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "额度告急"
+          }
+        }
+      }
+    },
+    "Moments": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "时刻"
+          }
+        }
+      }
+    },
+    "Mute sounds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "静音"
+          }
+        }
+      }
+    },
+    "My files": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "我的文件"
+          }
+        }
+      }
+    },
+    "Needs you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要你"
           }
         }
       }
@@ -421,12 +801,32 @@
         }
       }
     },
+    "New session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新会话"
+          }
+        }
+      }
+    },
     "Next": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "下一步"
+          }
+        }
+      }
+    },
+    "Niko Island Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niko Island 设置"
           }
         }
       }
@@ -447,6 +847,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "还没有正在运行的代理。"
+          }
+        }
+      }
+    },
+    "No analytics, no crash reports, no update checks. Events are kept in memory; the usage database holds numbers and identifiers only.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有统计、没有崩溃上报、没有更新检查。事件只保存在内存里；用量数据库只存数字和标识符。"
+          }
+        }
+      }
+    },
+    "No banner appears while the session's own terminal is in front.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当该会话所在的终端就在前台时，不会弹出横幅。"
           }
         }
       }
@@ -491,12 +911,42 @@
         }
       }
     },
+    "Nothing happens until you decide. The agent is waiting.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在你做出决定之前什么都不会发生，代理正在等待。"
+          }
+        }
+      }
+    },
+    "Notifications and startup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知与启动"
+          }
+        }
+      }
+    },
     "Notify me when": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "在这些时候通知我"
+          }
+        }
+      }
+    },
+    "Off by default. Each moment below can be switched on its own.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "默认关闭。下面每个时刻都可以单独开关。"
           }
         }
       }
@@ -511,12 +961,52 @@
         }
       }
     },
+    "Off: it appears only while there are sessions.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭后，只有存在会话时它才会出现。"
+          }
+        }
+      }
+    },
+    "Open Niko Island at login": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "登录时打开 Niko Island"
+          }
+        }
+      }
+    },
     "Open Releases Page": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "打开发布页面"
+          }
+        }
+      }
+    },
+    "Open by itself when an agent needs a decision": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理需要你决定时自动展开"
+          }
+        }
+      }
+    },
+    "Open folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开文件夹"
           }
         }
       }
@@ -531,22 +1021,42 @@
         }
       }
     },
-    "Other…": {
+    "Open when the pointer rests on it": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "其他…"
+            "value": "指针停在上面时展开"
           }
         }
       }
     },
-    "Play a sound when": {
+    "Opens the download page in your browser.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "在这些时候播放声音"
+            "value": "在浏览器中打开下载页面。"
+          }
+        }
+      }
+    },
+    "Play sounds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "播放音效"
+          }
+        }
+      }
+    },
+    "Play this sound": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试听这个音效"
           }
         }
       }
@@ -561,12 +1071,32 @@
         }
       }
     },
+    "Price list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "价格表"
+          }
+        }
+      }
+    },
     "Privacy": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "隐私"
+          }
+        }
+      }
+    },
+    "Put started, attention, completed, error or limit (.wav, .aiff, .mp3, .m4a) in the sounds folder, or a pack folder with an openpeon.json manifest inside its packs folder.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把名为 started、attention、completed、error 或 limit 的音频文件（.wav、.aiff、.mp3、.m4a）放进 sounds 文件夹；或者把带有 openpeon.json 清单的音效包文件夹放进其中的 packs 文件夹。"
           }
         }
       }
@@ -641,32 +1171,12 @@
         }
       }
     },
-    "Send answer": {
+    "Send answers": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "发送回答"
-          }
-        }
-      }
-    },
-    "Sessions": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "会话"
-          }
-        }
-      }
-    },
-    "Set up hooks…": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "设置钩子…"
           }
         }
       }
@@ -681,12 +1191,62 @@
         }
       }
     },
+    "Settings…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "设置…"
+          }
+        }
+      }
+    },
+    "Show a short notice when an agent finishes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理完成时显示一条简短提示"
+          }
+        }
+      }
+    },
+    "Sound set": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音效方案"
+          }
+        }
+      }
+    },
+    "Sounds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音效"
+          }
+        }
+      }
+    },
     "Start an agent in any terminal and it will show up here.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "在任意终端里启动一个代理，它就会出现在这里。"
+          }
+        }
+      }
+    },
+    "Startup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "启动"
           }
         }
       }
@@ -711,6 +1271,26 @@
         }
       }
     },
+    "Stopped with an error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "因出错而停止"
+          }
+        }
+      }
+    },
+    "The collapsed island names the session for a few seconds.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "收起状态的岛屿会显示该会话的名字几秒钟。"
+          }
+        }
+      }
+    },
     "Today": {
       "localizations": {
         "zh-Hans": {
@@ -727,6 +1307,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近 7 天每日 token 数"
+          }
+        }
+      }
+    },
+    "Tokens, cost and limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Token、费用与限额"
+          }
+        }
+      }
+    },
+    "Turn sounds on": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开音效"
+          }
+        }
+      }
+    },
+    "Type something else…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入其他内容…"
           }
         }
       }
@@ -751,6 +1361,16 @@
         }
       }
     },
+    "Version %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本 %@"
+          }
+        }
+      }
+    },
     "Version %@ · no telemetry, no account, MIT licensed": {
       "localizations": {
         "zh-Hans": {
@@ -761,12 +1381,62 @@
         }
       }
     },
+    "Version and privacy": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "版本与隐私"
+          }
+        }
+      }
+    },
+    "Volume": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "音量"
+          }
+        }
+      }
+    },
     "Wants to use %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "想要使用 %@"
+          }
+        }
+      }
+    },
+    "Work started": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "开始工作"
+          }
+        }
+      }
+    },
+    "You: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你：%@"
+          }
+        }
+      }
+    },
+    "Your own sounds": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你自己的音效"
           }
         }
       }
@@ -857,6 +1527,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "有问题要问"
+          }
+        }
+      }
+    },
+    "hit an error": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "出错了"
+          }
+        }
+      }
+    },
+    "macOS": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "macOS"
           }
         }
       }

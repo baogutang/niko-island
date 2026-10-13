@@ -30,6 +30,34 @@ final class DocsTests: XCTestCase {
             XCTAssertTrue(text.contains("xattr -cr"), "\(readme): Gatekeeper instructions")
             XCTAssertTrue(text.contains("uninstall"), "\(readme): uninstall instructions")
             XCTAssertTrue(text.contains("docs/ROADMAP.md"), "\(readme): roadmap link")
+            // The pictures are the island, and the page says they are renders, not captures.
+            XCTAssertTrue(text.contains("docs/images/island-sessions.png"), "\(readme): hero image")
+            XCTAssertTrue(text.contains("docs/images/island-demo.gif"), "\(readme): demo")
+            XCTAssertFalse(text.contains("panel-"), "\(readme): pictures of the old panel")
+            XCTAssertTrue(text.contains("scripts/make-assets.sh"), "\(readme): where the pictures come from")
+        }
+    }
+
+    func testReadmesDescribeSoundsAsTheyAre() throws {
+        XCTAssertFalse(NikoSettings().soundsEnabled, "the READMEs say sounds are off by default")
+        XCTAssertEqual(SoundEvent.allCases.filter { !$0.enabledByDefault }, [.started], "the READMEs say only 'work started' stays off")
+        for readme in ["README.md", "README.zh-CN.md"] {
+            let text = try read(readme)
+            // File names and manifest categories a user is told to use must be the ones the code looks for.
+            for event in SoundEvent.allCases {
+                XCTAssertTrue(text.contains("`\(event.rawValue)`"), "\(readme): file name for \(event.rawValue)")
+                XCTAssertTrue(SoundPack.categories(for: event).allSatisfy { text.contains("`\($0)`") }, "\(readme): pack categories for \(event.rawValue)")
+            }
+            for ext in ["wav", "aiff", "mp3", "m4a"] {
+                XCTAssertTrue(UserSoundFiles.extensions.contains(ext), ext)
+                XCTAssertTrue(text.contains("`.\(ext)`"), "\(readme): .\(ext)")
+            }
+            XCTAssertTrue(text.contains(SoundPack.manifestName), readme)
+            XCTAssertTrue(text.contains("~/.niko-island/sounds/packs/"), readme)
+            // Every creature shown has its picture.
+            for name in ["starfish", "whale", "boat", "gull", "jellyfish", "turtle", "octopus", "puffer", "island"] {
+                XCTAssertTrue(text.contains("docs/images/mascots/\(name).gif"), "\(readme): \(name)")
+            }
         }
     }
 
@@ -81,6 +109,49 @@ final class DocsTests: XCTestCase {
         let keys = Set(matches(#"data-i18n(?:-alt)?="([^"]+)""#, in: html))
         let translated = Set(matches(#"\n\s+"([a-z0-9.]+)":\s"#, in: html) + matches(#",\s"([a-z0-9.]+)":\s"#, in: html))
         XCTAssertTrue(keys.isSubset(of: translated), "untranslated: \(keys.subtracting(translated).sorted())")
+        XCTAssertGreaterThan(keys.count, 100)
+        for old in ["panel-sessions", "panel-question", "panel-usage"] { XCTAssertFalse(html.contains(old), old) }
+        XCTAssertTrue(html.contains("https://baogutang.github.io/niko-island/island-sessions.png"), "share image")
+    }
+
+    /// The play buttons on the website run a JavaScript port of `SoundSynth`.
+    /// This keeps the two scores identical, so the page plays what the app plays.
+    func testWebsiteSoundPreviewsUseTheAppsScores() throws {
+        let html = try read("website/index.html")
+        let cue = try NSRegularExpression(pattern: #"(started|attention|completed|error|limit): \{ (?:duty: ([0-9.]+), )?notes: \[(.*?)\] \}"#)
+        let note = try NSRegularExpression(pattern: #"\[([0-9.]+), ([0-9.]+), ([0-9.]+), ([0-9.]+)\]"#)
+        func group(_ match: NSTextCheckingResult, _ index: Int, in text: String) -> String? {
+            Range(match.range(at: index), in: text).map { String(text[$0]) }
+        }
+        let found = cue.matches(in: html, range: NSRange(html.startIndex..., in: html))
+        // Island first, then 8-bit: five cues each.
+        XCTAssertEqual(found.count, SoundEvent.allCases.count * BuiltInSoundSet.allCases.count)
+        for (index, match) in found.enumerated() {
+            let set = BuiltInSoundSet.allCases[index / SoundEvent.allCases.count]
+            let event = try XCTUnwrap(group(match, 1, in: html).flatMap(SoundEvent.init(rawValue:)))
+            XCTAssertEqual(event, SoundEvent.allCases[index % SoundEvent.allCases.count], "cue order")
+            let (voice, notes) = SoundSynth.score(for: event, set: set)
+            let duty = group(match, 2, in: html).flatMap(Double.init)
+            switch voice {
+            case .mallet: XCTAssertNil(duty, "\(set).\(event) is a mallet cue")
+            case .square(let expected): XCTAssertEqual(duty, expected, "\(set).\(event) duty")
+            }
+            let body = try XCTUnwrap(group(match, 3, in: html))
+            let listed = note.matches(in: body, range: NSRange(body.startIndex..., in: body)).map { item in
+                (1...4).compactMap { group(item, $0, in: body).flatMap(Double.init) }
+            }
+            XCTAssertEqual(listed.count, notes.count, "\(set).\(event) note count")
+            for (shown, expected) in zip(listed, notes) where shown.count == 4 {
+                XCTAssertEqual(440 * pow(2, (shown[0] - 69) / 12), expected.frequency, accuracy: 1e-9, "\(set).\(event) pitch")
+                XCTAssertEqual(shown[1], expected.start, accuracy: 1e-9, "\(set).\(event) start")
+                XCTAssertEqual(shown[2], expected.duration, accuracy: 1e-9, "\(set).\(event) duration")
+                XCTAssertEqual(shown[3], expected.gain, accuracy: 1e-9, "\(set).\(event) gain")
+            }
+        }
+        // The envelope constants of the port, as written in `SoundSynth.samples`.
+        for constant in ["0.004", "0.28", "0.08", "7.5", "0.012", "0.55", "0.5 / peak"] {
+            XCTAssertTrue(html.contains(constant), "synth constant \(constant)")
+        }
     }
 
     func testLicenseAndNotices() throws {
