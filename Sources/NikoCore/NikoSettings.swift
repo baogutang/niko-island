@@ -176,6 +176,13 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["islandWidth"] = .string(newValue.rawValue) }
     }
 
+    /// Which display the island lives on: "auto" (the one with a camera
+    /// housing, else the primary display) or a display's name.
+    public var islandDisplay: String {
+        get { raw["islandDisplay"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 } ?? "auto" }
+        set { raw["islandDisplay"] = .string(newValue) }
+    }
+
     public enum Accent: String, Sendable, CaseIterable {
         case mint, sky, violet, amber, coral
     }

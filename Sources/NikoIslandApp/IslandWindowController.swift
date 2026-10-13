@@ -56,7 +56,7 @@ final class IslandWindowController: NSObject {
 
     init(model: AppModel) {
         self.model = model
-        let screen = IslandWindowController.targetScreen()
+        let screen = IslandWindowController.targetScreen(preference: model.settings.islandDisplay)
         self.metrics = screen.map(IslandMetrics.init(screen:)) ?? .plain
         self.deskPanel = IslandWindowController.makePanel()
         self.overlayPanel = IslandWindowController.makePanel()
@@ -81,6 +81,10 @@ final class IslandWindowController: NSObject {
                 self?.quicken(for: 0.3)
                 self?.follow()
             }
+            .store(in: &subscriptions)
+        model.$settings.map(\.islandDisplay).removeDuplicates().dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.screensChanged() }
             .store(in: &subscriptions)
     }
 
@@ -107,10 +111,14 @@ final class IslandWindowController: NSObject {
         follow()
     }
 
-    /// The display with a camera housing if there is one, else the one with the menu bar.
-    static func targetScreen() -> NSScreen? {
-        NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.screens.first
+    /// The display the user picked by name; otherwise the one with a camera
+    /// housing if there is one, else the one with the menu bar.
+    static func targetScreen(preference: String = "auto") -> NSScreen? {
+        if preference != "auto", let chosen = NSScreen.screens.first(where: { $0.localizedName == preference }) { return chosen }
+        return NSScreen.screens.first { $0.safeAreaInsets.top > 0 } ?? NSScreen.screens.first
     }
+
+    private var screen: NSScreen? { IslandWindowController.targetScreen(preference: model.settings.islandDisplay) }
 
     private func installContent() {
         let desk = IslandView(model: model, metrics: metrics) { [weak self] rect in
@@ -132,7 +140,7 @@ final class IslandWindowController: NSObject {
     }
 
     private func place() {
-        guard let screen = IslandWindowController.targetScreen() else { return }
+        guard let screen else { return }
         let size = IslandMetrics.canvas
         baseOrigin = NSPoint(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height)
         screenTop = screen.frame.maxY
@@ -144,7 +152,7 @@ final class IslandWindowController: NSObject {
     }
 
     @objc private func screensChanged() {
-        let updated = IslandWindowController.targetScreen().map(IslandMetrics.init(screen:)) ?? .plain
+        let updated = screen.map(IslandMetrics.init(screen:)) ?? .plain
         // A full-screen Space has no menu bar to measure; keep the band the desktop gave us.
         if updated.hasNotch != metrics.hasNotch || updated.notchWidth != metrics.notchWidth
             || (deskPanel.isOnActiveSpace && updated != metrics) {

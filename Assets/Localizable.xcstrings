@@ -591,6 +591,26 @@
         }
       }
     },
+    "Automatic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动"
+          }
+        }
+      }
+    },
+    "Automatic: the display with a camera housing, else the main one.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "自动：有摄像头挖孔的显示器优先，否则用主显示器。"
+          }
+        }
+      }
+    },
     "Available in the installed app.": {
       "localizations": {
         "zh-Hans": {
@@ -821,6 +841,16 @@
         }
       }
     },
+    "Counting since %@ (%@).": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从 %@ 开始计数（%@）。"
+          }
+        }
+      }
+    },
     "Cues for each moment": {
       "localizations": {
         "zh-Hans": {
@@ -897,6 +927,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "移除卡片"
+          }
+        }
+      }
+    },
+    "Display": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示器"
           }
         }
       }

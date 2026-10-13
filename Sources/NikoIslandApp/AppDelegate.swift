@@ -72,6 +72,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if let route = UserDefaults.standard.string(forKey: "NikoOpenIsland") {
             model.route = route == "usage" ? .usage : .sessions
             model.expand(.click)
+            model.heldOpen = true
         }
 
         // The first launch gets the welcome (scripted launches say no thanks).

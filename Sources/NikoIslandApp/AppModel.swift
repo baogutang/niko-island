@@ -445,8 +445,11 @@ public final class AppModel: ObservableObject {
         toast = nil
     }
 
+    /// Held open for a screenshot (`-NikoOpenIsland`): nothing closes it.
+    public var heldOpen = false
+
     public func collapse() {
-        guard isExpanded else { return }
+        guard isExpanded, !heldOpen else { return }
         isExpanded = false
         route = .sessions
     }

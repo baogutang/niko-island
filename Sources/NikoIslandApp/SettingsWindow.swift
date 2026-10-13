@@ -297,6 +297,11 @@ struct SettingsPageView: View {
                         }
                     }
                 }
+                if NSScreen.screens.count > 1 {
+                    choiceRow(L("Display"), L("Automatic: the display with a camera housing, else the main one."),
+                              options: [("auto", L("Automatic"))] + NSScreen.screens.map { ($0.localizedName, $0.localizedName) },
+                              selection: settingsBinding(\.islandDisplay))
+                }
                 choiceRow(L("Width when open"),
                           options: [(NikoSettings.IslandWidth.compact, L("Compact")), (.regular, L("Regular")), (.wide, L("Wide"))],
                           selection: settingsBinding(\.islandWidth))

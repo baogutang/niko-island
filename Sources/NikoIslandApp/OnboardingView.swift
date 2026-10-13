@@ -66,7 +66,6 @@ struct OnboardingView: View {
             appeared = true
             model.refreshMaintenance()
         }
-        .onChange(of: model.maintenance.agents) { _, rows in seedSelection(rows) }
     }
 
     // MARK: Steps
@@ -134,15 +133,21 @@ struct OnboardingView: View {
 
     private var rows: [MaintenanceState.AgentRow] { model.maintenance.agents }
 
-    private func seedSelection(_ rows: [MaintenanceState.AgentRow]) {
-        guard !selectionSeeded, !rows.isEmpty else { return }
+    /// What is ticked. Until the user touches a card: everything we can vouch
+    /// for; adapters taken on trust are offered, unticked.
+    private var chosen: Set<String> {
+        selectionSeeded ? selected : Set(rows.filter { !$0.wired && $0.stability != .experimental }.map(\.id))
+    }
+
+    private func toggle(_ id: String) {
+        var next = chosen
+        if next.contains(id) { next.remove(id) } else { next.insert(id) }
+        selected = next
         selectionSeeded = true
-        // Everything we can vouch for is ticked; adapters taken on trust are offered, unticked.
-        selected = Set(rows.filter { !$0.wired && $0.stability != .experimental }.map(\.id))
     }
 
     private var agents: some View {
-        let pending = rows.filter { selected.contains($0.id) && !$0.wired }
+        let pending = rows.filter { chosen.contains($0.id) && !$0.wired }
         return VStack(spacing: 20) {
             stepTitle(rows.isEmpty ? L("No agents found yet") : L("These agents are on your Mac"),
                       rows.isEmpty ? L("Install one, then connect it from Settings. The island also finds Claude Code and Codex sessions by itself.")
@@ -172,7 +177,6 @@ struct OnboardingView: View {
                 .disabled(model.maintenance.busy)
             }
         }
-        .onAppear { seedSelection(rows) }
         .onChange(of: model.maintenance.busy) { _, busy in if !busy { connecting = false } }
     }
 
@@ -185,12 +189,12 @@ struct OnboardingView: View {
     }
 
     private func agentCard(_ row: MaintenanceState.AgentRow) -> some View {
-        let isOn = selected.contains(row.id)
+        let isOn = chosen.contains(row.id)
         let running = model.runningAgents.contains(row.id)
         let shape = RoundedRectangle(cornerRadius: 18, style: .continuous)
         return Button {
             guard !row.wired else { return }
-            if isOn { selected.remove(row.id) } else { selected.insert(row.id) }
+            toggle(row.id)
         } label: {
             HStack(spacing: 12) {
                 MascotView(source: row.id, size: 40, animated: running || (row.wired && connectedNow.contains(row.id)))
@@ -370,7 +374,7 @@ struct OnboardingView: View {
         }
     }
 
-    private var hasPending: Bool { rows.contains { selected.contains($0.id) && !$0.wired } }
+    private var hasPending: Bool { rows.contains { chosen.contains($0.id) && !$0.wired } }
 
     private var primaryTitle: String {
         switch step {

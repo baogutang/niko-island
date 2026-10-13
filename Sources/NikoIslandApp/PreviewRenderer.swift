@@ -14,8 +14,12 @@ enum PreviewRenderer {
         case sessions, permission, question, usage, empty
         case settingsSounds = "settings-sounds"
         case settingsAgents = "settings-agents"
+        case settingsIsland = "settings-island"
+        case onboarding
+        case onboardingAgents = "onboarding-agents"
 
-        var isSettings: Bool { self == .settingsSounds || self == .settingsAgents }
+        var isSettings: Bool { self == .settingsSounds || self == .settingsAgents || self == .settingsIsland }
+        var isOnboarding: Bool { self == .onboarding || self == .onboardingAgents }
     }
 
     // MARK: Sample data
@@ -76,9 +80,40 @@ enum PreviewRenderer {
                  host: ("WezTerm", "com.github.wez.wezterm"))
         }
 
+        let agentRows: [MaintenanceState.AgentRow] = [
+            .init(id: "claude", name: "Claude Code", stability: .stable, wired: true, approvals: true),
+            .init(id: "codex", name: "Codex", stability: .beta, wired: scene == .settingsAgents, approvals: true,
+                  followUp: AgentRegistry.descriptor("codex")?.followUp),
+            .init(id: "zcode", name: "ZCode", stability: .beta, wired: false, approvals: true),
+            .init(id: "cursor", name: "Cursor", stability: .beta, wired: false),
+            .init(id: "gemini", name: "Gemini CLI", stability: .beta, wired: false),
+            .init(id: "opencode", name: "OpenCode", stability: .experimental, wired: false),
+        ]
+
+        /// What the transcripts add: a session nobody announced, a name, a last reply, helpers.
+        func transcripts() {
+            let desktop = SessionKey(source: "codex", sessionID: "desk")
+            model.mergeTranscripts([
+                TranscriptSnapshot(key: desktop, path: "/dev/null", cwd: "/Users/dev/code/shot", host: .codexDesktop,
+                                   firstPrompt: "Add a share sheet to the capture window", lastPrompt: "Add a share sheet to the capture window",
+                                   phase: .working, activity: Activity(verb: "delegating", detail: "API Tester"),
+                                   updatedAt: now.addingTimeInterval(-6), phaseSince: now.addingTimeInterval(-410)),
+                TranscriptSnapshot(key: SessionKey(source: "codex", sessionID: "h1"), path: "/dev/null", phase: .working, activity: .thinking,
+                                   updatedAt: now, isSubagent: true, parentID: "desk"),
+                TranscriptSnapshot(key: SessionKey(source: "codex", sessionID: "h2"), path: "/dev/null", phase: .working, activity: .thinking,
+                                   updatedAt: now, isSubagent: true, parentID: "desk"),
+                TranscriptSnapshot(key: SessionKey(source: "gemini", sessionID: "c"), path: "/dev/null", title: "Install guide",
+                                   lastReply: "Shortened the guide to four steps and moved the troubleshooting notes to the end.",
+                                   phase: .waiting, activity: .waiting, updatedAt: now.addingTimeInterval(-372)),
+            ], now: now)
+        }
+
         switch scene {
-        case .idle, .empty:
+        case .idle:
             break
+        case .empty:
+            model.runningAgents = ["claude", "codex", "zcode"]
+            model.maintenance.agents = agentRows
         case .working:
             send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 60, prompt: "Fix the flaky upload retry test")
             send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 8, tool: "Bash", input: ["command": .string("swift test")])
@@ -107,23 +142,28 @@ enum PreviewRenderer {
                  input: ["questions": questions], host: ("ghostty", "com.mitchellh.ghostty"), blocking: true)
         case .sessions:
             fleet()
+            transcripts()
             send("claude", "Notification", session: "a", project: "atlas-api", ago: 14,
                  extra: ["notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"])
         case .usage:
             fleet()
-            model.usage = UsageSnapshot.demo(now: Date())
+            model.usage = UsageSnapshot.demo(now: now)
+            model.usageAgent = "claude"
             model.route = .usage
         case .settingsSounds:
             model.settings.soundsEnabled = true
             model.settingsPage = SettingsPage.sounds.rawValue
         case .settingsAgents:
             model.settingsPage = SettingsPage.agents.rawValue
-            model.maintenance.agents = [
-                .init(id: "claude", name: "Claude Code", stability: .stable, wired: true),
-                .init(id: "codex", name: "Codex", stability: .beta, wired: true),
-                .init(id: "gemini", name: "Gemini CLI", stability: .beta, wired: false),
-                .init(id: "opencode", name: "OpenCode", stability: .experimental, wired: false),
-            ]
+            model.maintenance.agents = agentRows
+            model.runningAgents = ["claude", "codex"]
+        case .settingsIsland:
+            model.settingsPage = SettingsPage.island.rawValue
+        case .onboarding:
+            break
+        case .onboardingAgents:
+            model.maintenance.agents = agentRows
+            model.runningAgents = ["claude", "codex", "zcode"]
         }
 
         switch scene {
@@ -179,9 +219,17 @@ enum PreviewRenderer {
                      mascotFrame: Int = 0, model: AppModel? = nil) -> AnyView {
         let model = model ?? demoModel(scene)
         if scene.isSettings {
-            return AnyView(SettingsRootView(model: model).frame(width: 860, height: scene == .settingsSounds ? 760 : 520)
+            let heights: [Scene: CGFloat] = [.settingsSounds: 760, .settingsAgents: 660, .settingsIsland: 1180]
+            return AnyView(SettingsRootView(model: model).frame(width: 860, height: heights[scene] ?? 520)
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .environment(\.isStaticPreview, true))
+        }
+        if scene.isOnboarding {
+            return AnyView(OnboardingView(model: model, metrics: .plain, onFinish: {}, step: scene == .onboarding ? .welcome : .agents)
+                .frame(width: 1440, height: 900)
+                .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .environment(\.isStaticPreview, true)
+                .environment(\.mascotFrame, mascotFrame))
         }
         return AnyView(Stage(model: model, metrics: metrics, width: width, height: height)
             .environment(\.isStaticPreview, true)

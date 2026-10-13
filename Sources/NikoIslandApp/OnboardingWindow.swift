@@ -11,7 +11,7 @@ final class OnboardingWindowController {
     var isShowing: Bool { panel != nil }
 
     func show(model: AppModel) {
-        guard panel == nil, let screen = IslandWindowController.targetScreen() else { return }
+        guard panel == nil, let screen = IslandWindowController.targetScreen(preference: model.settings.islandDisplay) else { return }
         let panel = OnboardingPanel(contentRect: screen.frame, styleMask: [.borderless], backing: .buffered, defer: false)
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         panel.isOpaque = false

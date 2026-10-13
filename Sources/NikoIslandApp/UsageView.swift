@@ -33,6 +33,10 @@ struct UsageView: View {
                 }
             } else {
                 tiles
+                if let since = current.resetAt {
+                    Text(L("Counting since %@ (%@).", since.formatted(date: .abbreviated, time: .shortened), sinceText(since)))
+                        .font(Theme.body(11)).foregroundStyle(Theme.tertiary)
+                }
                 if current.id == "all" { allLimits } else if !current.limits.isEmpty { limits(current) }
                 HStack(alignment: .top, spacing: 22) {
                     if current.days.contains(where: { $0.tokens > 0 }) { chart.frame(width: 200) }
@@ -45,8 +49,17 @@ struct UsageView: View {
 
     // MARK: Switcher
 
+    @ViewBuilder
     private var switcher: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        if isStaticPreview || usage.agents.count <= 5 {
+            pills
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) { pills }
+        }
+    }
+
+    private var pills: some View {
+        Group {
             HStack(spacing: 6) {
                 ForEach(usage.agents) { agent in
                     let selected = agent.id == current.id
@@ -82,7 +95,7 @@ struct UsageView: View {
         let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
         return VStack(alignment: .leading, spacing: 2) { content() }
             .padding(.horizontal, 11).padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: 74, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72, alignment: .topLeading)
             .background(shape.fill(Theme.field))
             .overlay(shape.strokeBorder(Theme.hairline))
     }
@@ -99,11 +112,12 @@ struct UsageView: View {
     private var resetTile: some View {
         tileFrame {
             HStack(spacing: 4) {
-                Text(L("Since reset").uppercased()).font(Theme.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
+                Text(L("Since reset").uppercased()).font(Theme.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary).lineLimit(1)
                 Spacer(minLength: 0)
                 if current.resetAt != nil {
                     Button { model.clearUsageReset(current.id) } label: {
                         Image(systemName: "xmark").font(.system(size: 8, weight: .bold)).foregroundStyle(Theme.tertiary)
+                            .frame(width: 14, height: 12).contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
                     .help(L("Stop this counter"))
@@ -112,23 +126,33 @@ struct UsageView: View {
             }
             if let window = current.sinceReset, let since = current.resetAt {
                 Text(costText(window.cost)).font(Theme.title(20)).foregroundStyle(look.accent).lineLimit(1).minimumScaleFactor(0.7)
-                Text(L("%@ tokens", tokenText(window.tokens))).font(Theme.body(11)).foregroundStyle(Theme.secondary).lineLimit(1)
-                HStack(spacing: 6) {
-                    Text(sinceText(since)).font(Theme.body(10)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(L("%@ tokens", tokenText(window.tokens)))
+                        .font(Theme.body(10.5)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                        .help(sinceText(since))
                     Spacer(minLength: 0)
-                    Button(L("Reset")) { model.resetUsage(current.id) }
-                        .buttonStyle(PillButtonStyle())
-                        .scaleEffect(0.82, anchor: .trailing)
+                    resetButton(primary: false)
                 }
             } else {
-                Text(L("Count from now")).font(Theme.body(11)).foregroundStyle(Theme.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                Spacer(minLength: 2)
-                Button(L("Reset")) { model.resetUsage(current.id) }
-                    .buttonStyle(PillButtonStyle(kind: .primary))
-                    .scaleEffect(0.86, anchor: .leading)
+                Text("—").font(Theme.title(20)).foregroundStyle(Theme.quaternary)
+                HStack(spacing: 4) {
+                    Text(L("Count from now")).font(Theme.body(10.5)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
+                    Spacer(minLength: 0)
+                    resetButton(primary: true)
+                }
             }
         }
+    }
+
+    private func resetButton(primary: Bool) -> some View {
+        Button { model.resetUsage(current.id) } label: {
+            Text(L("Reset")).font(Theme.body(10.5, .semibold))
+                .foregroundStyle(primary ? Color.black : Theme.primary)
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .background(Capsule().fill(primary ? Color.white : Color.white.opacity(0.14)))
+                .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func sinceText(_ date: Date) -> String {
