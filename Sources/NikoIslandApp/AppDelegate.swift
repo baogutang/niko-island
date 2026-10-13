@@ -63,6 +63,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             .store(in: &subscriptions)
 
+        // For screenshots and manual checks: `-NikoOpenSettings <page>` opens Settings straight away.
+        if let page = UserDefaults.standard.string(forKey: "NikoOpenSettings").flatMap(SettingsPage.init(rawValue:)) {
+            settingsWindow.show(page: page)
+        }
+
         // The first launch gets the welcome (scripted launches say no thanks).
         if !model.settings.onboardingDone, !UserDefaults.standard.bool(forKey: "NikoOnboardingDisabled") {
             model.wantsOnboarding = true

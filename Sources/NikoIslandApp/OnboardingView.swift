@@ -39,7 +39,7 @@ struct OnboardingView: View {
                             insertion: .opacity.combined(with: .offset(y: 26)).combined(with: .scale(scale: 0.97)),
                             removal: .opacity.combined(with: .offset(y: -18))))
                     Spacer(minLength: 0)
-                    footer.padding(.bottom, 44)
+                    footer.scaleEffect(min(scale, 1.3), anchor: .bottom).padding(.bottom, 44)
                 }
                 .padding(.horizontal, 40)
                 .padding(.top, 120)
@@ -48,8 +48,9 @@ struct OnboardingView: View {
                     Spacer()
                     if step != .done {
                         Button(L("Skip")) { finish() }
-                            .buttonStyle(PillButtonStyle(kind: .ghost))
+                            .buttonStyle(PillButtonStyle(kind: .ghost, large: true))
                             .keyboardShortcut(.cancelAction)
+                            .scaleEffect(min(scale, 1.3), anchor: .topTrailing)
                             .padding(.trailing, 28)
                             .padding(.top, 54)
                     }
@@ -191,33 +192,34 @@ struct OnboardingView: View {
             guard !row.wired else { return }
             if isOn { selected.remove(row.id) } else { selected.insert(row.id) }
         } label: {
-            HStack(spacing: 14) {
+            HStack(spacing: 12) {
                 MascotView(source: row.id, size: 40, animated: running || (row.wired && connectedNow.contains(row.id)))
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(spacing: 6) {
-                        Text(row.name).font(Theme.title(16)).foregroundStyle(Theme.primary)
+                        Text(row.name).font(Theme.title(16)).foregroundStyle(Theme.primary).lineLimit(1).fixedSize()
                         if row.stability == .beta { Chip(text: L("beta"), tint: Theme.sky, mono: false) }
                         if row.stability == .experimental { Chip(text: L("experimental"), tint: Theme.amber, mono: false) }
                     }
-                    HStack(spacing: 6) {
-                        if running {
+                    HStack(spacing: 5) {
+                        if row.wired {
+                            Text(L("connected")).foregroundStyle(look.accent)
+                            Text("·").foregroundStyle(Theme.quaternary)
+                        } else if running {
                             Circle().fill(look.accent).frame(width: 6, height: 6)
                             Text(L("running now")).foregroundStyle(look.accent)
+                            Text("·").foregroundStyle(Theme.quaternary)
                         }
                         Text(row.approvals ? L("status and approvals") : L("status")).foregroundStyle(Theme.tertiary)
                     }
                     .font(Theme.body(12))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
                 }
                 Spacer(minLength: 0)
-                if row.wired {
-                    Label(L("connected"), systemImage: "checkmark.circle.fill")
-                        .font(Theme.body(12.5, .semibold)).foregroundStyle(look.accent)
-                        .transition(.scale.combined(with: .opacity))
-                } else {
-                    Image(systemName: isOn ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(isOn ? look.accent : Theme.quaternary)
-                }
+                Image(systemName: row.wired ? "checkmark.seal.fill" : (isOn ? "checkmark.circle.fill" : "circle"))
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(row.wired || isOn ? look.accent : Theme.quaternary)
+                    .contentTransition(.symbolEffect(.replace))
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
