@@ -10,6 +10,8 @@
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
 | 本轮版本 | **v0.3.0 — 跟随菜单栏、自动发现会话、欢迎引导、按代理的用量**（2026-10-13，按你的要求发布） |
 | 发布产物 | 每种架构一份，不再有 universal：`Niko-Island-0.3.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.3.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
+| 发布核对 | `ci.yml`（5821990）与 `release.yml`（v0.3.0）全部绿色：测试、shellcheck、两种架构的构建与校验、两个应用的启动冒烟测试（Intel 版在 Rosetta 下）。五个发布文件重新下载后：摘要与 GitHub API 记录一致，`shasum -c SHA256SUMS` 通过；两个 dmg 可挂载，内含应用 + Applications 快捷方式 + “Read me first.txt”，应用分别只含 `arm64` / `x86_64`，ad-hoc 签名有效，版本 0.3.0；两个 zip 解压后签名有效。`releases/latest` → v0.3.0 |
+| 你机器上装的 | **仍是 0.2.0**，我没有替你覆盖 `/Applications` 里的应用。请下载 `apple-silicon` 的 dmg 自己装一次：这样顺便走一遍“浏览器下载 → Gatekeeper”这条我验证不了的路 |
 | 旧版本 | v0.2.0（岛屿界面，universal dmg + zip）、v0.1.0（面板界面，只有 zip） |
 | 官网 | https://baogutang.github.io/niko-island/ |
 | 测试 | 292 个，本机通过；`scripts/smoke-launch.sh` 对两个架构的应用都通过（Intel 版在 Rosetta 下） |
