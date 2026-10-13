@@ -237,10 +237,12 @@ public final class UsageEngine: @unchecked Sendable {
         let files = discover()
         var lastPublish = Date()
         var newestCodex: (path: String, mtime: Double)?
+        // ZCode first: its rows are one cheap query, and on a first run the
+        // transcripts below can take half a minute to index.
+        syncZCode()
         defer {
             // Codex states its limits in the rollout it wrote last.
             if let newestCodex, newestCodex.mtime > (codexLimits.capturedAt?.timeIntervalSince1970 ?? 0) { noteCodexLimits(newestCodex.path) }
-            syncZCode()
         }
         for (path, provider) in files {
             guard store != nil else { return }
