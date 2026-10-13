@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Security
 
@@ -22,29 +23,55 @@ public enum ClaudeUsageAPI {
 
     private static let known = ["five_hour", "seven_day", "seven_day_opus", "seven_day_sonnet"]
 
-    /// Reads both shapes this endpoint has had: one object per window
-    /// (`five_hour: {utilization, resets_at}`) and a list of limits.
+    /// Reads the shapes this endpoint has had: one object per window
+    /// (`five_hour: {utilization, resets_at}`), a list of limits, and in the
+    /// list a weekly allowance per model (`kind: weekly_scoped`).
     public static func parse(_ data: Data, now: Date = Date()) -> ProviderLimits? {
-        guard let root = try? JSONValue.parse(data), root.objectValue != nil else { return nil }
+        guard let root = try? JSONValue.parse(data), let object = root.objectValue else { return nil }
         var windows: [RateLimitWindow] = []
-        func add(id: String, _ window: JSONValue) {
-            guard window.objectValue != nil, !windows.contains(where: { $0.id == id }),
-                  let used = (window["utilization"] ?? window["used_percentage"] ?? window["percent"] ?? window["used_percent"])?.doubleValue,
-                  used.isFinite else { return }
-            let resets = ISOTime.flexible(window["resets_at"] ?? window["reset_at"] ?? window["resetsAt"]).map(Date.init(timeIntervalSince1970:))
-            windows.append(RateLimitWindow(id: id, usedPercent: min(max(used, 0), 100), resetsAt: resets))
+        func window(id: String, _ value: JSONValue) -> RateLimitWindow? {
+            guard value.objectValue != nil,
+                  let used = (value["utilization"] ?? value["used_percentage"] ?? value["percent"] ?? value["used_percent"])?.doubleValue,
+                  used.isFinite else { return nil }
+            let resets = ISOTime.flexible(value["resets_at"] ?? value["reset_at"] ?? value["resetsAt"]).map(Date.init(timeIntervalSince1970:))
+            return RateLimitWindow(id: id, usedPercent: min(max(used, 0), 100), resetsAt: resets)
         }
-        for key in known { if let window = root[key] { add(id: key, window) } }
+        func add(id: String, _ value: JSONValue) {
+            guard !windows.contains(where: { $0.id == id }), let window = window(id: id, value) else { return }
+            windows.append(window)
+        }
+        for key in known { if let value = root[key] { add(id: key, value) } }
+        // A window this version has no name for is still a window.
+        for member in object.members where !known.contains(member.key) && member.key != "limits" && member.key != "extra_usage" {
+            if member.value["utilization"]?.doubleValue != nil { add(id: member.key, member.value) }
+        }
+        let list = (root["limits"] ?? root["windows"])?.arrayValue ?? []
+        // The weekly allowance of one model. Newer than the named windows, so it wins where both speak.
+        for item in list where item["kind"]?.stringValue == "weekly_scoped" && item["group"]?.stringValue == "weekly" {
+            // A share set aside for one way of using the model is not the model's week.
+            if let surface = item["scope"]?["surface"], !surface.isNull { continue }
+            guard let name = item["scope"]?["model"]?["display_name"]?.stringValue?.trimmingCharacters(in: .whitespaces).lowercased(),
+                  !name.isEmpty, let scoped = window(id: "seven_day_" + name.replacingOccurrences(of: " ", with: "_"), item) else { continue }
+            windows.removeAll { $0.id == scoped.id }
+            windows.append(scoped)
+        }
         // The list says the same things under other names; it is only needed when the named windows are gone.
-        if windows.isEmpty {
+        if !windows.contains(where: { $0.id == "five_hour" || $0.id == "seven_day" }) {
             let names = ["session": "five_hour", "five_hour": "five_hour", "weekly": "seven_day", "week": "seven_day", "seven_day": "seven_day"]
-            for item in (root["limits"] ?? root["windows"])?.arrayValue ?? [] {
-                guard let kind = (item["kind"] ?? item["type"] ?? item["id"] ?? item["name"])?.stringValue, !kind.isEmpty else { continue }
+            for item in list {
+                guard let kind = (item["kind"] ?? item["type"] ?? item["id"] ?? item["name"])?.stringValue, let id = names[kind.lowercased()] else { continue }
                 if item["is_active"]?.boolValue == false { continue }
-                add(id: names[kind.lowercased()] ?? kind, item)
+                add(id: id, item)
             }
         }
+        // Paid use beyond the plan, where the account has switched it on.
+        if let extra = root["extra_usage"], extra["is_enabled"]?.boolValue == true { add(id: "extra_usage", extra) }
         guard !windows.isEmpty else { return nil }
+        let order = ["five_hour": 0, "seven_day": 1, "extra_usage": 9]
+        windows = windows.enumerated().sorted {
+            let (l, r) = (order[$0.element.id] ?? 2, order[$1.element.id] ?? 2)
+            return l == r ? $0.offset < $1.offset : l < r
+        }.map(\.element)
         return ProviderLimits(windows: windows, capturedAt: now, source: .provider)
     }
 }
@@ -77,45 +104,58 @@ public enum GLMQuotaAPI {
         return Region(rawValue: name.lowercased())
     }
 
-    /// `data.limits[]`: token windows are told apart by `unit` and `number`
-    /// (3 × 5 = five hours, 6 × 1 = a week); `TIME_LIMIT` is the monthly
+    /// `data.limits[]`: token windows are told apart by `unit` (3 = hours, so
+    /// 3 × 5 is the five-hour window; 6 = the week, whatever `number` says: the
+    /// service has sent both 1 and 7 for it); `TIME_LIMIT` is the monthly
     /// allowance of tool calls. A window that has not been touched may come
     /// without a reset time.
     public static func parse(_ data: Data, now: Date = Date()) -> ProviderLimits? {
         guard let root = try? JSONValue.parse(data), let body = root["data"], body.objectValue != nil,
               let items = body["limits"]?.arrayValue else { return nil }
         var windows: [RateLimitWindow] = []
+        /// Token windows that do not say which they are.
+        var unnamed: [(used: Double, resets: Date?)] = []
         for item in items {
-            let type = item["type"]?.stringValue ?? ""
+            let type = (item["type"]?.stringValue ?? "").uppercased()
             let unit = item["unit"]?.intValue
             let number = item["number"]?.intValue ?? 1
-            var minutes: Int?
-            switch unit {
-            case 3: minutes = number * 60
-            case 4: minutes = number * 1440
-            case 6: minutes = number * 10080
-            default: minutes = nil
-            }
-            let id: String
-            if type == "TIME_LIMIT" {
-                id = "tools_month"
-                minutes = nil
-            } else if type == "TOKENS_LIMIT" || type == "CREDIT_LIMIT" {
-                switch minutes {
-                case 300: id = "five_hour"
-                case 10080: id = "seven_day"
-                default: id = "window_\(unit ?? 0)_\(number)"
-                }
-            } else {
-                continue
-            }
             var used = item["percentage"]?.doubleValue
             if used == nil, let total = item["usage"]?.doubleValue, total > 0, let spent = item["currentValue"]?.doubleValue {
                 used = spent / total * 100
             }
-            guard let used, used.isFinite, !windows.contains(where: { $0.id == id }) else { continue }
+            guard let used, used.isFinite else { continue }
             let resets = item["nextResetTime"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
+            let id: String
+            var minutes: Int?
+            if type == "TIME_LIMIT" {
+                id = "tools_month"
+            } else if type == "TOKENS_LIMIT" || type == "CREDIT_LIMIT" {
+                switch unit {
+                case 3:
+                    minutes = number * 60
+                    id = number == 5 ? "five_hour" : "window_3_\(number)"
+                case 6:
+                    minutes = 10080
+                    id = "seven_day"
+                case 4:
+                    minutes = number * 1440
+                    id = number == 7 ? "seven_day" : "window_4_\(number)"
+                case nil:
+                    unnamed.append((used, resets))
+                    continue
+                default:
+                    id = "window_\(unit ?? 0)_\(number)"
+                }
+            } else {
+                continue
+            }
+            guard !windows.contains(where: { $0.id == id }) else { continue }
             windows.append(RateLimitWindow(id: id, usedPercent: min(max(used, 0), 100), resetsAt: resets, windowMinutes: minutes))
+        }
+        // No `unit` at all: the shorter window is the one that resets first, or has not started counting.
+        unnamed.sort { ($0.resets ?? .distantPast) < ($1.resets ?? .distantPast) }
+        for (entry, id) in zip(unnamed, ["five_hour", "seven_day"].filter { id in !windows.contains { $0.id == id } }) {
+            windows.append(RateLimitWindow(id: id, usedPercent: min(max(entry.used, 0), 100), resetsAt: entry.resets))
         }
         guard !windows.isEmpty else { return nil }
         // The windows people watch first.
@@ -125,6 +165,51 @@ public enum GLMQuotaAPI {
         // Not part of any published answer so far; shown if the service ever includes it.
         limits.resetsLeft = (body["resetCount"] ?? body["remainingResetCount"] ?? body["resetOpportunities"])?.intValue
         return limits
+    }
+}
+
+/// What ChatGPT says about a Codex plan: the windows Codex also writes into
+/// its session files, current even when Codex has not run for a while, and the
+/// resets an account has saved up.
+public enum CodexUsageAPI {
+    public static let usage = URL(string: "https://chatgpt.com/backend-api/wham/usage")!
+    public static let savedResets = URL(string: "https://chatgpt.com/backend-api/wham/rate-limit-reset-credits")!
+
+    public static func request(_ url: URL, login: CodexLogin.Login) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        request.setValue("Bearer \(login.token)", forHTTPHeaderField: "Authorization")
+        if let account = login.account, !account.isEmpty { request.setValue(account, forHTTPHeaderField: "ChatGPT-Account-Id") }
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("niko-island/\(NikoVersion.current)", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    /// `rate_limit.{primary_window, secondary_window}.{used_percent, limit_window_seconds, reset_at}`.
+    /// The windows keep the names Codex's own files use, so both sources describe the same rows.
+    public static func parse(_ data: Data, now: Date = Date()) -> ProviderLimits? {
+        guard let root = try? JSONValue.parse(data), let limit = root["rate_limit"], limit.objectValue != nil else { return nil }
+        var windows: [RateLimitWindow] = []
+        for (id, key) in [("primary", "primary_window"), ("secondary", "secondary_window")] {
+            guard let window = limit[key], window.objectValue != nil,
+                  let used = window["used_percent"]?.doubleValue, used.isFinite else { continue }
+            var resets = window["reset_at"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
+            if resets == nil, let after = window["reset_after_seconds"]?.doubleValue { resets = now.addingTimeInterval(after) }
+            windows.append(RateLimitWindow(id: id, usedPercent: min(max(used, 0), 100), resetsAt: resets,
+                                           windowMinutes: window["limit_window_seconds"]?.intValue.map { $0 / 60 }))
+        }
+        guard !windows.isEmpty else { return nil }
+        return ProviderLimits(windows: windows, capturedAt: now, plan: root["plan_type"]?.stringValue, source: .provider)
+    }
+
+    /// How many saved resets can still be spent. Counted from the list itself:
+    /// one that is used up or past its date does not count.
+    public static func savedResets(_ data: Data, now: Date = Date()) -> Int? {
+        guard let root = try? JSONValue.parse(data), let credits = root["credits"]?.arrayValue else { return nil }
+        return credits.filter { credit in
+            guard credit["status"]?.stringValue == "available" else { return false }
+            guard let expires = ISOTime.flexible(credit["expires_at"]) else { return true }
+            return expires > now.timeIntervalSince1970
+        }.count
     }
 }
 
@@ -154,7 +239,7 @@ public enum ClaudeCodeLogin {
     static let keychainService = "Claude Code-credentials"
 
     public static func parse(_ data: Data) -> Login? {
-        guard let root = try? JSONValue.parse(data), let oauth = root["claudeAiOauth"], oauth.objectValue != nil,
+        guard let root = try? JSONValue.parse(data), let oauth = root["claudeAiOauth"] ?? root["claude.ai_oauth"], oauth.objectValue != nil,
               let token = oauth["accessToken"]?.stringValue, !token.isEmpty else { return nil }
         let expires = oauth["expiresAt"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
         return Login(token: token, expiresAt: expires, plan: oauth["subscriptionType"]?.stringValue)
@@ -175,6 +260,63 @@ public enum ClaudeCodeLogin {
         if let data = try? Data(contentsOf: home.appendingPathComponent(".claude/.credentials.json")), let login = parse(data) {
             return .found(login)
         }
+        return .missing
+    }
+}
+
+/// Codex's own sign-in with a ChatGPT plan, where Codex keeps it: `auth.json`
+/// in its folder, or the Keychain when Codex is set to use that. Read at the
+/// moment of a lookup, never written and never renewed by us.
+public enum CodexLogin {
+    public struct Login: Sendable, Equatable {
+        public var token: String
+        public var account: String?
+
+        public init(token: String, account: String? = nil) {
+            self.token = token
+            self.account = account
+        }
+    }
+
+    public enum Outcome: Sendable, Equatable {
+        case found(Login)
+        case missing
+        case denied
+    }
+
+    static let keychainService = "Codex Auth"
+
+    /// An API key has no plan to ask about: only a ChatGPT sign-in counts.
+    public static func parse(_ data: Data) -> Login? {
+        guard let root = try? JSONValue.parse(data), root.objectValue != nil else { return nil }
+        if let mode = root["auth_mode"]?.stringValue, mode.lowercased() != "chatgpt" { return nil }
+        guard let token = root["tokens"]?["access_token"]?.stringValue, !token.isEmpty else { return nil }
+        return Login(token: token, account: root["tokens"]?["account_id"]?.stringValue)
+    }
+
+    /// The name Codex files its sign-in under in the Keychain: `cli|` and the
+    /// first 16 hex digits of the SHA-256 of its folder's real path.
+    static func keychainAccount(folder: URL) -> String {
+        let path = folder.resolvingSymlinksInPath().path
+        let digest = SHA256.hash(data: Data(path.utf8)).map { String(format: "%02x", $0) }.joined()
+        return "cli|" + digest.prefix(16)
+    }
+
+    public static func read(home: URL) -> Outcome {
+        let folder = home.appendingPathComponent(".codex")
+        // The file is where Codex puts it unless told otherwise, and reading it asks nobody.
+        if let data = try? Data(contentsOf: folder.appendingPathComponent("auth.json")), let login = parse(data) { return .found(login) }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecAttrAccount as String: keychainAccount(folder: folder),
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecSuccess, let data = item as? Data, let login = parse(data) { return .found(login) }
+        if status == errSecUserCanceled || status == errSecAuthFailed || status == errSecInteractionNotAllowed { return .denied }
         return .missing
     }
 }
@@ -225,19 +367,32 @@ public actor ProviderLimitsClient {
         public var claude = false
         public var glm = false
         public var glmRegion = GLMQuotaAPI.Region.bigmodel
+        public var codex = false
 
-        public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel) {
+        public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false) {
             self.claude = claude
             self.glm = glm
             self.glmRegion = glmRegion
+            self.codex = codex
         }
+
+        public func asks(_ provider: String) -> Bool {
+            switch provider {
+            case ProviderLimitsClient.claude: return claude
+            case ProviderLimitsClient.glm: return glm
+            case ProviderLimitsClient.codex: return codex
+            default: return false
+            }
+        }
+
+        public var asksAnyone: Bool { claude || glm || codex }
     }
 
     public enum State: Sendable, Equatable {
         case ok
-        /// Claude Code has never logged in on this Mac (or keeps its login somewhere else).
+        /// The agent has never logged in on this Mac (or keeps its login somewhere else).
         case noLogin
-        /// The login is there but past its date; Claude Code renews it the next time it runs.
+        /// The login is there but the provider no longer takes it; the agent renews it the next time it runs.
         case loginExpired
         /// The Keychain question was answered with "Deny".
         case denied
@@ -265,14 +420,18 @@ public actor ProviderLimitsClient {
     public struct Secrets: Sendable {
         public var claudeLogin: @Sendable () -> ClaudeCodeLogin.Outcome
         public var glmKey: @Sendable () -> String?
+        public var codexLogin: @Sendable () -> CodexLogin.Outcome
 
-        public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?) {
+        public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?,
+                    codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing }) {
             self.claudeLogin = claudeLogin
             self.glmKey = glmKey
+            self.codexLogin = codexLogin
         }
 
         public static func system(home: URL) -> Secrets {
-            Secrets(claudeLogin: { ClaudeCodeLogin.read(home: home) }, glmKey: { ProviderKeychain.read(ProviderLimitsClient.glmAccount) })
+            Secrets(claudeLogin: { ClaudeCodeLogin.read(home: home) }, glmKey: { ProviderKeychain.read(ProviderLimitsClient.glmAccount) },
+                    codexLogin: { CodexLogin.read(home: home) })
         }
     }
 
@@ -283,10 +442,12 @@ public actor ProviderLimitsClient {
     /// The GLM Coding Plan is what ZCode spends, so its limits are shown with ZCode.
     public static let glm = "zcode"
     public static let glmAccount = "glm-coding-plan"
+    public static let codex = "codex"
+    public static let providers = [claude, glm, codex]
     /// The only hosts a request may go to.
-    public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai"]
+    public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com"]
 
-    static let interval: [String: TimeInterval] = [claude: 300, glm: 180]
+    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300]
     static let forcedInterval: TimeInterval = 30
 
     private let cacheFile: URL
@@ -297,6 +458,8 @@ public actor ProviderLimitsClient {
     private var config = Config()
     private var results: [String: Result] = [:]
     private var claudeLogin: ClaudeCodeLogin.Login?
+    /// Sign-ins a provider has turned down: asking again with the same one would only be turned down again.
+    private var refused: [String: String] = [:]
     private var loop: Task<Void, Never>?
     /// Providers being asked right now: a second caller does not ask again.
     private var asking: Set<String> = []
@@ -317,11 +480,11 @@ public actor ProviderLimitsClient {
     public func configure(_ new: Config) {
         let old = config
         config = new
-        if !new.claude {
-            results[Self.claude] = nil
-            claudeLogin = nil
+        for provider in Self.providers where !new.asks(provider) {
+            results[provider] = nil
+            refused[provider] = nil
         }
-        if !new.glm { results[Self.glm] = nil }
+        if !new.claude { claudeLogin = nil }
         if new.glmRegion != old.glmRegion { results[Self.glm] = nil }
         if old != new {
             save()
@@ -329,7 +492,7 @@ public actor ProviderLimitsClient {
         }
         loop?.cancel()
         loop = nil
-        guard new.claude || new.glm else { return }
+        guard new.asksAnyone else { return }
         loop = Task { [weak self] in
             while !Task.isCancelled {
                 guard let client = self else { return }
@@ -343,17 +506,22 @@ public actor ProviderLimitsClient {
     public func refresh(force: Bool = false) async {
         let now = clock()
         var changed = false
-        for provider in [Self.claude, Self.glm] {
-            guard provider == Self.claude ? config.claude : config.glm else { continue }
+        for provider in Self.providers {
+            guard config.asks(provider) else { continue }
             let wait = force ? Self.forcedInterval : (Self.interval[provider] ?? 300)
             if let last = results[provider]?.checkedAt, now.timeIntervalSince(last) < wait { continue }
             // A "no" at the Keychain stands until the user asks again.
             if !force, results[provider]?.state == .denied { continue }
             guard asking.insert(provider).inserted else { continue }
-            var result = provider == Self.claude ? await askClaude(now: now) : await askGLM(now: now)
+            var result: Result
+            switch provider {
+            case Self.claude: result = await askClaude(now: now)
+            case Self.glm: result = await askGLM(now: now)
+            default: result = await askCodex(now: now)
+            }
             asking.remove(provider)
             // Switched off while the answer was on its way: it is not wanted any more.
-            guard provider == Self.claude ? config.claude : config.glm else { continue }
+            guard config.asks(provider) else { continue }
             // A failed check does not erase what was known a moment ago.
             if result.limits == nil, let known = results[provider]?.limits?.current(now: now), !known.windows.isEmpty {
                 result.limits = known
@@ -378,15 +546,47 @@ public actor ProviderLimitsClient {
             }
         }
         guard let login = claudeLogin else { return Result(state: .noLogin, checkedAt: now) }
-        if let expires = login.expiresAt, expires <= now {
+        let pastItsDate = login.expiresAt.map { $0 <= now } ?? false
+        // The date in the Keychain is Claude Code's note to itself; whether the sign-in still works is
+        // Anthropic's call. One that was turned down is not offered again until Claude Code replaces it.
+        if refused[Self.claude] == login.token {
             claudeLogin = nil
-            return Result(state: .loginExpired, checkedAt: now)
+            return Result(state: pastItsDate ? .loginExpired : .unauthorized, checkedAt: now)
         }
-        let (state, limits) = await ask(ClaudeUsageAPI.request(token: login.token)) { ClaudeUsageAPI.parse($0, now: now) }
-        if state == .unauthorized { claudeLogin = nil }
+        var (state, limits) = await ask(ClaudeUsageAPI.request(token: login.token)) { ClaudeUsageAPI.parse($0, now: now) }
+        if state == .unauthorized || (pastItsDate && state != .ok) {
+            // Past its date and not answered: whatever the refusal was called, the date is the reason.
+            refused[Self.claude] = login.token
+            claudeLogin = nil
+            if pastItsDate { state = .loginExpired }
+        }
         var out = limits
         if out != nil, out?.plan == nil { out?.plan = login.plan }
         return Result(limits: out, state: state, checkedAt: now)
+    }
+
+    private func askCodex(now: Date) async -> Result {
+        let login: CodexLogin.Login
+        switch secrets.codexLogin() {
+        case .found(let found): login = found
+        case .missing: return Result(state: .noLogin, checkedAt: now)
+        case .denied: return Result(state: .denied, checkedAt: now)
+        }
+        if refused[Self.codex] == login.token { return Result(state: .loginExpired, checkedAt: now) }
+        var (state, limits) = await ask(CodexUsageAPI.request(CodexUsageAPI.usage, login: login)) { CodexUsageAPI.parse($0, now: now) }
+        if state == .unauthorized {
+            // Codex renews its sign-in when it runs; until then this one is spent.
+            refused[Self.codex] = login.token
+            state = .loginExpired
+        }
+        if state == .ok, limits != nil {
+            // A second question, and one that may go unanswered without harm.
+            let request = CodexUsageAPI.request(CodexUsageAPI.savedResets, login: login)
+            if let (data, status) = try? await send(request), (200..<300).contains(status) {
+                limits?.resetsLeft = CodexUsageAPI.savedResets(data, now: now)
+            }
+        }
+        return Result(limits: limits, state: state, checkedAt: now)
     }
 
     private func askGLM(now: Date) async -> Result {
@@ -395,10 +595,15 @@ public actor ProviderLimitsClient {
         return Result(limits: limits, state: state, checkedAt: now)
     }
 
+    /// The one door to the network: https, and only to a host on the list.
+    private func send(_ request: URLRequest) async throws -> (Data, Int) {
+        guard let host = request.url?.host, Self.hosts.contains(host), request.url?.scheme == "https" else { throw URLError(.unsupportedURL) }
+        return try await transport(request)
+    }
+
     private func ask(_ request: URLRequest, parse: (Data) -> ProviderLimits?) async -> (State, ProviderLimits?) {
-        guard let host = request.url?.host, Self.hosts.contains(host), request.url?.scheme == "https" else { return (.unreachable, nil) }
         do {
-            let (data, status) = try await transport(request)
+            let (data, status) = try await send(request)
             switch status {
             case 200..<300:
                 guard let limits = parse(data) else { return (.unreadable, nil) }

@@ -61,17 +61,18 @@ Sessions of Claude Code and Codex are also read from their session logs
 task list is `.zcode/v2/tasks-index.sqlite`), all read-only. None of that needs
 registration. See `Sources/NikoCore/Scout/`.
 
-Limits of a plan (0.4.0) come from, in this order of trust: files the agent
+Limits of a plan (0.4.0, extended in 0.5.0) come from, in this order of trust: files the agent
 writes (Codex rollouts: `rate_limits`), Claude Code's status line, Claude
 Code's transcript when a request is refused (`apiErrorParams.rate_limit_info`),
 and, only when the user switches it on, the provider:
 
 | Provider | Request | Credential | Answer |
 |---|---|---|---|
-| Anthropic | `GET https://api.anthropic.com/api/oauth/usage`, `anthropic-beta: oauth-2025-04-20` | Claude Code's own sign-in from the Keychain item `Claude Code-credentials`, read at call time, never renewed | `five_hour` / `seven_day` with `utilization` and `resets_at`, or a `limits` list |
-| BigModel / Z.ai (GLM Coding Plan) | `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` or `https://api.z.ai/…` | a key the user pastes, kept in the Keychain under this app's name | `data.limits[]` with `type`, `unit`, `number`, `percentage`, `nextResetTime`; `data.level` |
+| Anthropic | `GET https://api.anthropic.com/api/oauth/usage`, `anthropic-beta: oauth-2025-04-20` | Claude Code's own sign-in from the Keychain item `Claude Code-credentials` (or `~/.claude/.credentials.json`), read at call time, never renewed | `five_hour` / `seven_day` (and other named windows) with `utilization` and `resets_at`; a `limits` list, in which `kind: weekly_scoped` carries a week per model (`scope.model.display_name`); `extra_usage` |
+| BigModel / Z.ai (GLM Coding Plan) | `GET https://open.bigmodel.cn/api/monitor/usage/quota/limit` or `https://api.z.ai/…` | a key the user pastes, kept in the Keychain under this app's name | `data.limits[]` with `type`, `unit` (3 = hours, 6 = the week), `number`, `percentage`, `nextResetTime`; `data.level` |
+| OpenAI (a ChatGPT plan used by Codex, 0.5.0) | `GET https://chatgpt.com/backend-api/wham/usage` and `…/wham/rate-limit-reset-credits`, `ChatGPT-Account-Id` | Codex's own sign-in from `~/.codex/auth.json` (`auth_mode: chatgpt`), or the Keychain item `Codex Auth` when Codex keeps it there; read at call time, never renewed | `rate_limit.primary_window` / `secondary_window` with `used_percent`, `limit_window_seconds`, `reset_at`; `plan_type`; saved resets as `credits[]` with `status` and `expires_at` |
 
-Neither endpoint is documented by its provider. See
+None of these endpoints is documented by its provider; the shapes are the ones several open-source tools read, and the OpenAI one was answered live once. See
 `Sources/NikoCore/Usage/ProviderLookups.swift`. ZCode's own stored sign-in is
 encrypted by ZCode and is not read.
 

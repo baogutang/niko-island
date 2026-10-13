@@ -10,7 +10,7 @@ import UniformTypeIdentifiers
 @MainActor
 enum PreviewRenderer {
     enum Scene: String, CaseIterable {
-        case idle, working, attention, toast
+        case idle, working, attention, toast, done
         case sessions, permission, question, usage, empty
         case settingsSounds = "settings-sounds"
         case settingsAgents = "settings-agents"
@@ -59,8 +59,17 @@ enum PreviewRenderer {
                          now: now.addingTimeInterval(-ago))
         }
 
+        func steps(_ list: [(String, String, String)]) -> JSONObject {
+            ["todos": .array(list.map { .object(["content": .string($0.0), "activeForm": .string($0.1), "status": .string($0.2)]) })]
+        }
+
         func fleet() {
             send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 320, prompt: "Fix the flaky upload retry test")
+            send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 300, tool: "TodoWrite", input: steps([
+                ("Reproduce the failure", "Reproducing the failure", "completed"), ("Find the race", "Finding the race", "completed"),
+                ("Add a backoff", "Adding a backoff", "completed"), ("Run the upload tests", "Running the upload tests", "in_progress"),
+                ("Tidy up", "Tidying up", "pending"),
+            ]))
             send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 46, tool: "Bash", input: ["command": .string("swift test --filter UploadTests")])
             send("codex", "UserPromptSubmit", session: "b", project: "storefront", ago: 260, prompt: "Move the checkout form to the new validation hooks",
                  host: ("ghostty", "com.mitchellh.ghostty"))
@@ -121,6 +130,16 @@ enum PreviewRenderer {
         case .toast:
             send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 60, prompt: "Fix the flaky upload retry test")
             send("claude", "Stop", session: "a", project: "atlas-api", ago: 1)
+        case .done:
+            send("claude", "UserPromptSubmit", session: "a", project: "atlas-api", ago: 260, prompt: "Fix the flaky upload retry test")
+            send("claude", "PreToolUse", session: "a", project: "atlas-api", ago: 40, tool: "TodoWrite", input: steps([
+                ("Reproduce the failure", "Reproducing the failure", "completed"), ("Find the race", "Finding the race", "completed"),
+                ("Add a backoff", "Adding a backoff", "completed"), ("Run the upload tests", "Running the upload tests", "completed"),
+            ]))
+            send("claude", "Stop", session: "a", project: "atlas-api", ago: 1, extra: [
+                "last_assistant_message": "Fixed. The retry fired before the first upload had closed its stream, so two writers raced for `upload.tmp`. "
+                    + "The retry now waits for the stream to close, with a **250 ms backoff**.\n\nAll 42 upload tests pass.",
+            ])
         case .attention, .permission:
             fleet()
             send("claude", "PermissionRequest", session: "a", project: "atlas-api", ago: 12, tool: "Bash",
@@ -166,9 +185,15 @@ enum PreviewRenderer {
             model.runningAgents = ["claude", "codex", "zcode"]
         }
 
+        // Sample repositories are not on this disk: say what their `.git` would.
+        if !model.sessions.isEmpty {
+            model.branches = ["/Users/dev/code/atlas-api": "fix/upload-retry", "/Users/dev/code/storefront": "feat/validation-hooks",
+                              "/Users/dev/code/shot": "main", "/Users/dev/code/infra": "queue-migration"]
+        }
+
         switch scene {
         case .sessions, .permission, .question, .usage, .empty: model.expand(.click)
-        case .toast: break
+        case .toast, .done: break
         default: model.collapse()
         }
         if scene != .toast { model.dismissToast() }
@@ -278,7 +303,7 @@ enum PreviewRenderer {
         let storyboard: [(Scene, Int, Double)] = [
             (.idle, 0, 1.1), (.working, 0, 0.55), (.working, 1, 0.55), (.working, 0, 0.55), (.working, 1, 0.55),
             (.attention, 0, 1.2), (.permission, 0, 2.6), (.working, 0, 0.5), (.working, 1, 0.5),
-            (.question, 0, 2.6), (.sessions, 0, 2.2), (.usage, 0, 2.0), (.toast, 0, 1.8), (.idle, 0, 0.9),
+            (.question, 0, 2.6), (.sessions, 0, 2.2), (.usage, 0, 2.0), (.done, 0, 2.6), (.idle, 0, 0.9),
         ]
         var frames: [(CGImage, Double)] = []
         for (scene, mascotFrame, delay) in storyboard {

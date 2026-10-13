@@ -34,6 +34,22 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(fromList.windows.map(\.usedPercent), [12.5, 3])
         XCTAssertNil(fromList.windows[1].resetsAt)
 
+        // A week per model: the list's figure is the newer one, a share for one surface is not the model's week,
+        // paid extra use counts only where it is switched on, and a window with no name here is still shown.
+        let scoped = Data(#"""
+        {"five_hour":{"utilization":10,"resets_at":"2026-09-23T11:09:59Z"},"seven_day":{"utilization":20,"resets_at":"2026-09-26T13:59:59Z"},
+         "seven_day_opus":{"utilization":33,"resets_at":"2026-09-26T13:59:59Z"},"seven_day_oauth_apps":{"utilization":4,"resets_at":null},
+         "extra_usage":{"is_enabled":true,"monthly_limit":5000,"used_credits":1250,"utilization":25,"currency":"USD"},
+         "limits":[{"kind":"weekly_scoped","group":"weekly","percent":41,"resets_at":"2026-09-26T13:59:59Z","scope":{"model":{"display_name":"Opus"},"surface":null}},
+                   {"kind":"weekly_scoped","group":"weekly","percent":7,"resets_at":null,"scope":{"model":{"display_name":"Sonnet"}}},
+                   {"kind":"weekly_scoped","group":"weekly","percent":99,"scope":{"model":{"display_name":"Sonnet"},"surface":"design"}},
+                   {"kind":"weekly_scoped","group":"weekly","percent":50,"scope":{}}]}
+        """#.utf8)
+        let perModel = try XCTUnwrap(ClaudeUsageAPI.parse(scoped, now: now))
+        XCTAssertEqual(perModel.windows.map(\.id), ["five_hour", "seven_day", "seven_day_oauth_apps", "seven_day_opus", "seven_day_sonnet", "extra_usage"])
+        XCTAssertEqual(perModel.windows.map(\.usedPercent), [10, 20, 4, 41, 7, 25])
+        XCTAssertTrue(perModel.windows.dropLast().allSatisfy { $0.minutes == 300 || $0.minutes == 10080 })
+
         XCTAssertNil(ClaudeUsageAPI.parse(Data("{}".utf8)))
         XCTAssertNil(ClaudeUsageAPI.parse(Data("<html>".utf8)))
         XCTAssertEqual(ClaudeUsageAPI.request(token: "t").url?.host, "api.anthropic.com")
@@ -62,6 +78,17 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(fromCredits.windows.map(\.id), ["five_hour", "seven_day"])
         XCTAssertEqual(fromCredits.windows.map(\.usedPercent), [0, 2])
         XCTAssertNil(fromCredits.windows[0].resetsAt)
+
+        // The week has been sent as "unit 6, number 7" as well as "unit 6, number 1": the unit is what says "week".
+        let sevens = Data(#"{"data":{"limits":[{"type":"TOKENS_LIMIT","unit":6,"number":7,"percentage":61,"nextResetTime":1790400000000},{"type":"tokens_limit","unit":3,"number":5,"percentage":5}]}}"#.utf8)
+        let week = try XCTUnwrap(GLMQuotaAPI.parse(sevens, now: now))
+        XCTAssertEqual(week.windows.map(\.id), ["five_hour", "seven_day"])
+        XCTAssertEqual(week.windows.map(\.minutes), [300, 10080])
+        // No unit at all: the window that resets first (or has not started counting) is the short one.
+        let bare = Data(#"{"data":{"limits":[{"type":"TOKENS_LIMIT","percentage":70,"nextResetTime":1790400000000},{"type":"TOKENS_LIMIT","percentage":8,"nextResetTime":1790010000000}]}}"#.utf8)
+        let guessed = try XCTUnwrap(GLMQuotaAPI.parse(bare, now: now))
+        XCTAssertEqual(guessed.windows.map(\.id), ["five_hour", "seven_day"])
+        XCTAssertEqual(guessed.windows.map(\.usedPercent), [8, 70])
 
         XCTAssertNil(GLMQuotaAPI.parse(Data(#"{"code":401,"msg":"token expired"}"#.utf8)))
         XCTAssertEqual(GLMQuotaAPI.url(.bigmodel).host, "open.bigmodel.cn")
@@ -97,6 +124,67 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertNotNil(ClaudeCodeLogin.parse(try Data(contentsOf: scratch.file("home/.claude/.credentials.json"))))
     }
 
+    func testChatGPTsAnswerAboutACodexPlanIsRead() throws {
+        // A plan with only a weekly window, as seen: the second window is null.
+        let weekly = Data(#"""
+        {"plan_type":"pro","rate_limit":{"allowed":true,"limit_reached":false,
+          "primary_window":{"used_percent":30,"limit_window_seconds":604800,"reset_after_seconds":580000,"reset_at":1790580000},
+          "secondary_window":null},
+         "credits":{"has_credits":false,"unlimited":false,"balance":"0"},"rate_limit_reset_credits":{"available_count":0}}
+        """#.utf8)
+        let limits = try XCTUnwrap(CodexUsageAPI.parse(weekly, now: now))
+        XCTAssertEqual(limits.windows.map(\.id), ["primary"], "named as Codex's own files name them, so both sources fill the same rows")
+        XCTAssertEqual(limits.windows[0].usedPercent, 30)
+        XCTAssertEqual(limits.windows[0].minutes, 10080)
+        XCTAssertEqual(limits.windows[0].resetsAt, Date(timeIntervalSince1970: 1_790_580_000))
+        XCTAssertEqual(limits.plan, "pro")
+        XCTAssertEqual(limits.source, .provider)
+
+        let both = Data(#"{"rate_limit":{"primary_window":{"used_percent":12,"limit_window_seconds":18000,"reset_after_seconds":600},"secondary_window":{"used_percent":140,"limit_window_seconds":604800,"reset_at":1790580000}}}"#.utf8)
+        let two = try XCTUnwrap(CodexUsageAPI.parse(both, now: now))
+        XCTAssertEqual(two.windows.map(\.minutes), [300, 10080])
+        XCTAssertEqual(two.windows.map(\.usedPercent), [12, 100])
+        XCTAssertEqual(two.windows[0].resetsAt, now.addingTimeInterval(600))
+        XCTAssertNil(CodexUsageAPI.parse(Data(#"{"detail":"Unauthorized"}"#.utf8)))
+        XCTAssertNil(CodexUsageAPI.parse(Data("<html>".utf8)))
+
+        // Saved resets are counted from the list: used ones and ones past their date do not count.
+        let saved = Data(#"{"credits":[{"status":"available","expires_at":"2099-01-01T00:00:00Z"},{"status":"available","expires_at":null},{"status":"available","expires_at":"2020-01-01T00:00:00Z"},{"status":"redeemed","expires_at":"2099-01-01T00:00:00Z"}],"available_count":9}"#.utf8)
+        XCTAssertEqual(CodexUsageAPI.savedResets(saved, now: now), 2)
+        XCTAssertEqual(CodexUsageAPI.savedResets(Data(#"{"credits":[],"available_count":0}"#.utf8), now: now), 0)
+        XCTAssertNil(CodexUsageAPI.savedResets(Data(#"{"detail":"no"}"#.utf8), now: now))
+
+        let request = CodexUsageAPI.request(CodexUsageAPI.usage, login: .init(token: "t", account: "acct"))
+        XCTAssertEqual(request.url?.host, "chatgpt.com")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer t")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "ChatGPT-Account-Id"), "acct")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"), true, "asked under this app's own name, not as somebody else's client")
+        XCTAssertEqual(CodexUsageAPI.savedResets.host, "chatgpt.com")
+    }
+
+    func testCodexsSignInCountsOnlyWhenItIsAChatGPTPlan() throws {
+        let plan = Data(#"{"auth_mode":"chatgpt","OPENAI_API_KEY":null,"tokens":{"id_token":"i","access_token":"at","refresh_token":"rt","account_id":"acct"},"last_refresh":"2026-10-05T03:46:50Z"}"#.utf8)
+        XCTAssertEqual(CodexLogin.parse(plan), CodexLogin.Login(token: "at", account: "acct"))
+        // Older files do not name the mode.
+        XCTAssertEqual(CodexLogin.parse(Data(#"{"tokens":{"access_token":"at"}}"#.utf8))?.token, "at")
+        // An API key has no plan to ask about.
+        XCTAssertNil(CodexLogin.parse(Data(#"{"auth_mode":"apikey","OPENAI_API_KEY":"sk-x","tokens":{"access_token":"at"}}"#.utf8)))
+        XCTAssertNil(CodexLogin.parse(Data(#"{"auth_mode":"chatgpt","tokens":{}}"#.utf8)))
+        XCTAssertNil(CodexLogin.parse(Data("nope".utf8)))
+
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home.appendingPathComponent(".codex"), withIntermediateDirectories: true)
+        try plan.write(to: home.appendingPathComponent(".codex/auth.json"))
+        XCTAssertEqual(CodexLogin.read(home: home), .found(.init(token: "at", account: "acct")), "the file is read first: it asks nobody")
+        // The name Codex files a Keychain sign-in under: "cli|" and 16 hex digits of its folder's path.
+        let account = CodexLogin.keychainAccount(folder: home.appendingPathComponent(".codex"))
+        XCTAssertTrue(account.hasPrefix("cli|"))
+        XCTAssertEqual(account.count, 20)
+        XCTAssertEqual(account, CodexLogin.keychainAccount(folder: home.appendingPathComponent(".codex")))
+        XCTAssertNotEqual(account, CodexLogin.keychainAccount(folder: home.appendingPathComponent(".codex-other")))
+    }
+
     // MARK: The client
 
     private final class Wire: @unchecked Sendable {
@@ -124,8 +212,20 @@ final class ProviderLimitsTests: XCTestCase {
     private let claudeAnswer = #"{"five_hour":{"utilization":37,"resets_at":"2099-01-01T00:00:00Z"},"seven_day":{"utilization":61,"resets_at":"2099-01-03T00:00:00Z"}}"#
     private let glmAnswer = #"{"code":200,"data":{"level":"max","limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":9,"nextResetTime":4070908800000}]}}"#
 
-    private func client(paths: NikoPaths, wire: Wire, clock: Clock, login: ClaudeCodeLogin.Outcome = .missing, key: String? = nil) -> ProviderLimitsClient {
-        ProviderLimitsClient(paths: paths, secrets: .init(claudeLogin: { login }, glmKey: { key }),
+    /// A sign-in that can be replaced mid-test, the way the agent replaces its own.
+    private final class Stored<Value>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _value: Value
+        init(_ value: Value) { _value = value }
+        var value: Value {
+            get { lock.lock(); defer { lock.unlock() }; return _value }
+            set { lock.lock(); _value = newValue; lock.unlock() }
+        }
+    }
+
+    private func client(paths: NikoPaths, wire: Wire, clock: Clock, login: ClaudeCodeLogin.Outcome = .missing, key: String? = nil,
+                        stored: Stored<ClaudeCodeLogin.Outcome>? = nil, codex: Stored<CodexLogin.Outcome>? = nil) -> ProviderLimitsClient {
+        ProviderLimitsClient(paths: paths, secrets: .init(claudeLogin: { stored?.value ?? login }, glmKey: { key }, codexLogin: { codex?.value ?? .missing }),
                              transport: { try wire.send($0) }, clock: { clock.now }) { _ in }
     }
 
@@ -197,23 +297,122 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(wire.requests.count, 2)
     }
 
-    func testASignInThatHasRunOutIsNotSentAndNeverRenewed() async throws {
+    func testASignInPastItsDateIsOfferedOnceAndNeverRenewed() async throws {
         let scratch = Scratch()
         let paths = NikoPaths(root: scratch.file("ni"))
         try FileManager.default.createDirectory(at: paths.cache, withIntermediateDirectories: true)
         let wire = Wire(), clock = Clock(now)
-        let stale = ClaudeCodeLogin.Login(token: "old", expiresAt: now.addingTimeInterval(-60), plan: "pro")
-        let asker = client(paths: paths, wire: wire, clock: clock, login: .found(stale))
+        let stored = Stored(ClaudeCodeLogin.Outcome.found(.init(token: "old", expiresAt: now.addingTimeInterval(-60), plan: "pro")))
+        let asker = client(paths: paths, wire: wire, clock: clock, stored: stored)
+        // The date is Claude Code's note to itself; whether the sign-in still works is Anthropic's call. It says no
+        // (and has been seen to say so as "too many requests" as well as "unauthorized").
+        wire.queue(#"{"error":{"type":"rate_limit_error"}}"#, 429)
         await asker.configure(.init(claude: true))
         await asker.refresh(force: true)
         await settle(asker, "claude")
-        let results = await asker.current()
+        var results = await asker.current()
         XCTAssertEqual(results["claude"]?.state, .loginExpired)
-        XCTAssertTrue(wire.requests.isEmpty, "an expired sign-in goes nowhere, and nothing here asks for a new one")
+        XCTAssertEqual(wire.requests.count, 1)
+
+        // The same sign-in is not offered again, however long we wait or however often "Check now" is pressed.
+        for _ in 0..<3 {
+            clock.advance(400)
+            await asker.refresh(force: true)
+        }
+        results = await asker.current()
+        XCTAssertEqual(results["claude"]?.state, .loginExpired)
+        XCTAssertEqual(wire.requests.count, 1, "one refusal is enough")
+
+        // Claude Code ran and put a new one there: that one is asked with.
+        stored.value = .found(.init(token: "new", expiresAt: clock.now.addingTimeInterval(3600), plan: "pro"))
+        wire.queue(claudeAnswer)
+        clock.advance(400)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["claude"]?.state, .ok)
+        XCTAssertEqual(wire.requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer new")
+
+        // A date that was wrong does not stand in the way of an answer.
+        let lucky = client(paths: NikoPaths(root: scratch.file("ni2")), wire: wire, clock: clock,
+                           login: .found(.init(token: "dated", expiresAt: clock.now.addingTimeInterval(-60), plan: nil)))
+        try FileManager.default.createDirectory(at: scratch.file("ni2/cache"), withIntermediateDirectories: true)
+        wire.queue(claudeAnswer)
+        await lucky.configure(.init(claude: true))
+        await lucky.refresh(force: true)
+        await settle(lucky, "claude")
+        let answered = await lucky.current()
+        XCTAssertEqual(answered["claude"]?.state, .ok)
+
         let source = try String(contentsOf: repositoryRoot.appendingPathComponent("Sources/NikoCore/Usage/ProviderLookups.swift"), encoding: .utf8)
         for forbidden in ["refresh_token", "refreshToken\"]", "oauth/token", "SecItemUpdate"] {
             XCTAssertFalse(source.contains(forbidden), "renewing or rewriting another app's sign-in is not our business: \(forbidden)")
         }
+    }
+
+    func testCodexIsAskedWithItsOwnSignInAndSavedResetsComeAlong() async throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        try FileManager.default.createDirectory(at: paths.cache, withIntermediateDirectories: true)
+        let wire = Wire(), clock = Clock(now)
+        let codex = Stored(CodexLogin.Outcome.found(.init(token: "codex-secret", account: "acct")))
+        let asker = client(paths: paths, wire: wire, clock: clock, codex: codex)
+        let usage = #"{"plan_type":"pro","rate_limit":{"primary_window":{"used_percent":30,"limit_window_seconds":604800,"reset_at":4070908800},"secondary_window":null}}"#
+
+        await asker.refresh(force: true)
+        XCTAssertTrue(wire.requests.isEmpty, "off until switched on")
+
+        wire.queue(usage)
+        wire.queue(#"{"credits":[{"status":"available","expires_at":null},{"status":"available","expires_at":"2099-01-01T00:00:00Z"}]}"#)
+        await asker.configure(.init(codex: true))
+        await asker.refresh(force: true)
+        await settle(asker, "codex")
+        var results = await asker.current()
+        XCTAssertEqual(results["codex"]?.state, .ok)
+        XCTAssertEqual(results["codex"]?.limits?.windows.map(\.id), ["primary"])
+        XCTAssertEqual(results["codex"]?.limits?.resetsLeft, 2)
+        XCTAssertEqual(wire.requests.map { $0.url?.path }, ["/backend-api/wham/usage", "/backend-api/wham/rate-limit-reset-credits"])
+        XCTAssertTrue(wire.requests.allSatisfy { $0.url?.host == "chatgpt.com" && $0.value(forHTTPHeaderField: "Authorization") == "Bearer codex-secret" })
+        let cached = try String(contentsOf: paths.cache.appendingPathComponent("provider-limits.json"), encoding: .utf8)
+        XCTAssertFalse(cached.contains("secret"))
+        XCTAssertFalse(cached.contains("acct"))
+
+        // The second question going unanswered costs nothing but the count.
+        clock.advance(400)
+        wire.queue(usage)
+        wire.queue("{}", 500)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["codex"]?.state, .ok)
+        XCTAssertNil(results["codex"]?.limits?.resetsLeft)
+
+        // Turned down: Codex renews its own sign-in, we do not, and we do not knock again with the same one.
+        clock.advance(400)
+        wire.queue(#"{"detail":"Unauthorized"}"#, 401)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["codex"]?.state, .loginExpired)
+        XCTAssertEqual(results["codex"]?.limits?.windows.count, 1, "the last good answer stays on screen")
+        let asked = wire.requests.count
+        clock.advance(400)
+        await asker.refresh(force: true)
+        XCTAssertEqual(wire.requests.count, asked)
+        codex.value = .found(.init(token: "renewed", account: "acct"))
+        wire.queue(usage)
+        wire.queue(#"{"credits":[]}"#)
+        clock.advance(400)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["codex"]?.state, .ok)
+        XCTAssertEqual(results["codex"]?.limits?.resetsLeft, 0)
+
+        // No ChatGPT plan signed in: nothing to ask with, nothing asked.
+        codex.value = .missing
+        clock.advance(400)
+        let before = wire.requests.count
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["codex"]?.state, .noLogin)
+        XCTAssertEqual(wire.requests.count, before)
     }
 
     func testFailuresAreNamedAndDoNotEraseWhatWasKnown() async throws {
@@ -232,7 +431,7 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(results["zcode"]?.state, .noKey, "no key, no request")
         XCTAssertEqual(wire.requests.count, 1)
 
-        for (body, status, expected) in [("{}", 429, ProviderLimitsClient.State.rateLimited), ("nope", 200, .unreadable), ("{}", 401, .unauthorized), ("", 503, .unreachable)] {
+        for (body, status, expected) in [("{}", 429, ProviderLimitsClient.State.rateLimited), ("nope", 200, .unreadable), ("", 503, .unreachable)] {
             clock.advance(400)
             wire.queue(body, status)
             await asker.refresh()
@@ -245,6 +444,20 @@ final class ProviderLimitsTests: XCTestCase {
         await asker.refresh()
         results = await asker.current()
         XCTAssertEqual(results["claude"]?.state, .unreachable)
+
+        // A sign-in Anthropic turns down is not offered a second time.
+        clock.advance(400)
+        wire.queue("{}", 401)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["claude"]?.state, .unauthorized)
+        let asked = wire.requests.count
+        clock.advance(400)
+        await asker.refresh()
+        results = await asker.current()
+        XCTAssertEqual(results["claude"]?.state, .unauthorized)
+        XCTAssertEqual(wire.requests.count, asked)
+        XCTAssertEqual(results["claude"]?.limits?.windows.count, 2)
 
         // "Deny" at the Keychain stands until the user asks again.
         let refused = client(paths: NikoPaths(root: scratch.file("ni2")), wire: wire, clock: clock, login: .denied)

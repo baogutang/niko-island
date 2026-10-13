@@ -390,7 +390,14 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         let failed = await eventually { sounds.played.contains(.error) }
         XCTAssertTrue(failed)
         XCTAssertEqual(model.sessions.first?.activity, Activity(verb: "hit an error", detail: "overloaded"))
-        XCTAssertEqual(model.toast?.kind, .failed)
+        XCTAssertEqual(model.completion?.failed, true, "an error has something to say, so it is said on a card")
+        XCTAssertEqual(model.completion?.reply, "overloaded")
+        model.settings.completionStyle = .notice
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("StopFailure", extra: ",\"error\":\"overloaded\""))
+        let noticed = await eventually { self.model.toast?.kind == .failed }
+        XCTAssertTrue(noticed)
+        XCTAssertNil(model.completion)
 
         // One warning when a window crosses 90 %, none while it stays there.
         var usage = UsageSnapshot()
@@ -498,6 +505,328 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         let idle = await eventually { self.model.sessions.first?.phase == .waiting }
         XCTAssertTrue(idle)
         XCTAssertNil(model.toast)
+    }
+
+    // MARK: A finished turn, said on a card
+
+    private let closing = ",\"last_assistant_message\":\"Fixed the **race** in `Hub.swift`.\\n\\nTests pass.\""
+
+    /// One whole turn; returns once the session is waiting again.
+    private func turn(prompt: String = "ship the fix", closing words: String? = nil) async {
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"\(prompt)\""))
+        let working = await eventually { self.model.sessions.first?.phase == .working }
+        XCTAssertTrue(working)
+        _ = await bridge(event("Stop", extra: words ?? closing))
+        let waiting = await eventually { self.model.sessions.first?.phase == .waiting }
+        XCTAssertTrue(waiting)
+    }
+
+    func testAFinishedTurnComesDownAsACardWithTheAgentsLastWords() async throws {
+        XCTAssertEqual(model.settings.completionStyle, .card)
+        await turn()
+        let card = try XCTUnwrap(model.completion)
+        XCTAssertEqual(card.key, key)
+        XCTAssertEqual(card.reply, "Fixed the **race** in `Hub.swift`.\n\nTests pass.")
+        XCTAssertEqual(card.project, "demo-project")
+        XCTAssertEqual(card.title, "ship the fix")
+        XCTAssertFalse(card.failed)
+        XCTAssertNil(model.toast, "the card says it; a notice as well would say it twice")
+        XCTAssertFalse(model.isExpanded, "a card is not the island opening")
+        // The agent's light markup is drawn, not shown as asterisks and backticks.
+        XCTAssertEqual(String(ReplyText.attributed(card.reply ?? "").characters), "Fixed the race in Hub.swift.\n\nTests pass.")
+        XCTAssertEqual(model.sessions.first?.replyLine, "Fixed the race in Hub.swift. Tests pass.")
+        XCTAssertEqual(ReplyText.flattened(String(repeating: "word ", count: 100), limit: 40).count, 40)
+
+        // A click goes to the session and puts the card away.
+        model.openCompletion()
+        XCTAssertNil(model.completion)
+        XCTAssertEqual(jumps, [key])
+
+        // Asking for more makes the card old news, and the old words are not this turn's.
+        await turn()
+        XCTAssertNotNil(model.completion)
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"and the docs\""))
+        let cleared = await eventually { self.model.completion == nil }
+        XCTAssertTrue(cleared)
+        XCTAssertNil(model.sessions.first?.lastReply)
+
+        // Opening the island puts it away too: the list says the same and more.
+        _ = await bridge(event("Stop", extra: closing))
+        let again = await eventually { self.model.completion != nil }
+        XCTAssertTrue(again)
+        model.expand(.click)
+        XCTAssertNil(model.completion)
+        model.collapse()
+
+        // The ✕, and a pointer resting on the card.
+        await turn()
+        model.holdCompletion(true)
+        model.holdCompletion(false)
+        XCTAssertNotNil(model.completion)
+        model.dismissCompletion()
+        XCTAssertNil(model.completion)
+        XCTAssertTrue(jumps.count == 1, "putting a card away goes nowhere")
+    }
+
+    func testACardIsOnlyShownWhereItHelps() async throws {
+        // Chosen as a short notice.
+        model.settings.completionStyle = .notice
+        await turn()
+        XCTAssertNil(model.completion)
+        XCTAssertEqual(model.toast?.kind, .completed)
+
+        // Chosen as nothing.
+        model.settings.completionStyle = .off
+        await turn()
+        XCTAssertNil(model.completion)
+        XCTAssertNil(model.toast)
+
+        // Nothing to say: the short notice does.
+        model.settings.completionStyle = .card
+        await turn(closing: "")
+        XCTAssertNil(model.completion)
+        XCTAssertEqual(model.toast?.kind, .completed)
+
+        // The user is already looking at that session.
+        model.isFrontmost = { $0.key == self.key }
+        await turn()
+        XCTAssertNil(model.completion)
+        XCTAssertNotNil(model.toast)
+        model.isFrontmost = { _ in false }
+
+        // No island on screen to show it on.
+        model.islandIsVisible = { false }
+        await turn()
+        XCTAssertNil(model.completion)
+        model.islandIsVisible = { true }
+
+        // The island is open: the row itself says it.
+        model.expand(.click)
+        await turn()
+        XCTAssertNil(model.completion)
+        XCTAssertNil(model.toast)
+        model.collapse()
+
+        // Something is waiting for a decision: that comes first.
+        model.settings.expandOnAttention = false
+        async let waiting = bridge(event("PermissionRequest", session: "s2", tool: "Bash"))
+        let asked = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(asked)
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\""))
+        _ = await bridge(event("Stop", extra: closing))
+        let stopped = await eventually { self.model.sessions.first { $0.key == self.key }?.phase == .waiting }
+        XCTAssertTrue(stopped)
+        XCTAssertNil(model.completion)
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+
+        // Back to normal, the card is back.
+        await turn()
+        XCTAssertNotNil(model.completion)
+    }
+
+    func testACardWaitsAMomentForWordsThatComeFromTheTranscript() async throws {
+        // With sessions being read from disk, a hook's "finished" is ahead of the transcript by a moment.
+        model.stop()
+        XCTAssertTrue(model.start(usage: false, scout: true))
+        model.completionSettleDelay = 0.4
+        let transcript = ",\"transcript_path\":\"/tmp/demo-project/s1.jsonl\""
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\"" + transcript))
+        _ = await bridge(event("Stop", extra: transcript))
+        let stopped = await eventually { self.model.sessions.first?.phase == .waiting }
+        XCTAssertTrue(stopped)
+        XCTAssertNil(model.completion, "nothing to say yet")
+        XCTAssertNil(model.toast, "and no notice that a card would then have to replace")
+        // The transcript catches up inside the wait.
+        model.mergeTranscripts([TranscriptSnapshot(key: key, path: "/tmp/demo-project/s1.jsonl", cwd: "/tmp/demo-project", firstPrompt: "ship the fix",
+                                                   lastPrompt: "ship the fix", lastReply: "Shipped.", phase: .waiting, activity: .waiting, updatedAt: Date())])
+        let shown = await eventually { self.model.completion != nil }
+        XCTAssertTrue(shown)
+        XCTAssertEqual(model.completion?.reply, "Shipped.")
+
+        // Asked something new before the wait is over: there is nothing finished to show.
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"and the docs\"" + transcript))
+        _ = await bridge(event("Stop", extra: transcript))
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"wait, the tests first\"" + transcript))
+        let working = await eventually { self.model.sessions.first?.phase == .working }
+        XCTAssertTrue(working)
+        try await Task.sleep(nanoseconds: 700_000_000)
+        XCTAssertNil(model.completion)
+
+        // Words that come with the event need no waiting at all.
+        model.completionSettleDelay = 30
+        _ = await bridge(event("Stop", extra: closing + transcript))
+        let atOnce = await eventually(timeout: 3) { self.model.completion != nil }
+        XCTAssertTrue(atOnce)
+    }
+
+    func testNobodyAtTheScreenMeansNoSoundsAndNoCards() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        XCTAssertTrue(model.settings.quietWhenAway)
+        model.isAway = true
+        await turn()
+        XCTAssertNil(model.completion)
+        XCTAssertNil(model.toast)
+        XCTAssertTrue(sounds.played.isEmpty, "\(sounds.played)")
+        // A request still waits, silently, and is there when the user is back.
+        model.settings.expandOnAttention = false
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash"))
+        let asked = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(asked)
+        XCTAssertTrue(sounds.played.isEmpty)
+        model.isAway = false
+        model.decide(model.pending[0].id, .allowOnce)
+        _ = await waiting
+
+        // Told to carry on regardless.
+        model.settings.quietWhenAway = false
+        model.isAway = true
+        await turn()
+        XCTAssertNotNil(model.completion)
+        XCTAssertEqual(sounds.played, [.completed])
+    }
+
+    // MARK: Allow and deny from the keyboard
+
+    func testKeysOnlyAnswerARequestThatIsOnScreen() async throws {
+        model.settings.expandOnAttention = false
+        async let first = bridge(event("PermissionRequest", tool: "Bash", command: "rm -rf build"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        XCTAssertFalse(model.settings.decisionHotkeys)
+        XCTAssertFalse(model.decideByKey(.allow), "off unless switched on")
+        XCTAssertFalse(model.isExpanded)
+        XCTAssertEqual(model.pending.count, 1)
+
+        model.settings.decisionHotkeys = true
+        // With the island closed the first press only shows what is being asked.
+        XCTAssertFalse(model.decideByKey(.allow))
+        XCTAssertTrue(model.isExpanded)
+        XCTAssertEqual(model.pending.count, 1, "nothing is allowed unseen")
+        XCTAssertEqual(model.focusedRequest?.id, model.pending.first?.id)
+        // Now it is on screen: the key answers it.
+        XCTAssertTrue(model.decideByKey(.allow))
+        let allowed = await first
+        XCTAssertEqual(behavior(allowed), "allow")
+        XCTAssertTrue(model.pending.isEmpty)
+
+        // Looking at usage is not looking at the request.
+        async let second = bridge(event("PermissionRequest", tool: "Bash"))
+        let again = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(again)
+        model.expand(.click)
+        model.route = .usage
+        XCTAssertFalse(model.decideByKey(.deny))
+        XCTAssertEqual(model.route, .sessions)
+        XCTAssertEqual(model.pending.count, 1)
+        XCTAssertTrue(model.decideByKey(.deny))
+        let denied = await second
+        XCTAssertEqual(behavior(denied), "deny")
+
+        // A question is answered with its answers, never with a key.
+        let question = """
+        {"hook_event_name":"PermissionRequest","session_id":"s1","cwd":"/tmp/demo-project","tool_name":"AskUserQuestion",
+         "tool_input":{"questions":[{"question":"Which database?","header":"DB","multiSelect":false,"options":[{"label":"Postgres"},{"label":"SQLite"}]}]}}
+        """
+        async let asking = bridge(question)
+        let asked = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(asked)
+        model.expand(.click)
+        XCTAssertFalse(model.decideByKey(.allow))
+        XCTAssertFalse(model.decideByKey(.deny))
+        XCTAssertEqual(model.pending.count, 1)
+        model.decide(model.pending[0].id, .passToTerminal)
+        _ = await asking
+        // Nothing waiting: the keys do nothing at all.
+        XCTAssertFalse(model.decideByKey(.allow))
+    }
+
+    // MARK: A request left waiting
+
+    func testARequestLeftWaitingIsBroughtUpAgainAFewTimes() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        model.settings.expandOnAttention = false
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        let asked = model.pending[0].receivedAt
+        XCTAssertEqual(sounds.played, [.attention])
+        XCTAssertEqual(attentionRequests, 1)
+
+        model.remindAboutWaiting(now: asked.addingTimeInterval(3600))
+        XCTAssertEqual(sounds.played, [.attention], "never, unless asked for")
+
+        model.settings.reminderMinutes = 5
+        model.remindAboutWaiting(now: asked.addingTimeInterval(200))
+        XCTAssertEqual(sounds.played.count, 1, "not yet")
+        // Nobody at the screen: the reminder waits for them.
+        model.isAway = true
+        model.remindAboutWaiting(now: asked.addingTimeInterval(400))
+        XCTAssertEqual(sounds.played.count, 1)
+        model.isAway = false
+        model.remindAboutWaiting(now: asked.addingTimeInterval(401))
+        XCTAssertEqual(sounds.played.count, 2)
+        XCTAssertEqual(attentionRequests, 2)
+        model.remindAboutWaiting(now: asked.addingTimeInterval(500))
+        XCTAssertEqual(sounds.played.count, 2, "the wait starts again from the reminder")
+        model.remindAboutWaiting(now: asked.addingTimeInterval(710))
+        model.remindAboutWaiting(now: asked.addingTimeInterval(1020))
+        XCTAssertEqual(sounds.played.count, 4)
+        model.remindAboutWaiting(now: asked.addingTimeInterval(9000))
+        XCTAssertEqual(sounds.played.count, 4, "three reminders, then it lets be")
+        XCTAssertEqual(model.pending.count, 1, "a reminder decides nothing")
+
+        // With "open for requests" on, a reminder opens the island again.
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+        model.settings.expandOnAttention = true
+        async let second = bridge(event("PermissionRequest", tool: "Bash"))
+        let again = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(again)
+        model.collapse()
+        XCTAssertFalse(model.isExpanded)
+        model.remindAboutWaiting(now: model.pending[0].receivedAt.addingTimeInterval(301))
+        XCTAssertTrue(model.isExpanded)
+        model.decide(model.pending[0].id, .deny)
+        _ = await second
+    }
+
+    // MARK: Rows
+
+    func testRowsCarryTheBranchTheListAndTheModel() async throws {
+        let repo = scratch.file("repo")
+        try FileManager.default.createDirectory(at: repo.appendingPathComponent(".git"), withIntermediateDirectories: true)
+        try Data("ref: refs/heads/feature/card\n".utf8).write(to: repo.appendingPathComponent(".git/HEAD"))
+        let live = SessionKey(source: "codex", sessionID: "cx")
+        var snapshot = TranscriptSnapshot(key: live, path: "/dev/null", cwd: repo.path, host: .codexDesktop, firstPrompt: "Add a card",
+                                          lastPrompt: "Add a card", lastReply: nil, phase: .working, activity: .thinking, updatedAt: Date())
+        snapshot.progress = TaskProgress(done: 1, total: 4, current: "Draw the card")
+        snapshot.model = "gpt-6-astra"
+        model.mergeTranscripts([snapshot])
+        let session = try XCTUnwrap(model.sessions.first)
+        XCTAssertEqual(session.progress, TaskProgress(done: 1, total: 4, current: "Draw the card"))
+        XCTAssertEqual(session.modelLabel, "gpt-6-astra")
+
+        model.refreshBranches()
+        let found = await eventually { self.model.branches[repo.path] == "feature/card" }
+        XCTAssertTrue(found)
+        // Switched off, the branch is neither read nor kept.
+        model.settings.setChip(.branch, shown: false)
+        model.refreshBranches()
+        XCTAssertTrue(model.branches.isEmpty)
+
+        // A card for a finished turn carries the list as it stood.
+        snapshot.phase = .waiting
+        snapshot.activity = .waiting
+        snapshot.lastReply = "Card drawn."
+        snapshot.progress = TaskProgress(done: 4, total: 4)
+        model.mergeTranscripts([snapshot])
+        XCTAssertEqual(model.completion?.progress, TaskProgress(done: 4, total: 4))
+        XCTAssertEqual(model.completion?.reply, "Card drawn.")
     }
 
     func testRowsShowTheConversationAndItsHost() async throws {
@@ -637,7 +966,8 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         model.mergeTranscripts([snapshot(.working)])
         model.mergeTranscripts([snapshot(.waiting, reply: "Done.")])
         XCTAssertEqual(recorder.played, [.completed])
-        XCTAssertEqual(model.toast?.key, key)
+        XCTAssertEqual(model.completion?.key, key)
+        XCTAssertEqual(model.completion?.reply, "Done.", "read from the transcript, so there is nothing to wait for")
         XCTAssertEqual(model.sessions.first?.replyLine, "Done.")
         // Dismissed: gone until the transcript has something new to say.
         model.dismiss(key)
@@ -719,7 +1049,7 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(settings.language, "system")
         XCTAssertEqual(settings.islandDisplay, "auto")
         XCTAssertTrue(settings.discoverSessions && settings.showMascots && settings.hotkeyEnabled)
-        XCTAssertTrue(NikoSettings.RowChip.allCases.allSatisfy(settings.showsChip))
+        XCTAssertEqual(NikoSettings.RowChip.allCases.filter(settings.showsChip), [.elapsed, .agent, .host, .branch])
 
         model.settings.accent = .violet
         model.settings.islandWidth = .wide
@@ -737,7 +1067,8 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         let look = IslandLook(settings: model.settings)
         XCTAssertEqual(look.textScale, NikoSettings.TextSize.large.scale)
         XCTAssertEqual(look.motion, 0.7)
-        XCTAssertEqual(look.chips, [.elapsed, .agent])
+        XCTAssertEqual(look.chips, [.elapsed, .agent, .branch])
+        XCTAssertEqual(look.replyLines, 1)
         XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "crab")
         XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "whale")
         model.settings.setMascot(nil, for: "claude")

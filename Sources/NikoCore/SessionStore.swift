@@ -37,6 +37,10 @@ public struct Session: Identifiable, Sendable, Equatable {
     public var lastReply: String?
     /// Sub-agents currently working for this session.
     public var subagents = 0
+    /// How far the agent is through its own list of steps, when it keeps one.
+    public var progress: TaskProgress?
+    /// The model the session last ran on, as the agent names it.
+    public var model: String?
 
     public var source: String { key.source }
 
@@ -120,6 +124,8 @@ public struct SessionStore: Sendable {
         case HookEvent.userPromptSubmit:
             session.phase = .working
             session.activity = .thinking
+            // What the agent said before this prompt is no longer its last word.
+            session.lastReply = nil
             if let prompt = event.raw["prompt"]?.stringValue, !prompt.isEmpty {
                 session.lastPrompt = prompt
                 if session.firstPrompt == nil {
@@ -131,6 +137,7 @@ public struct SessionStore: Sendable {
             session.phase = .working
             session.activity = Activity.forTool(event.toolName, input: event.toolInput)
             session.toolCalls += 1
+            if let progress = TaskProgress.from(tool: event.toolName, input: event.toolInput.map { .object($0) }) { session.progress = progress }
         case HookEvent.postToolUse:
             session.phase = .working
             session.activity = .thinking
@@ -154,6 +161,11 @@ public struct SessionStore: Sendable {
         case HookEvent.stop:
             session.phase = .waiting
             session.activity = .waiting
+            // Some agents hand over their closing words with the event (the bridge keeps them short).
+            if let reply = (event.raw["last_assistant_message"] ?? event.raw["lastAssistantMessage"])?.stringValue,
+               !reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                session.lastReply = reply.count > 600 ? String(reply.prefix(600)) : reply
+            }
         case HookEvent.stopFailure:
             session.phase = .waiting
             session.activity = Activity(verb: "hit an error", detail: (event.raw["error"] ?? event.raw["message"])?.stringValue
@@ -233,6 +245,8 @@ public struct SessionStore: Sendable {
                 session.customTitle = snapshot.title
                 session.lastReply = snapshot.lastReply
                 session.subagents = subagents
+                session.progress = snapshot.progress
+                session.model = snapshot.model
                 sessions[key] = session
                 changes.append(.updated(key))
                 continue
@@ -241,9 +255,16 @@ public struct SessionStore: Sendable {
             let before = session
             session.host = session.host ?? snapshot.host
             session.customTitle = snapshot.title ?? session.customTitle
-            session.lastReply = snapshot.lastReply ?? session.lastReply
+            if session.origin == .hooks, session.phase == .waiting, snapshot.phase == .working {
+                // The transcript is a step behind the hooks: what it holds is not the closing reply yet.
+            } else {
+                // A transcript that is mid-turn and has heard nothing yet says so: the earlier reply is not this turn's.
+                session.lastReply = snapshot.lastReply ?? (snapshot.phase == .working ? nil : session.lastReply)
+            }
             session.transcriptPath = session.transcriptPath ?? snapshot.path
             session.subagents = subagents
+            session.progress = snapshot.progress ?? session.progress
+            session.model = snapshot.model ?? session.model
             if session.firstPrompt == nil, let prompt = snapshot.firstPrompt {
                 session.firstPrompt = prompt
                 session.title = AutoNamer.title(cwd: session.cwd ?? snapshot.cwd, prompt: prompt, source: key.source)

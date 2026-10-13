@@ -53,30 +53,47 @@ to what turned up when somebody did.
 | The welcome, laid out at the display's size, with a new entrance | Built; captured at the display's own resolution and recorded on one large display. Sharp there. Not every effect was watched (the confetti, creatures crossing) |
 | Lighter, smaller type; text size; faster closing; motion speed | Built; looked at in the running app |
 
+## Released: 0.5.0
+
+| Area | State |
+|---|---|
+| A card when an agent finishes, with its last reply | Built and covered by tests of when it shows and when it does not. Driven through the real bridge on a real desktop and captured from the island's own window. No live agent was watched finishing a turn into it |
+| Task progress on a row | Built and covered by tests. ZCode's todo table was checked against its real schema; Claude Code's and Codex's lists follow documented shapes and have not been seen from a live session |
+| Git branch on a row, a chip for the model, one to three lines of the last reply | Built and covered by tests; branches of real repositories and worktrees were seen on the running island |
+| Allow and deny from the keyboard (off by default) | Built and covered by tests; a request was allowed with ⌃⌥A and another denied with ⌃⌥D in the running app, through the real bridge |
+| A reminder for a request left waiting; quiet while the screen is locked or asleep | Built and covered by tests with a stand-in clock. Not watched across a real lock or a real five minutes |
+| A Codex desktop session opens on its own conversation | Built; the link has the form the Codex app itself uses. The click was not watched in Codex's window |
+| Asking OpenAI for Codex limits and saved resets (opt-in) | Built, covered by tests, and answered live on the one machine tried |
+| Asking Anthropic: per-model weekly windows, extra usage, a sign-in past its date offered once | Built and covered by tests with a stand-in for the network. Still no live answer read: the one sign-in tried was turned down |
+
 ## Next
 
-1. **A live answer for the two provider lookups.** Anthropic's with a current
-   Claude Code sign-in, BigModel / Z.ai's with a real key. Until then both are
-   written against documented formats only.
+1. **A live answer for the two remaining provider lookups.** Anthropic's with
+   a current Claude Code sign-in, BigModel / Z.ai's with a real key. Until
+   then both are written against documented formats only.
 2. **Claude limits for people who only use the desktop app.** Today that needs
    a sign-in Claude Code has renewed in a terminal. Renewing it ourselves
    would mean acting as Claude Code and rewriting its Keychain entry, which
    can sign it out; that is a decision for the owner of the Mac, not a
-   default.
-3. **Drive the beta adapters against their live agents**, Codex and ZCode
+   default. (The open-source tools that read this sign-in do not renew it
+   either.)
+3. **Watch a live agent through the new parts**: a turn finishing into a card
+   with its own words, a real task list filling its bar, a real approval
+   given from the keyboard.
+4. **Drive the beta adapters against their live agents**, Codex and ZCode
    first (they can approve), and move the ones that hold up to stable.
    `TESTPLAN.md` section 10.
-4. **Try the island on a MacBook's own display** and with two displays. The
+5. **Try the island on a MacBook's own display** and with two displays. The
    camera-housing layout has only been rendered, never seen on hardware.
-5. **Click a real approval through** from the island with a live Claude Code
-   session, and work through the rest of `TESTPLAN.md`.
 6. **Listen to the built-in sounds** and tune them by ear.
-7. **A finished-turn card**: the last reply and a way to answer, right on the
-   island, instead of only a notice. Task progress from the agent's own to-do
-   list, and the git branch on a row, belong with it.
-8. **Keyboard shortcuts for Allow and Deny**, off by default.
-9. **Notarized builds** if the project gets a signing identity. Until then
-   releases stay ad-hoc signed.
+7. **Group sessions** by project or by agent once there are many, and a
+   shortcut that jumps to the session that needs you.
+8. **Quiet hours** for sounds, beyond "quiet while the screen is locked".
+9. **Answer from the card**: type a follow-up to a finished turn without
+   leaving what you are doing. It needs a way into each agent's input that
+   does not exist for most of them yet.
+10. **Notarized builds** if the project gets a signing identity. Until then
+    releases stay ad-hoc signed.
 
 ## Planned, not started
 
@@ -85,8 +102,9 @@ to what turned up when somebody did.
   does not write yet.
 - Themes beyond the accent colour.
 - Sounds that respect Focus modes.
-- Usage numbers from vendors' own APIs, with the user's own credentials, sent
-  directly to the vendor and only when switched on.
+- Plan limits for more providers (Gemini, Kimi, MiniMax and others), asked
+  the same way as the three there are: opt-in, the user's own sign-in or key,
+  one host each.
 - Push to a phone through a user-configured relay (off by default).
 - Monitoring agents on remote machines over SSH.
 - Opening a new terminal window to re-attach a detached tmux session.

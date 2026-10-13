@@ -13,6 +13,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private let onboarding = OnboardingWindowController()
     private var subscriptions: Set<AnyCancellable> = []
     public let model: AppModel
+    private var observers: [NSObjectProtocol] = []
 
     public override init() {
         self.model = AppModel(paths: NikoPaths.resolve())
@@ -55,6 +56,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = StatusItemController(model: model)
 
         Hotkey.shared.action = { [weak self] in self?.model.toggleExpanded() }
+        Hotkey.shared.actions[.allow] = { [weak self] in self?.model.decideByKey(.allow) }
+        Hotkey.shared.actions[.deny] = { [weak self] in self?.model.decideByKey(.deny) }
         model.$settings
             .receive(on: DispatchQueue.main)
             .sink { settings in
@@ -62,6 +65,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
                 Hotkey.shared.setEnabled(settings.hotkeyEnabled)
             }
             .store(in: &subscriptions)
+        // ⌃⌥A and ⌃⌥D belong to us only while a request is waiting; otherwise other apps keep them.
+        model.$pending.map { !$0.isEmpty }
+            .combineLatest(model.$settings.map(\.decisionHotkeys))
+            .receive(on: DispatchQueue.main)
+            .sink { waiting, enabled in
+                Hotkey.shared.set(.allow, enabled: waiting && enabled)
+                Hotkey.shared.set(.deny, enabled: waiting && enabled)
+            }
+            .store(in: &subscriptions)
+        model.isFrontmost = { TerminalJumper.isFrontmost($0) }
+        watchScreen()
         model.$wantsOnboarding
             .receive(on: DispatchQueue.main)
             .sink { [weak self] wanted in
@@ -88,6 +102,39 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         if !model.settings.onboardingDone, !UserDefaults.standard.bool(forKey: "NikoOnboardingDisabled") {
             model.wantsOnboarding = true
         }
+    }
+
+    private var screenLocked = false
+    private var screenAsleep = false
+
+    /// Nobody is at a locked or sleeping screen: sounds and cards wait until
+    /// somebody is. A display that wakes to the lock screen is still nobody.
+    private func noteScreen(locked: Bool? = nil, asleep: Bool? = nil) {
+        if let locked { screenLocked = locked }
+        if let asleep { screenAsleep = asleep }
+        let away = screenLocked || screenAsleep
+        if model.isAway != away { model.isAway = away }
+    }
+
+    private func watchScreen() {
+        let distributed = DistributedNotificationCenter.default()
+        let workspace = NSWorkspace.shared.notificationCenter
+        observers.append(distributed.addObserver(forName: Notification.Name("com.apple.screenIsLocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.noteScreen(locked: true) }
+        })
+        observers.append(distributed.addObserver(forName: Notification.Name("com.apple.screenIsUnlocked"), object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.noteScreen(locked: false) }
+        })
+        observers.append(workspace.addObserver(forName: NSWorkspace.screensDidSleepNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.noteScreen(asleep: true) }
+        })
+        observers.append(workspace.addObserver(forName: NSWorkspace.screensDidWakeNotification, object: nil, queue: .main) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.noteScreen(asleep: false) }
+        })
     }
 
     public func applicationWillTerminate(_ notification: Notification) {

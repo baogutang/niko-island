@@ -34,7 +34,8 @@ struct IslandBody: View {
     @Environment(\.isStaticPreview) private var isStaticPreview
 
     var body: some View {
-        let shape = IslandShape(ear: model.isExpanded ? 10 : 6, radius: model.isExpanded ? 30 : 13)
+        let card = model.isExpanded ? nil : model.completion
+        let shape = IslandShape(ear: model.isExpanded ? 10 : (card == nil ? 6 : 8), radius: model.isExpanded ? 30 : (card == nil ? 13 : 24))
         // Opening has a little bounce; closing is quicker and settles without one,
         // so the island is out of the way the moment it is not wanted.
         let spring = model.isExpanded ? Animation.spring(response: 0.34 * look.motion, dampingFraction: 0.84)
@@ -43,6 +44,9 @@ struct IslandBody: View {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
                     .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.08)))
+            } else if let card {
+                CompletionCard(model: model, completion: card, metrics: metrics)
+                    .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.06)))
             } else {
                 CollapsedIsland(model: model, metrics: metrics)
                     .transition(.opacity.animation(.easeOut(duration: 0.1)))
@@ -52,12 +56,13 @@ struct IslandBody: View {
         .background(shape.fill(Theme.island))
         .clipShape(shape)
         .contentShape(shape)
-        .shadow(color: .black.opacity(model.isExpanded ? 0.55 : 0), radius: 24, y: 14)
+        .shadow(color: .black.opacity(model.isExpanded ? 0.55 : (card == nil ? 0 : 0.45)), radius: 24, y: 14)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: IslandFrameKey.self, value: proxy.frame(in: .named("island-canvas")))
         })
         .animation(isStaticPreview ? nil : spring, value: model.isExpanded)
         .animation(isStaticPreview ? nil : spring, value: model.toast)
+        .animation(isStaticPreview ? nil : Animation.spring(response: 0.36 * look.motion, dampingFraction: 0.86), value: model.completion)
         .animation(isStaticPreview ? nil : spring, value: model.badge)
     }
 }

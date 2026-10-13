@@ -1,6 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "%@ did not accept the sign-in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 没有接受这个登录凭据。"
+          }
+        }
+      }
+    },
     "%@ has a question": {
       "localizations": {
         "zh-Hans": {
@@ -171,12 +181,32 @@
         }
       }
     },
+    "%lld of %lld steps done": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已完成 %lld / %lld 步"
+          }
+        }
+      }
+    },
     "%lld resets left": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "还可重置 %lld 次"
+          }
+        }
+      }
+    },
+    "%lld resets saved": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "存有 %lld 次重置"
           }
         }
       }
@@ -351,6 +381,26 @@
         }
       }
     },
+    "A card comes down with what the agent said last, and a click on it goes to the session. A notice only names the session. Neither opens the island or takes focus.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片会带着代理最后说的话落下来，点一下就回到那个会话；提示只显示会话名称。两者都不会展开灵动岛，也不会抢走焦点。"
+          }
+        }
+      }
+    },
+    "A card stays twice as long, and for as long as the pointer is on it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片停留的时间是它的两倍；指针停在卡片上时不会消失。"
+          }
+        }
+      }
+    },
     "A key is saved in your Keychain.": {
       "localizations": {
         "zh-Hans": {
@@ -431,6 +481,16 @@
         }
       }
     },
+    "After %lld min": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分钟后"
+          }
+        }
+      }
+    },
     "Agents": {
       "localizations": {
         "zh-Hans": {
@@ -507,6 +567,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "本次会话后续都允许这个工具"
+          }
+        }
+      }
+    },
+    "Allow with %@, deny with %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 %@ 允许，用 %@ 拒绝"
           }
         }
       }
@@ -621,16 +691,6 @@
         }
       }
     },
-    "Anthropic did not accept the sign-in.": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Anthropic 没有接受这个登录凭据。"
-          }
-        }
-      }
-    },
     "App": {
       "localizations": {
         "zh-Hans": {
@@ -657,6 +717,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "向智谱 BigModel / Z.ai 查询我的 GLM Coding Plan 额度"
+          }
+        }
+      }
+    },
+    "Ask OpenAI for my Codex limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 OpenAI 查询我的 Codex 额度"
           }
         }
       }
@@ -791,6 +861,16 @@
         }
       }
     },
+    "Card": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "卡片"
+          }
+        }
+      }
+    },
     "Check now": {
       "localizations": {
         "zh-Hans": {
@@ -851,12 +931,52 @@
         }
       }
     },
+    "Click to go to the session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击回到会话"
+          }
+        }
+      }
+    },
+    "Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 还没有在这台 Mac 上用 ChatGPT 套餐登录，所以没有可用来查询的凭据。"
+          }
+        }
+      }
+    },
     "Codex runs a new hook only after you trust it: type /hooks in Codex and trust the niko-bridge entries.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Codex 只有在你信任之后才会运行新的钩子：在 Codex 里输入 /hooks，信任带 niko-bridge 的条目。"
+          }
+        }
+      }
+    },
+    "Codex's own files already say most of it. This adds a current answer while Codex is idle, and the resets your account has saved. Reads the ChatGPT sign-in Codex keeps on this Mac and sends it to chatgpt.com, nowhere else. Asked every five minutes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 自己的文件已经记了大部分。打开后，Codex 空闲时也能拿到最新数字，还能看到账号里存着的重置次数。读取 Codex 存在这台 Mac 上的 ChatGPT 登录凭据，只发送到 chatgpt.com，不发往别处。每五分钟查询一次。"
+          }
+        }
+      }
+    },
+    "Codex's sign-in on this Mac has run out. It renews itself the next time Codex runs.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Codex 在这台 Mac 上的登录已过期。下次运行 Codex 时它会自己续期。"
           }
         }
       }
@@ -1121,6 +1241,16 @@
         }
       }
     },
+    "Extra usage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "额外用量"
+          }
+        }
+      }
+    },
     "Files and sound packs": {
       "localizations": {
         "zh-Hans": {
@@ -1311,12 +1441,12 @@
         }
       }
     },
-    "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. Both are off until you turn them on.": {
+    "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "套餐用了多少，只有厂商知道，这台 Mac 上并没有记录（Codex 例外：它会把额度写进自己的会话文件）。下面每个开关只向一家厂商查询，用的是你自己的登录凭据，只保留百分比和恢复时间。两个开关默认都是关闭的。"
+            "value": "套餐用了多少，只有厂商知道，这台 Mac 上并没有记录（Codex 例外：它会把额度写进自己的会话文件）。下面每个开关只向一家厂商查询，用的是你自己的登录凭据，只保留百分比和恢复时间。所有开关默认都是关闭的。"
           }
         }
       }
@@ -1461,6 +1591,16 @@
         }
       }
     },
+    "Lines of the agent's last reply": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理最后回复显示几行"
+          }
+        }
+      }
+    },
     "Long": {
       "localizations": {
         "zh-Hans": {
@@ -1581,6 +1721,16 @@
         }
       }
     },
+    "Next to the project's name.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示在项目名称旁边。"
+          }
+        }
+      }
+    },
     "Niko Island Settings": {
       "localizations": {
         "zh-Hans": {
@@ -1671,6 +1821,16 @@
         }
       }
     },
+    "No sounds and no cards while nobody is there to notice. Requests still wait for you.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没人在看的时候不播放声音，也不弹卡片。请求会一直等你回来。"
+          }
+        }
+      }
+    },
     "No supported agent was found in your home directory.": {
       "localizations": {
         "zh-Hans": {
@@ -1701,12 +1861,32 @@
         }
       }
     },
+    "None": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不显示"
+          }
+        }
+      }
+    },
     "Not now": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "暂不接入"
+          }
+        }
+      }
+    },
+    "Nothing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不提示"
           }
         }
       }
@@ -1727,6 +1907,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "还没有接入任何代理。在你确认之前，接入不会改动任何东西。"
+          }
+        }
+      }
+    },
+    "Notice": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "简短提示"
           }
         }
       }
@@ -1787,6 +1977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "一只小生物加几个字。它停在菜单栏上，应用进入全屏时随菜单栏一起离开。"
+          }
+        }
+      }
+    },
+    "Only for a request the island is showing: with the island closed, the first press opens it. The keys are left to other apps while nothing is waiting. Questions are never answered this way.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只对灵动岛正在显示的请求生效：灵动岛收起时，第一次按键只会把它展开。没有请求在等待时，这两个快捷键留给其他应用使用。提问永远不会用这种方式回答。"
           }
         }
       }
@@ -2051,6 +2251,16 @@
         }
       }
     },
+    "Remind me about a request left waiting": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求一直没处理时提醒我"
+          }
+        }
+      }
+    },
     "Remove": {
       "localizations": {
         "zh-Hans": {
@@ -2221,16 +2431,6 @@
         }
       }
     },
-    "Show a short notice when an agent finishes": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "代理完成时显示一条简短提示"
-          }
-        }
-      }
-    },
     "Show how long": {
       "localizations": {
         "zh-Hans": {
@@ -2247,6 +2447,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "再看一遍"
+          }
+        }
+      }
+    },
+    "Show the git branch": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示 Git 分支"
+          }
+        }
+      }
+    },
+    "Show the model": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示模型"
           }
         }
       }
@@ -2277,6 +2497,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示所在的终端或应用"
+          }
+        }
+      }
+    },
+    "Shown on a row once the agent has stopped.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理停下后显示在会话行里。"
           }
         }
       }
@@ -2361,6 +2591,16 @@
         }
       }
     },
+    "Stay quiet while the screen is locked or asleep": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "屏幕锁定或休眠时保持安静"
+          }
+        }
+      }
+    },
     "Stop": {
       "localizations": {
         "zh-Hans": {
@@ -2401,12 +2641,12 @@
         }
       }
     },
-    "The collapsed island names the session for a few seconds.": {
+    "The cue plays again, up to three times. Not while the screen is locked.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "收起状态的岛屿会显示该会话的名字几秒钟。"
+            "value": "提示音会再响一次，最多三次。屏幕锁定时不提醒。"
           }
         }
       }
@@ -2661,22 +2901,12 @@
         }
       }
     },
-    "Weekly, Opus": {
+    "Weekly, %@": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "每周（Opus）"
-          }
-        }
-      }
-    },
-    "Weekly, Sonnet": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "每周（Sonnet）"
+            "value": "每周（%@）"
           }
         }
       }
@@ -2697,6 +2927,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "列出什么、保留多久"
+          }
+        }
+      }
+    },
+    "When an agent finishes": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理完成时"
           }
         }
       }
@@ -2981,12 +3221,12 @@
         }
       }
     },
-    "macOS was told not to share Claude Code's sign-in.": {
+    "macOS was told not to share %@'s sign-in.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "你在 macOS 的询问里选择了不共享 Claude Code 的登录凭据。"
+            "value": "你在 macOS 的询问里选择了不共享 %@ 的登录凭据。"
           }
         }
       }

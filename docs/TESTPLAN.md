@@ -7,7 +7,7 @@ screen and ears: the island window, full-screen apps, sounds, notifications,
 and real agents. Nothing here touches your real agent configuration until
 section 10.
 
-Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 or 0.4.0, on one
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0, 0.4.0 or 0.5.0, on one
 setup: macOS 15 with an external display that has no camera housing. A ☑ says nothing about
 a MacBook's own display or two displays at once. Items marked **(not
 automated)** have no test at all behind them.
@@ -210,9 +210,48 @@ echo '{"hook_event_name":"Stop","session_id":"t1","cwd":"'$PWD'"}' | "$B" --sour
 echo '{"hook_event_name":"StopFailure","session_id":"t1","cwd":"'$PWD'","error":"rate limited"}' | "$B" --source claude
 ```
 
-- ☐ After `Stop`, the collapsed tab names the session as finished for a few
-  seconds, then returns to its usual text.
-- ☐ After `StopFailure`, the row reads "hit an error" with the message.
+- ☐ After `Stop` (no closing words came with it, and there is no transcript),
+  the collapsed tab names the session as finished for a few seconds, then
+  returns to its usual text.
+- ☐ After `StopFailure`, the row reads "hit an error" with the message, and a
+  card in the error's colour comes down with it.
+
+The card, the list of steps, the keys:
+
+```bash
+S='"session_id":"t2","cwd":"'$PWD'"'
+echo '{"hook_event_name":"UserPromptSubmit",'$S',"prompt":"fix the flaky test"}' | "$B" --source claude
+echo '{"hook_event_name":"PreToolUse",'$S',"tool_name":"TodoWrite","tool_input":{"todos":[{"content":"Find the race","activeForm":"Finding the race","status":"completed"},{"content":"Add a backoff","activeForm":"Adding a backoff","status":"in_progress"},{"content":"Run the tests","activeForm":"Running the tests","status":"pending"}]}}' | "$B" --source claude
+echo '{"hook_event_name":"Stop",'$S',"last_assistant_message":"Fixed. The retry now waits, with a **250 ms backoff**.\n\nAll tests pass."}' | "$B" --source claude
+```
+
+- ☑ After the second line, the open island shows the row with a thin bar,
+  "1/3" and "Adding a backoff"; next to the project's name is the branch of
+  the folder you ran this in.
+- ☑ After the third line, with the island closed, a card comes down: "Finished",
+  the project and the prompt, the reply with "250 ms backoff" in bold, the
+  bar, and "Click to go to the session". Nothing else on screen loses focus.
+- ☐ Rest the pointer on the card: it stays. Move away: it leaves after about
+  ten seconds. The ✕ puts it away at once; so does opening the island.
+- ☐ Click the card: the session's terminal comes forward.
+- ☐ Send the first line again while a card is showing: the card goes.
+- ☐ Settings → Island → *When an agent finishes* → Notice: the same three
+  lines end in the one-line notice instead. → Nothing: in nothing.
+- ☐ With the session's own terminal tab in front, the third line shows the
+  notice, not the card. **(not automated beyond the rule)**
+- ☐ Lock the screen, send the three lines, unlock: no sound was played and no
+  card is waiting. **(a real lock was not tried; the rule is tested)**
+- ☑ Settings → General → *Allow with ⌃⌥A, deny with ⌃⌥D*, then send the
+  `PermissionRequest` from above: the buttons show the keys next to their
+  names; ⌃⌥A prints `"behavior":"allow"`, and for a second request ⌃⌥D prints
+  `"behavior":"deny"`.
+- ☐ With "Open by itself when an agent needs a decision" off, the first ⌃⌥A
+  only opens the island; the second allows.
+- ☐ With the `AskUserQuestion` request from above, neither key does anything.
+- ☐ With nothing waiting, ⌃⌥A and ⌃⌥D reach the app in front as usual.
+- ☐ Settings → General → *Remind me about a request left waiting* → After
+  2 min, sounds on: leave a request alone; its cue plays again after two
+  minutes, at most three times. **(a real wait was not sat through)**
 
 ## 6. Usage and limits
 
@@ -235,7 +274,7 @@ Click the bars icon in the island's header.
   window full, with the time it opens again. It disappears at that time.
 - ☐ Compare today's total for Claude Code with `niko-island usage`.
 
-Asking the provider (Settings → Usage → "Limits the provider keeps"). Both
+Asking the provider (Settings → Usage → "Limits the provider keeps"). All three
 switches are off on a fresh install; **check that first**, and that nothing is
 asked while they are off (no `provider-limits.json` appears in
 `~/.niko-island/cache/`).
@@ -246,16 +285,28 @@ asked while they are off (no `provider-limits.json` appears in
   Code-credentials"; "Deny" turns into a line saying so, and is not asked
   again until you press "Check now". **(the answer path has only been
   exercised with the format Claude Code caches, never with a live answer)**
-- ☑ The same switch with a sign-in that has run out (desktop app only): the
-  note says the sign-in has run out; nothing is sent. *(checked with the
-  hidden `niko-island internal limits claude`, which prints states and
-  percentages only)*
+- ☑ The same switch with a sign-in that has run out (desktop app only): it is
+  offered to Anthropic once, turned down, and the note says the sign-in has
+  run out; the same sign-in is not sent again. *(checked with the hidden
+  `niko-island internal limits claude`, which prints states and percentages
+  only)*
+- ☐ With a plan that has a weekly window per model: rows "Weekly, Opus" and
+  the like appear under the two main bars; "Extra usage" only if the account
+  has it switched on. **(written against the answer format open-source tools
+  document; not seen live)**
+- ☑ **Ask OpenAI**, with Codex signed in to a ChatGPT plan: the Codex tab says
+  "asked just now", shows the plan and its windows, and a chip "N resets
+  saved" when the account has any. *(answered live on one machine: a weekly
+  window, the plan, no saved resets)* ☐ With an account that has saved
+  resets, the chip shows their number.
+- ☐ Sign Codex out (or use an API key): the note says there is no ChatGPT
+  plan signed in on this Mac, and nothing is sent.
 - ☐ **Ask BigModel / Z.ai**: paste a key of your Coding Plan, Save. The key
   field turns into "A key is saved in your Keychain"; the ZCode tab shows the
   plan's 5-hour and weekly percentages. "Remove" deletes the key and switches
   the lookup off. A wrong key says "The key was not accepted."
   **(never run against the live service)**
-- ☐ With either switch on, quit and reopen: the last answer is shown at once,
+- ☐ With any of the switches on, quit and reopen: the last answer is shown at once,
   then replaced.
 - ☐ `~/.niko-island/cache/provider-limits.json` holds percentages and times;
   search it for your key or sign-in: nothing.

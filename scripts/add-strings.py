@@ -5,8 +5,9 @@
     { "English key": "中文", "Another %@ key": "另一个 %@" }
     JSON
 
-Keys are the English strings passed to L() in the code. `--prune FILE...`
-additionally drops keys that no longer appear in the given Swift sources.
+Keys are the English strings passed to L() in the code. `--prune` additionally
+drops keys that no longer appear as a string literal anywhere in Sources (not
+only inside L(): verbs and follow-up notes are translated where they are shown).
 """
 import json
 import pathlib
@@ -27,9 +28,9 @@ def main() -> int:
         used = set()
         for path in (ROOT / "Sources").rglob("*.swift"):
             text = path.read_text(encoding="utf-8")
-            used.update(m.group(1).encode().decode("unicode_escape").encode("latin-1").decode("utf-8")
-                        if "\\" in m.group(1) else m.group(1)
-                        for m in re.finditer(r'L\("((?:[^"\\]|\\.)*)"', text))
+            # Swift escapes that occur in these strings; anything else is left as written.
+            used.update(m.group(1).replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\")
+                        for m in re.finditer(r'"((?:[^"\\]|\\.)*)"', text))
         stale = sorted(k for k in strings if k not in used)
         for key in stale:
             del strings[key]

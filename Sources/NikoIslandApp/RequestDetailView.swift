@@ -86,6 +86,19 @@ struct PermissionForm: View {
         }
     }
 
+    /// A button's name, with its shortcut next to it while the shortcuts are switched on.
+    @ViewBuilder
+    private func keyed(_ title: String, _ key: Hotkey.Key) -> some View {
+        if model.settings.decisionHotkeys {
+            HStack(spacing: 6) {
+                Text(title)
+                Text(key.display).font(look.mono(10, .medium)).opacity(0.55)
+            }
+        } else {
+            Text(title)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
@@ -106,7 +119,7 @@ struct PermissionForm: View {
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
             }
             HStack(spacing: 8) {
-                Button(L("Allow once")) { model.decide(request.id, .allowOnce) }
+                Button { model.decide(request.id, .allowOnce) } label: { keyed(L("Allow once"), .allow) }
                     .buttonStyle(PillButtonStyle(kind: .primary, large: true))
                 if let tool = request.event.toolName {
                     Button(L("Always allow %@", tool)) { model.decide(request.id, .allowAlwaysTool) }
@@ -117,7 +130,7 @@ struct PermissionForm: View {
                     .buttonStyle(PillButtonStyle(large: true))
                     .help(L("Allow every request for the rest of this session"))
                 Spacer(minLength: 0)
-                Button(L("Deny")) { model.decide(request.id, .deny) }
+                Button { model.decide(request.id, .deny) } label: { keyed(L("Deny"), .deny) }
                     .buttonStyle(PillButtonStyle(kind: .destructive, large: true))
             }
             Button { model.decide(request.id, .passToTerminal) } label: {

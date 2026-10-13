@@ -67,6 +67,8 @@ final class IslandWindowController: NSObject {
         overlayPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
 
         installContent()
+        // A finished-turn card is only worth showing where the island can be seen.
+        model.islandIsVisible = { [weak self] in self?.placement.surface != .hidden }
         place()
         installMonitors()
         let center = NotificationCenter.default
@@ -354,7 +356,8 @@ final class IslandWindowController: NSObject {
         overlayPanel.ignoresMouseEvents = !(inside && activePanel === overlayPanel)
         if inside {
             closeTimer?.cancel()
-            guard !model.isExpanded, model.settings.expandOnHover else { return }
+            // A finished-turn card is being read: resting on it keeps it, and does not open the list over it.
+            guard !model.isExpanded, model.settings.expandOnHover, model.completion == nil else { return }
             schedule(&openTimer, after: Double(model.settings.hoverOpenDelayMS) / 1000) { [weak self] in
                 guard let self, self.pointerInside else { return }
                 self.model.expand(.hover)

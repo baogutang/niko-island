@@ -37,6 +37,18 @@ public final class AppModel: ObservableObject {
         case attention
     }
 
+    /// A finished turn, shown as a card under the closed island: what was
+    /// asked, what the agent said last, and a way back to the session.
+    public struct Completion: Equatable, Sendable {
+        public var key: SessionKey
+        public var source: String
+        public var project: String
+        public var title: String
+        public var reply: String?
+        public var failed = false
+        public var progress: TaskProgress?
+    }
+
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
         public enum Kind: Sendable { case completed, failed }
@@ -79,6 +91,16 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var expandReason: ExpandReason = .click
     @Published public var route: Route = .sessions
     @Published public private(set) var toast: Toast?
+    /// The card for a turn that has just finished; nil most of the time.
+    @Published public private(set) var completion: Completion?
+    /// The screen is locked or asleep: nobody is there to hear or see anything.
+    @Published public internal(set) var isAway = false
+    /// Branch per working directory, for the rows that are listed.
+    @Published public internal(set) var branches: [String: String] = [:]
+    /// Says whether the island can be seen right now (it is away over a full-screen app). Set by the window.
+    var islandIsVisible: () -> Bool = { true }
+    private var completionTask: Task<Void, Never>?
+    private var completionHeld = false
     /// The pending request whose details are open (the oldest one unless the user picked another).
     @Published public var focusedRequestID: UInt64?
     @Published public var settings: NikoSettings {
@@ -91,7 +113,9 @@ public final class AppModel: ObservableObject {
             if settings.sessionRetentionMinutes != oldValue.sessionRetentionMinutes { scout?.setWindow(settings.sessionRetention) }
             if settings.discoverSessions != oldValue.discoverSessions { reconcileScout() }
             if settings.claudeLimitsLookup != oldValue.claudeLimitsLookup || settings.glmLimitsLookup != oldValue.glmLimitsLookup
-                || settings.glmRegion != oldValue.glmRegion { reconcileProviderLimits() }
+                || settings.glmRegion != oldValue.glmRegion || settings.codexLimitsLookup != oldValue.codexLimitsLookup {
+                reconcileProviderLimits()
+            }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot() {
@@ -221,7 +245,54 @@ public final class AppModel: ObservableObject {
         presenceTimer = timer
     }
 
+    private var branchFolders: Set<String> = []
+
+    /// Which branch each listed session's directory is on. Read off the main thread: it is a handful of small files.
+    func refreshBranches() {
+        guard settings.showsChip(.branch) else {
+            if !branches.isEmpty { branches = [:] }
+            return
+        }
+        let directories = Array(Set(sessions.compactMap(\.cwd))).prefix(32)
+        guard !directories.isEmpty else { return }
+        let apply: @MainActor @Sendable ([String: String]) -> Void = { [weak self] found in
+            guard let self, self.branches != found else { return }
+            self.branches = found
+        }
+        DispatchQueue.global(qos: .utility).async {
+            var found: [String: String] = [:]
+            for directory in directories { found[directory] = GitInfo.branch(cwd: directory) }
+            let result = found
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { apply(result) }
+            }
+        }
+    }
+
+    // MARK: Deciding from the keyboard
+
+    public enum KeyDecision { case allow, deny }
+
+    /// ⌃⌥A / ⌃⌥D. A decision is only taken for a request that is on screen:
+    /// if the island is closed, the first press opens it on the request and
+    /// decides nothing. Questions are never answered this way.
+    @discardableResult
+    public func decideByKey(_ decision: KeyDecision) -> Bool {
+        guard settings.decisionHotkeys, let request = focusedRequest else { return false }
+        guard isExpanded, route == .sessions else {
+            route = .sessions
+            focusedRequestID = request.id
+            expand(.attention)
+            return false
+        }
+        guard !request.isQuestion else { return false }
+        decide(request.id, decision == .allow ? .allowOnce : .deny)
+        return true
+    }
+
     func refreshPresence() {
+        refreshBranches()
+        remindAboutWaiting()
         let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         Task.detached(priority: .utility) {
             let running = AgentPresence.running(apps: apps, processes: AgentPresence.runningProcessNames())
@@ -229,6 +300,33 @@ public final class AppModel: ObservableObject {
                 if self.runningAgents != running { self.runningAgents = running }
             }
         }
+    }
+
+    // MARK: Requests left waiting
+
+    /// How often one request is brought up again before the app lets it be.
+    nonisolated static let reminderLimit = 3
+    private var reminders: [UInt64: (count: Int, last: Date)] = [:]
+
+    /// An agent that is blocked on you is the one thing worth saying twice.
+    /// After the wait the user chose, the cue plays again (and the island opens
+    /// again, if it opens for requests); a few times, then it lets be.
+    func remindAboutWaiting(now: Date = Date()) {
+        reminders = reminders.filter { id, _ in pending.contains { $0.id == id } }
+        let minutes = settings.reminderMinutes
+        // Nobody at the screen: the wait is counted from when they are back.
+        guard minutes > 0, !pending.isEmpty, !(isAway && settings.quietWhenAway) else { return }
+        var due = false
+        for request in pending {
+            let state = reminders[request.id] ?? (count: 0, last: request.receivedAt)
+            guard state.count < Self.reminderLimit, now.timeIntervalSince(state.last) >= Double(minutes) * 60 else { continue }
+            reminders[request.id] = (state.count + 1, now)
+            due = true
+        }
+        guard due else { return }
+        play(.attention, now: now)
+        if !isExpanded, settings.expandOnAttention { expand(.attention) }
+        onAttentionNeeded?()
     }
 
     // MARK: Sessions found on disk
@@ -277,7 +375,7 @@ public final class AppModel: ObservableObject {
             usageEngine?.noteLimitReached(agent: snapshot.key.source, window: window, at: snapshot.updatedAt)
         }
         guard !changes.isEmpty else { return }
-        for change in changes { react(to: change) }
+        for change in changes { react(to: change, replyIsIn: true) }
         publish()
     }
 
@@ -392,10 +490,13 @@ public final class AppModel: ObservableObject {
             }
         }
 
-        react(to: change)
+        // Some agents hand over their closing words with the event itself.
+        let carried = (event.raw["last_assistant_message"] ?? event.raw["lastAssistantMessage"])?.stringValue
+        react(to: change, replyIsIn: carried.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false)
     }
 
-    private func react(to change: SessionStore.Change) {
+    /// `replyIsIn`: the agent's closing words are already on the session (they came with the event, or from its transcript).
+    private func react(to change: SessionStore.Change, replyIsIn: Bool = false) {
         switch change {
         case .ended(let key):
             grants.revoke(key)
@@ -403,16 +504,19 @@ public final class AppModel: ObservableObject {
         case .becameIdle(let key):
             if let session = store[key] {
                 announce(.idle, session: session, body: "")
-                show(Toast(key: key, title: session.title, kind: .completed))
+                presentWhenSettled(key, failed: false, replyIsIn: replyIsIn)
             }
             play(.completed)
         case .failed(let key):
             if let session = store[key] {
                 announce(.idle, session: session, body: session.activity.detail ?? L("Stopped with an error"))
-                show(Toast(key: key, title: session.title, kind: .failed))
+                presentWhenSettled(key, failed: true, replyIsIn: replyIsIn)
             }
             play(.error)
         case .started(let key):
+            // The session is at work again: what it said last time is no longer the news.
+            if completion?.key == key { dismissCompletion() }
+            if toast?.key == key { toast = nil }
             notifier?.clear(session: key)
             play(.started)
         case .attention(let key):
@@ -437,7 +541,7 @@ public final class AppModel: ObservableObject {
     /// Plays a cue if the user has it switched on. The same cue is not repeated
     /// within a second and a half, so a burst of events is one sound, not ten.
     func play(_ event: SoundEvent, now: Date = Date()) {
-        guard settings.shouldPlay(event) else { return }
+        guard settings.shouldPlay(event), !(isAway && settings.quietWhenAway) else { return }
         if let last = lastPlayed[event], now.timeIntervalSince(last) < 1.5 { return }
         lastPlayed[event] = now
         soundPlayer?.play(event)
@@ -459,6 +563,7 @@ public final class AppModel: ObservableObject {
         expandReason = reason
         isExpanded = true
         toast = nil
+        dismissCompletion()
     }
 
     /// Held open for a screenshot (`-NikoOpenIsland`): nothing closes it.
@@ -479,8 +584,89 @@ public final class AppModel: ObservableObject {
         pending.first { $0.id == focusedRequestID } ?? pending.first
     }
 
+    // MARK: A turn has finished
+
+    /// Shows a finished turn the way the user chose: not at all, as a notice
+    /// on the closed island, or as a card with the agent's last words.
+    func present(_ session: Session, failed: Bool) {
+        guard !isExpanded, !(isAway && settings.quietWhenAway) else { return }
+        let toast = Toast(key: session.key, title: session.title, kind: failed ? .failed : .completed)
+        switch settings.completionStyle {
+        case .off:
+            return
+        case .notice:
+            show(toast)
+        case .card:
+            // A card needs something to say, somewhere to be seen, and a user who is not already looking at the session.
+            let reply = failed ? (session.activity.detail ?? session.lastReply) : session.lastReply
+            guard let text = reply, !text.isEmpty, islandIsVisible(), pending.isEmpty, !isFrontmost(session) else {
+                show(toast)
+                return
+            }
+            self.toast = nil
+            completion = Completion(key: session.key, source: session.source, project: session.projectName, title: session.headline,
+                                    reply: text, failed: failed, progress: session.progress)
+            scheduleCompletionDismissal()
+        }
+    }
+
+    /// A hook says "finished" the moment the turn ends; unless the agent's last
+    /// words came with it, they reach us a moment later, when its transcript is
+    /// read. A card waits for them; nothing else does.
+    var completionSettleDelay: TimeInterval = 1.9
+
+    private func presentWhenSettled(_ key: SessionKey, failed: Bool, replyIsIn: Bool) {
+        guard let session = store[key] else { return }
+        let waits = settings.completionStyle == .card && !replyIsIn && session.origin == .hooks && session.transcriptPath != nil
+            && scout != nil && completionSettleDelay > 0
+        guard waits else {
+            present(session, failed: failed)
+            return
+        }
+        Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64((self?.completionSettleDelay ?? 0) * 1_000_000_000))
+            // Asked something new in the meantime: there is nothing finished to show.
+            guard let self, let current = self.store[key], current.phase == .waiting else { return }
+            self.present(current, failed: failed)
+        }
+    }
+
+    /// Tests replace this; the app asks which application is in front.
+    var isFrontmost: (Session) -> Bool = { _ in false }
+
+    private func scheduleCompletionDismissal() {
+        completionTask?.cancel()
+        guard !completionHeld else { return }
+        let seconds = max(8, settings.toastSeconds * 2)
+        completionTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: UInt64(seconds) * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.completion = nil
+        }
+    }
+
+    /// The pointer is on the card: it stays for as long as it is being read.
+    public func holdCompletion(_ held: Bool) {
+        guard held != completionHeld else { return }
+        completionHeld = held
+        if held { completionTask?.cancel() } else if completion != nil { scheduleCompletionDismissal() }
+    }
+
+    public func dismissCompletion() {
+        completionTask?.cancel()
+        completionHeld = false
+        if completion != nil { completion = nil }
+    }
+
+    /// The card was clicked: go to the session it is about.
+    public func openCompletion() {
+        guard let key = completion?.key else { return }
+        dismissCompletion()
+        jump(to: key)
+    }
+
     private func show(_ toast: Toast) {
-        guard settings.showCompletionToast, !isExpanded else { return }
+        guard settings.completionStyle != .off, !isExpanded else { return }
         self.toast = toast
         toastTask?.cancel()
         toastTask = Task { [weak self] in
@@ -511,6 +697,12 @@ public final class AppModel: ObservableObject {
         sessions = store.ordered
         grantedSessions = Set(sessions.map(\.key).filter { grants.hasGrants(for: $0) })
         badge = Badge(active: sessions.filter { $0.phase == .working }.count, pending: pending.count)
+        // A folder not seen before: its branch is looked up now rather than at the next tick.
+        let folders = Set(sessions.compactMap(\.cwd))
+        if folders != branchFolders {
+            branchFolders = folders
+            refreshBranches()
+        }
     }
 
     private func pruneStaleSessions() {

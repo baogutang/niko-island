@@ -1,5 +1,76 @@
 # Changelog
 
+## [0.5.0] - 2026-10-13
+
+The things 0.4.0 had put on the roadmap, built; and what two open-source
+projects taught about asking a provider for limits.
+
+### Added
+- **A card when an agent finishes.** Instead of a one-line notice, a card
+  comes down from the island with what the agent said last, its bold, code and
+  links drawn as such, and a bar for its list of steps if it kept one. A click
+  goes to the session, the ✕ puts the card away, and it stays while the
+  pointer is on it. It opens nothing and never takes keyboard focus. It is not
+  shown when the island is open, when a request is waiting, or when the
+  session's own window is already in front. Settings → Island → *When an agent
+  finishes*: card, notice, or nothing.
+- **Task progress.** A thin bar and the step in hand on the row of an agent
+  that keeps a list of steps: Claude Code's `TodoWrite` and task files, Codex's
+  `update_plan`, ZCode's todo table.
+- **The git branch** next to the project's name, read from `.git/HEAD`
+  (worktrees included) without running git. A chip for the **model**, off by
+  default.
+- **Allow and deny from the keyboard**: ⌃⌥A and ⌃⌥D for the request the island
+  is showing. Off by default. The keys are claimed only while a request is
+  waiting; with the island closed the first press only opens it; a question is
+  never answered this way.
+- **A reminder for a request left waiting** (off by default): the cue plays
+  again after 2, 5 or 10 minutes, up to three times.
+- **Quiet while nobody is there**: no sounds and no cards while the screen is
+  locked or asleep (on by default). Requests still wait.
+- **One to three lines of the last reply** on a row, or none.
+- **A Codex desktop session opens on its own conversation** when its row is
+  clicked, through the link the Codex app itself uses.
+- **Ask OpenAI for Codex limits (off by default).** A third switch in
+  Settings → Usage. Codex's own files already say most of it; this adds a
+  current figure while Codex is idle and **how many resets a ChatGPT plan has
+  saved**. It reads the sign-in Codex keeps on this Mac and talks to
+  chatgpt.com only.
+
+### Changed
+- **Asking Anthropic** now also reads each model's own weekly window and paid
+  extra usage, where the plan has them. A sign-in whose date has passed is
+  offered once rather than not at all (the date is Claude Code's note to
+  itself, the answer is Anthropic's), and a sign-in that was turned down is
+  not offered again until Claude Code has replaced it.
+- **The Coding Plan lookup** recognises the weekly window by its unit, whatever
+  count comes with it, and no longer needs a unit at all to tell two windows
+  apart.
+- A reply belongs to its turn: what an agent said before your newest prompt is
+  no longer shown as its last word while it works on the new one.
+- The branch of a new session's folder is looked up at once, not at the next
+  tick.
+
+### Fixed
+- **Codex sessions named after their wrapping.** A prompt sent with files was
+  listed as "# Files mentioned by the user:", and project instructions as
+  "# AGENTS.md instructions for …". The row now shows what was actually typed.
+- A "finished" notice stayed on the island after its session had started
+  working again.
+
+### Known limitations
+- **No live agent was watched finishing a turn into a card.** The card was
+  driven through the real bridge with events in the documented format, and
+  from transcripts in tests.
+- **Task lists of Claude Code and Codex are read from documented shapes.** No
+  session on the machine the app is built on had written one. ZCode's table
+  was checked against its real schema.
+- **Claude limits still need a current Claude Code sign-in**, which the desktop
+  app alone does not keep current. On the one machine tried, Anthropic turned
+  the old sign-in down.
+- **How many ZCode reset cards are left** is still known only to ZCode's
+  account service. The open-source tools looked at do not get it either.
+
 ## [0.4.0] - 2026-10-13
 
 What turned up when 0.3.0 was used for an afternoon.

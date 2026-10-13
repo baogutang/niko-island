@@ -366,7 +366,11 @@ public enum NikoCLI {
             let transport: ProviderLimitsClient.Transport = { request in
                 let (data, status) = try await ProviderLimitsClient.network(request)
                 print("\(request.url?.host ?? "?") → HTTP \(status), \(data.count) bytes")
-                if let parsed = try? JSONValue.parse(data) { print("shape: \(shape(parsed))") }
+                if let parsed = try? JSONValue.parse(data) {
+                    print("shape: \(shape(parsed))")
+                } else {
+                    print("not JSON\(data.first == UInt8(ascii: "<") ? " (a web page)" : "")")
+                }
                 return (data, status)
             }
             if which == "claude" {
@@ -379,11 +383,18 @@ public enum NikoCLI {
                 case .denied: print("sign-in: macOS said no")
                 }
             }
+            if which == "codex" {
+                switch CodexLogin.read(home: home) {
+                case .found(let login): print("sign-in: found, account id \(login.account == nil ? "absent" : "present")")
+                case .missing: print("sign-in: none with a ChatGPT plan on this Mac")
+                case .denied: print("sign-in: macOS said no")
+                }
+            }
             let done = DispatchSemaphore(value: 0)
             let region = GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
             Task.detached {
                 let client = ProviderLimitsClient(paths: work, secrets: .system(home: home), transport: transport) { _ in }
-                await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region))
+                await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex"))
                 await client.refresh(force: true)
                 for (provider, result) in await client.current() {
                     print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")

@@ -133,6 +133,58 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["showCompletionToast"] = .bool(newValue) }
     }
 
+    /// What the island does when an agent finishes a turn.
+    public enum CompletionStyle: String, Sendable, CaseIterable {
+        /// Nothing on the island (sounds and banners have their own switches).
+        case off
+        /// The closed island names the session for a few seconds.
+        case notice
+        /// A card comes down with what the agent said last.
+        case card
+    }
+
+    public var completionStyle: CompletionStyle {
+        get {
+            if let stored = raw["completionStyle"]?.stringValue.flatMap(CompletionStyle.init(rawValue:)) { return stored }
+            // Before there was a choice there was a switch; "off" stays off.
+            return showCompletionToast ? .card : .off
+        }
+        set {
+            raw["completionStyle"] = .string(newValue.rawValue)
+            raw["showCompletionToast"] = .bool(newValue != .off)
+        }
+    }
+
+    /// How many lines of the agent's last reply a session row shows (0 to 3).
+    public var replyLines: Int {
+        get { min(3, max(0, raw["replyLines"]?.intValue ?? 1)) }
+        set { raw["replyLines"] = .int(min(3, max(0, newValue))) }
+    }
+
+    /// ⌃⌥A allows and ⌃⌥D denies the request the island is showing. The keys
+    /// are only claimed while a request is waiting. Off unless switched on.
+    public var decisionHotkeys: Bool {
+        get { bool("decisionHotkeys", default: false) }
+        set { raw["decisionHotkeys"] = .bool(newValue) }
+    }
+
+    /// No sounds and no cards while the screen is locked or asleep.
+    public var quietWhenAway: Bool {
+        get { bool("quietWhenAway", default: true) }
+        set { raw["quietWhenAway"] = .bool(newValue) }
+    }
+
+    /// Minutes a request may wait unanswered before the app speaks up again. 0: never.
+    public static let reminderChoices = [0, 2, 5, 10]
+
+    public var reminderMinutes: Int {
+        get {
+            let stored = raw["reminderMinutes"]?.intValue ?? 0
+            return NikoSettings.reminderChoices.contains(stored) ? stored : 0
+        }
+        set { raw["reminderMinutes"] = .int(newValue) }
+    }
+
     /// Keep the island at the top of the screen even when no agent is running.
     public var showIslandWhenIdle: Bool {
         get { bool("showIslandWhenIdle", default: true) }
@@ -146,6 +198,24 @@ public struct NikoSettings: Sendable, Equatable {
     public var claudeLimitsLookup: Bool {
         get { bool("claudeLimitsLookup", default: false) }
         set { raw["claudeLimitsLookup"] = .bool(newValue) }
+    }
+
+    /// Whether the provider behind an agent's plan is being asked.
+    public func asksProvider(_ agent: String) -> Bool {
+        switch agent {
+        case "claude": return claudeLimitsLookup
+        case "zcode": return glmLimitsLookup
+        case "codex": return codexLimitsLookup
+        default: return false
+        }
+    }
+
+    /// Ask ChatGPT about the Codex plan with Codex's own sign-in. Codex already
+    /// writes its limits into its session files; this adds a current answer
+    /// while Codex is idle, and the resets an account has saved.
+    public var codexLimitsLookup: Bool {
+        get { bool("codexLimitsLookup", default: false) }
+        set { raw["codexLimitsLookup"] = .bool(newValue) }
     }
 
     /// Ask BigModel / Z.ai for the GLM Coding Plan's limits, with a key the user
@@ -211,12 +281,15 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     public enum RowChip: String, Sendable, CaseIterable {
-        case elapsed, agent, host
+        case elapsed, agent, host, branch, model
+
+        /// The model's name is long and rarely changes: shown only on request.
+        public var shownByDefault: Bool { self != .model }
     }
 
     /// Whether a kind of chip is shown on session rows.
     public func showsChip(_ chip: RowChip) -> Bool {
-        raw["rowChips"]?[chip.rawValue]?.boolValue ?? true
+        raw["rowChips"]?[chip.rawValue]?.boolValue ?? chip.shownByDefault
     }
 
     public mutating func setChip(_ chip: RowChip, shown: Bool) {

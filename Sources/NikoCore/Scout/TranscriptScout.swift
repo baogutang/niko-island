@@ -122,8 +122,11 @@ public final class TranscriptScout: @unchecked Sendable {
             return CodexTranscript.snapshot(path: path, meta: meta, tail: entry.tail, tailIsWholeFile: entry.tailIsWholeFile,
                                             modified: entry.modified, now: now)
         }
-        return ClaudeTranscript.snapshot(path: path, tail: entry.tail, tailIsWholeFile: entry.tailIsWholeFile,
-                                         firstPrompt: entry.claudeFirstPrompt, modified: entry.modified, now: now)
+        var snapshot = ClaudeTranscript.snapshot(path: path, tail: entry.tail, tailIsWholeFile: entry.tailIsWholeFile,
+                                                 firstPrompt: entry.claudeFirstPrompt, modified: entry.modified, now: now)
+        // Newer Claude Code keeps its task list as files next to the transcripts instead of in them.
+        if let id = snapshot?.key.sessionID, let tasks = TaskProgress.claudeTasks(home: home, sessionID: id) { snapshot?.progress = tasks }
+        return snapshot
     }
 
     private func read(_ path: String, size: UInt64, into entry: inout Entry) {

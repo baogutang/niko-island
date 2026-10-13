@@ -121,7 +121,8 @@ extension AppModel {
 
     var providerLimitsConfig: ProviderLimitsClient.Config {
         let region = GLMQuotaAPI.Region(rawValue: settings.glmRegion) ?? GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
-        return ProviderLimitsClient.Config(claude: settings.claudeLimitsLookup, glm: settings.glmLimitsLookup, glmRegion: region)
+        return ProviderLimitsClient.Config(claude: settings.claudeLimitsLookup, glm: settings.glmLimitsLookup, glmRegion: region,
+                                           codex: settings.codexLimitsLookup)
     }
 
     /// Starts, stops or re-aims the lookups after a setting changed. Nothing is
@@ -129,7 +130,7 @@ extension AppModel {
     func reconcileProviderLimits() {
         let config = providerLimitsConfig
         if limitsClient == nil {
-            guard config.claude || config.glm else { return }
+            guard config.asksAnyone else { return }
             limitsClient = makeLimitsClient { [weak self] results in
                 DispatchQueue.main.async {
                     MainActor.assumeIsolated { self?.receive(providerLimits: results) }
@@ -138,8 +139,7 @@ extension AppModel {
         }
         guard let client = limitsClient else { return }
         Task { await client.configure(config) }
-        if !config.claude { providerLookups[ProviderLimitsClient.claude] = nil }
-        if !config.glm { providerLookups[ProviderLimitsClient.glm] = nil }
+        for provider in ProviderLimitsClient.providers where !config.asks(provider) { providerLookups[provider] = nil }
     }
 
     func receive(providerLimits results: [String: ProviderLimitsClient.Result]) {

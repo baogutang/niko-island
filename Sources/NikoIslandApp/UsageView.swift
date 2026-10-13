@@ -121,9 +121,11 @@ struct UsageView: View {
 
     private func windowName(_ window: RateLimitWindow) -> String {
         switch window.id {
-        case "seven_day_opus": return L("Weekly, Opus")
-        case "seven_day_sonnet": return L("Weekly, Sonnet")
         case "tools_month": return L("Tool calls, monthly")
+        case "extra_usage": return L("Extra usage")
+        case let id where id.hasPrefix("seven_day_"):
+            // One model's share of the week, or a share this version has no name for.
+            return L("Weekly, %@", id.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized)
         default: break
         }
         switch window.minutes {
@@ -177,25 +179,8 @@ struct UsageView: View {
 
     /// The provider that can be asked about an agent's plan, if there is one.
     private func lookup(for agent: String) -> (enabled: Bool, provider: String)? {
-        switch agent {
-        case ProviderLimitsClient.claude: return (model.settings.claudeLimitsLookup, "Anthropic")
-        case ProviderLimitsClient.glm: return (model.settings.glmLimitsLookup, "BigModel / Z.ai")
-        default: return nil
-        }
-    }
-
-    private func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
-        switch state {
-        case .ok: return nil
-        case .noLogin: return L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
-        case .loginExpired: return L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
-        case .denied: return L("macOS was told not to share Claude Code's sign-in.")
-        case .noKey: return L("No Coding Plan key has been added yet.")
-        case .unauthorized: return agent == ProviderLimitsClient.claude ? L("Anthropic did not accept the sign-in.") : L("The key was not accepted.")
-        case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
-        case .unreachable: return L("The provider could not be reached.")
-        case .unreadable: return L("The provider answered in a form this version does not read.")
-        }
+        guard let provider = ProviderLookupText.provider(agent) else { return nil }
+        return (model.settings.asksProvider(agent), provider)
     }
 
     private func smallButton(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
@@ -229,7 +214,9 @@ struct UsageView: View {
                     }
                     if let plan = agent.plan, !plan.isEmpty { Chip(text: plan.capitalized) }
                     Spacer(minLength: 4)
-                    if let left = agent.resetsLeft { Chip(text: L("%lld resets left", left), tint: look.accent) }
+                    if let left = agent.resetsLeft, left > 0 {
+                        Chip(text: agent.id == ProviderLimitsClient.codex ? L("%lld resets saved", left) : L("%lld resets left", left), tint: look.accent)
+                    }
                     if asking?.enabled == true, !isStaticPreview { smallButton(L("Check now")) { model.refreshProviderLimits() } }
                     if resetsInApp {
                         smallButton(L("Reset in %@…", name)) { model.openAgentApp(agent.id) }
@@ -248,7 +235,7 @@ struct UsageView: View {
                                 smallButton(L("Show them…"), primary: true, action: openUsageSettings)
                             }
                         }
-                    } else if let result, let text = problem(result.state, agent: agent.id) {
+                    } else if let result, let text = ProviderLookupText.problem(result.state, agent: agent.id) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
                             Text(text).font(look.body(11.5)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
                             Spacer(minLength: 4)
@@ -324,5 +311,38 @@ struct UsageView: View {
             }
         }
         .font(look.body(11)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// What a lookup's outcome means, in words. Said the same way in the usage view and in Settings.
+enum ProviderLookupText {
+    /// Who is asked about an agent's plan.
+    static func provider(_ agent: String) -> String? {
+        switch agent {
+        case ProviderLimitsClient.claude: return "Anthropic"
+        case ProviderLimitsClient.glm: return "BigModel / Z.ai"
+        case ProviderLimitsClient.codex: return "OpenAI"
+        default: return nil
+        }
+    }
+
+    static func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
+        let codex = agent == ProviderLimitsClient.codex
+        switch state {
+        case .ok: return nil
+        case .noLogin:
+            return codex ? L("Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.")
+                : L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
+        case .loginExpired:
+            return codex ? L("Codex's sign-in on this Mac has run out. It renews itself the next time Codex runs.")
+                : L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
+        case .denied: return L("macOS was told not to share %@'s sign-in.", AgentRegistry.displayName(for: agent))
+        case .noKey: return L("No Coding Plan key has been added yet.")
+        case .unauthorized:
+            return agent == ProviderLimitsClient.glm ? L("The key was not accepted.") : L("%@ did not accept the sign-in.", provider(agent) ?? "")
+        case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
+        case .unreachable: return L("The provider could not be reached.")
+        case .unreadable: return L("The provider answered in a form this version does not read.")
+        }
     }
 }

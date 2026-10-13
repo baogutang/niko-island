@@ -27,6 +27,8 @@ public final class ZCodeSessions {
         var turn: Turn
         var since: Date?
         var desktop = false
+        var progress: TaskProgress?
+        var model: String?
     }
 
     enum Turn: Equatable {
@@ -108,6 +110,7 @@ public final class ZCodeSessions {
                                   title: row[3].stringValue.flatMap(Self.title), updated: Self.date(row[4].doubleValue),
                                   turn: .finished, desktop: hidden[id] != nil)
             try read(session: id, into: &reading, db: db)
+            reading.progress = progress(of: id, db: db)
             out.append(reading)
         }
         // A helper lives in the app its parent lives in.
@@ -154,6 +157,7 @@ public final class ZCodeSessions {
                 if reading.lastPrompt != nil { break }
             } else if role == "assistant" {
                 assistantsRead += 1
+                if reading.model == nil { reading.model = (message["modelId"] ?? message["modelID"])?.stringValue }
                 let parts = assistantsRead <= 3 ? try self.parts(of: messageID, db: db) : []
                 if !sawNewest {
                     sawNewest = true
@@ -175,6 +179,14 @@ public final class ZCodeSessions {
                 }
             }
         }
+    }
+
+    /// The steps ZCode keeps for a session in its `todo` table.
+    private func progress(of id: String, db: SQLiteDB) -> TaskProgress? {
+        guard let rows = try? db.query("SELECT content, status FROM todo WHERE session_id = ? ORDER BY position LIMIT 200", [.text(id)]), !rows.isEmpty else { return nil }
+        return TaskProgress.from(items: rows.map { row in
+            .object(JSONObject(["content": .string(row[0].stringValue ?? ""), "status": .string(row[1].stringValue ?? "")]))
+        })
     }
 
     /// The parts of one message, newest first.
@@ -230,12 +242,15 @@ public final class ZCodeSessions {
         case .tool(let tool): (phase, activity) = stale ? (.waiting, .waiting) : (.working, tool)
         case .attention(let what): (phase, activity) = stale ? (.waiting, .waiting) : (.needsAttention, what)
         }
-        return TranscriptSnapshot(
+        var snapshot = TranscriptSnapshot(
             key: SessionKey(source: source, sessionID: reading.id), path: path, cwd: reading.cwd,
             host: reading.desktop ? .zcodeDesktop : nil, title: reading.title,
             firstPrompt: reading.lastPrompt, lastPrompt: reading.lastPrompt, lastReply: reading.lastReply,
             phase: phase, activity: activity, updatedAt: reading.updated, phaseSince: reading.since,
             isSubagent: reading.parentID != nil, parentID: reading.parentID)
+        snapshot.progress = reading.progress
+        snapshot.model = reading.model
+        return snapshot
     }
 
     /// A session started without a project lives in ZCode's own scratch folder,

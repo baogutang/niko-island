@@ -56,7 +56,8 @@ struct IslandLook: Equatable {
     var mascots: [String: String] = [:]
     var showMascots = true
     var compact = false
-    var chips = Set(NikoSettings.RowChip.allCases)
+    var chips = Set(NikoSettings.RowChip.allCases.filter(\.shownByDefault))
+    var replyLines = 1
     /// The island's type is drawn a little smaller or larger on request.
     var textScale: CGFloat = NikoSettings.TextSize.regular.scale
     /// How long the island takes to open and close, relative to the standard.
@@ -72,6 +73,7 @@ struct IslandLook: Equatable {
     init(settings: NikoSettings) {
         textScale = settings.textSize.scale
         motion = settings.motion.factor
+        replyLines = settings.replyLines
         accent = Theme.color(for: settings.accent)
         mascots = settings.mascotChoices
         showMascots = settings.showMascots

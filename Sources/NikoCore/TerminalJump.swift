@@ -94,6 +94,15 @@ extension Session {
 }
 
 public enum TerminalJump {
+    /// A link that opens one conversation in the agent's own desktop app, for
+    /// the apps that have such links. Codex: `codex://threads/<id>`.
+    public static func threadURL(for session: Session) -> URL? {
+        guard session.terminal.isEmpty, session.host == .codexDesktop, session.source == "codex" else { return nil }
+        let id = session.key.sessionID
+        guard !id.isEmpty, id.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }) else { return nil }
+        return URL(string: "codex://threads/\(id)")
+    }
+
     /// AppleScript string literal. Everything interpolated into a script goes through here.
     static func literal(_ value: String) -> String {
         var out = "\""

@@ -274,6 +274,14 @@ struct SettingsPageView: View {
                     set: { enabled in loginItemError = LoginItem.set(enabled) }))
                 toggleRow(L("Open the island with %@", Hotkey.display),
                           L("From anywhere, without the pointer."), isOn: settingsBinding(\.hotkeyEnabled))
+                toggleRow(L("Allow with %@, deny with %@", Hotkey.Key.allow.display, Hotkey.Key.deny.display),
+                          L("Only for a request the island is showing: with the island closed, the first press opens it. The keys are left to other apps while nothing is waiting. Questions are never answered this way."),
+                          isOn: settingsBinding(\.decisionHotkeys))
+                toggleRow(L("Stay quiet while the screen is locked or asleep"),
+                          L("No sounds and no cards while nobody is there to notice. Requests still wait for you."), isOn: settingsBinding(\.quietWhenAway))
+                choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times. Not while the screen is locked."),
+                          options: NikoSettings.reminderChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
+                          selection: settingsBinding(\.reminderMinutes))
                 choiceRow(L("Language"), divider: false,
                           options: [("system", L("Same as macOS")), ("en", "English"), ("zh-Hans", "简体中文")],
                           selection: settingsBinding(\.language))
@@ -317,7 +325,11 @@ struct SettingsPageView: View {
                 toggleRow(L("Pixel creatures"), L("Off: a plain dot in each agent's colour."), isOn: settingsBinding(\.showMascots))
                 toggleRow(L("Show how long"), isOn: chipBinding(.elapsed))
                 toggleRow(L("Show which agent"), isOn: chipBinding(.agent))
-                toggleRow(L("Show which terminal or app"), divider: false, isOn: chipBinding(.host))
+                toggleRow(L("Show which terminal or app"), isOn: chipBinding(.host))
+                toggleRow(L("Show the git branch"), L("Next to the project's name."), isOn: chipBinding(.branch))
+                toggleRow(L("Show the model"), isOn: chipBinding(.model))
+                choiceRow(L("Lines of the agent's last reply"), L("Shown on a row once the agent has stopped."), divider: false,
+                          options: [(0, L("None")), (1, "1"), (2, "2"), (3, "3")], selection: settingsBinding(\.replyLines))
             }
             card(L("Opening and closing")) {
                 toggleRow(L("Open when the pointer rests on it"),
@@ -333,9 +345,11 @@ struct SettingsPageView: View {
                           selection: settingsBinding(\.motion))
                 toggleRow(L("Open by itself when an agent needs a decision"),
                           L("It never takes keyboard focus away from what you are typing."), isOn: settingsBinding(\.expandOnAttention))
-                toggleRow(L("Show a short notice when an agent finishes"),
-                          L("The collapsed island names the session for a few seconds."), isOn: settingsBinding(\.showCompletionToast))
-                choiceRow(L("How long the notice stays"),
+                choiceRow(L("When an agent finishes"),
+                          L("A card comes down with what the agent said last, and a click on it goes to the session. A notice only names the session. Neither opens the island or takes focus."),
+                          options: [(NikoSettings.CompletionStyle.card, L("Card")), (.notice, L("Notice")), (.off, L("Nothing"))],
+                          selection: settingsBinding(\.completionStyle))
+                choiceRow(L("How long the notice stays"), L("A card stays twice as long, and for as long as the pointer is on it."),
                           options: NikoSettings.toastChoices.map { ($0, L("%lld s", $0)) }, selection: settingsBinding(\.toastSeconds))
                 toggleRow(L("Keep the island visible when nothing is running"),
                           L("Off: it appears only while there are sessions."), divider: false, isOn: settingsBinding(\.showIslandWhenIdle))
@@ -590,7 +604,7 @@ struct SettingsPageView: View {
                 .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.cardStroke))
             card(L("Limits the provider keeps")) {
-                Text(L("How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. Both are off until you turn them on."))
+                Text(L("How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on."))
                     .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 10)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
@@ -602,9 +616,13 @@ struct SettingsPageView: View {
                           L("The plan ZCode draws on. ZCode keeps its own key locked away, so this needs a key of that plan from you. It is stored in your Keychain and sent only to the service chosen below."),
                           isOn: settingsBinding(\.glmLimitsLookup))
                 glmKeyRow
-                choiceRow(L("Service"), L("Automatic: the one ZCode is set to."), divider: lookupNote(ProviderLimitsClient.glm) != nil,
+                choiceRow(L("Service"), L("Automatic: the one ZCode is set to."), divider: true,
                           options: [("auto", L("Automatic")), ("bigmodel", "bigmodel.cn"), ("zai", "z.ai")], selection: settingsBinding(\.glmRegion))
-                if let note = lookupNote(ProviderLimitsClient.glm) { lookupStatus(note, divider: false) }
+                if let note = lookupNote(ProviderLimitsClient.glm) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask OpenAI for my Codex limits"),
+                          L("Codex's own files already say most of it. This adds a current answer while Codex is idle, and the resets your account has saved. Reads the ChatGPT sign-in Codex keeps on this Mac and sends it to chatgpt.com, nowhere else. Asked every five minutes."),
+                          divider: lookupNote(ProviderLimitsClient.codex) != nil, isOn: settingsBinding(\.codexLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.codex) { lookupStatus(note, divider: false) }
             }
             card(L("Price list")) {
                 toggleRow(L("Refresh the model price list from the network (weekly)"),
@@ -616,20 +634,10 @@ struct SettingsPageView: View {
 
     /// What the last lookup said, in words; nil while that lookup is switched off.
     private func lookupNote(_ provider: String) -> String? {
-        let enabled = provider == ProviderLimitsClient.claude ? model.settings.claudeLimitsLookup : model.settings.glmLimitsLookup
-        guard enabled else { return nil }
+        guard model.settings.asksProvider(provider) else { return nil }
         guard let result = model.providerLookups[provider] else { return L("Asking…") }
-        switch result.state {
-        case .ok: return L("Answered. %lld windows known.", result.limits?.windows.count ?? 0)
-        case .noLogin: return L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
-        case .loginExpired: return L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
-        case .denied: return L("macOS was told not to share Claude Code's sign-in.")
-        case .noKey: return L("No Coding Plan key has been added yet.")
-        case .unauthorized: return provider == ProviderLimitsClient.claude ? L("Anthropic did not accept the sign-in.") : L("The key was not accepted.")
-        case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
-        case .unreachable: return L("The provider could not be reached.")
-        case .unreadable: return L("The provider answered in a form this version does not read.")
-        }
+        if let problem = ProviderLookupText.problem(result.state, agent: provider) { return problem }
+        return L("Answered. %lld windows known.", result.limits?.windows.count ?? 0)
     }
 
     private func lookupStatus(_ note: String, divider: Bool) -> some View {

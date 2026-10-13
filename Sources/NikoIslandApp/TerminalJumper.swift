@@ -23,7 +23,10 @@ enum TerminalJumper {
             }
             // No tab to select (an IDE, a desktop app, another emulator): bring the app forward.
             guard !selected, let bundleID = target.bundleID ?? session.host?.bundleID else { return }
+            let thread = TerminalJump.threadURL(for: session)
             DispatchQueue.main.async {
+                // A desktop app that can be told which conversation to show is told.
+                if let thread, NSWorkspace.shared.open(thread) { return }
                 if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
                     running.activate(options: [.activateAllWindows])
                 } else if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) {

@@ -32,10 +32,18 @@ extension Session {
     }
 
     /// What the agent said last, shown once it has stopped.
-    var replyLine: String? {
-        guard phase == .waiting, let reply = lastReply else { return nil }
-        let line = Activity.oneLine(reply, limit: 120)
-        return line.isEmpty ? nil : line
+    var replyLine: String? { replyText(lines: 1) }
+
+    /// The reply as one paragraph, long enough to fill the lines a row may use.
+    func replyText(lines: Int) -> String? {
+        guard lines > 0, phase == .waiting, let reply = lastReply else { return nil }
+        let text = ReplyText.flattened(reply, limit: 110 * lines)
+        return text.isEmpty ? nil : text
+    }
+
+    /// The model, shortened to what fits on a chip.
+    var modelLabel: String? {
+        model.map(ModelLabel.short).flatMap { $0.isEmpty ? nil : $0 }
     }
 }
 
@@ -62,6 +70,17 @@ struct SessionRowView: View {
                     Text(session.projectName)
                         .font(look.body(12.5, .medium)).foregroundStyle(Theme.secondary)
                         .lineLimit(1).fixedSize()
+                    if look.chips.contains(.branch), let branch = session.cwd.flatMap({ model.branches[$0] }) {
+                        // The branch belongs to the project, so it sits with its name.
+                        HStack(spacing: 2) {
+                            Image(systemName: "arrow.triangle.branch").font(.system(size: 8.5, weight: .semibold))
+                            Text(branch).font(look.mono(10.5, .regular)).lineLimit(1).truncationMode(.middle)
+                        }
+                        .foregroundStyle(Theme.tertiary)
+                        .frame(maxWidth: 130, alignment: .leading)
+                        .fixedSize()
+                        .help(branch)
+                    }
                     Text("·").font(look.body(12.5)).foregroundStyle(Theme.tertiary)
                     Text(session.headline)
                         .font(look.title(15, .medium)).foregroundStyle(Theme.primary)
@@ -72,9 +91,13 @@ struct SessionRowView: View {
                         .font(look.body(12)).foregroundStyle(Theme.tertiary).lineLimit(1)
                 }
                 activityLine
-                if let reply = session.replyLine {
+                if let progress = session.progress, !(progress.isComplete && session.phase == .waiting) {
+                    ProgressLine(progress: progress)
+                }
+                if let reply = session.replyText(lines: look.replyLines) {
                     Text(reply)
-                        .font(look.body(12)).foregroundStyle(Theme.secondary).lineLimit(1).truncationMode(.tail)
+                        .font(look.body(12)).foregroundStyle(Theme.secondary).lineLimit(look.replyLines).truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if model.grantedSessions.contains(session.key) { grantLine }
             }
@@ -86,6 +109,7 @@ struct SessionRowView: View {
                     Chip(text: AgentRegistry.displayName(for: session.source), tint: AgentTint.color(for: session.source))
                 }
                 if look.chips.contains(.host), let host = session.hostLabel { Chip(text: host) }
+                if look.chips.contains(.model), let model = session.modelLabel { Chip(text: model) }
                 if session.subagents > 0 { Chip(text: L("%lld helpers", session.subagents), tint: Theme.sky) }
                 if session.phase == .needsAttention { BellBadge() }
             }

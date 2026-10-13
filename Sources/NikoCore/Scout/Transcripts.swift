@@ -41,6 +41,10 @@ public struct TranscriptSnapshot: Sendable, Equatable {
     public var parentID: String?
     /// The provider turned the agent away because this window is used up.
     public var limitReached: RateLimitWindow?
+    /// The agent's own list of steps, when it keeps one.
+    public var progress: TaskProgress?
+    /// The model the session last ran on.
+    public var model: String?
 
     public init(key: SessionKey, path: String, cwd: String? = nil, host: SessionHost? = nil, title: String? = nil,
                 firstPrompt: String? = nil, lastPrompt: String? = nil, lastReply: String? = nil,
@@ -94,8 +98,17 @@ enum TranscriptText {
 
     /// Text a person typed, as opposed to wrappers the agent adds around commands and context.
     static func prompt(_ text: String) -> String? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !trimmed.hasPrefix("<"), !trimmed.hasPrefix("Caveat:") else { return nil }
+        var trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        // Codex puts the files and editor state that came along in front of what was typed;
+        // the person's own words follow a "## My request" heading.
+        if trimmed.hasPrefix("# Files mentioned by the user") || trimmed.hasPrefix("# Context from my IDE setup") {
+            guard let heading = trimmed.range(of: "\n## My request"),
+                  let lineEnd = trimmed[heading.upperBound...].firstIndex(of: "\n") else { return nil }
+            trimmed = trimmed[lineEnd...].trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        // Project instructions handed to the agent in the user's name are not the user speaking.
+        guard !trimmed.isEmpty, !trimmed.hasPrefix("<"), !trimmed.hasPrefix("Caveat:"),
+              !trimmed.hasPrefix("# AGENTS.md instructions for") else { return nil }
         return trimmed.count > 600 ? String(trimmed.prefix(600)) : trimmed
     }
 
@@ -167,6 +180,8 @@ public enum ClaudeTranscript {
         var since: Date?
         var limit: RateLimitWindow?
         var stoppedByLimit = false
+        var progress: TaskProgress?
+        var model: String?
 
         for line in TranscriptText.lines(tail, dropFirst: !tailIsWholeFile) {
             guard let object = TranscriptText.object(line) else {
@@ -201,6 +216,7 @@ public enum ClaudeTranscript {
                         since = stamp ?? since
                     } else if let prompt = TranscriptText.prompt(text) {
                         lastPrompt = prompt
+                        lastReply = nil   // the reply belongs to the prompt before it
                         turn = .thinking
                         since = stamp ?? since
                         stoppedByLimit = false
@@ -215,6 +231,7 @@ public enum ClaudeTranscript {
                     continue
                 }
                 let message = object["message"]
+                if let name = message?["model"]?.stringValue, !name.isEmpty, name != "<synthetic>" { model = name }
                 var tool: Activity?
                 for item in message?["content"]?.arrayValue ?? [] {
                     switch item["type"]?.stringValue {
@@ -222,6 +239,7 @@ public enum ClaudeTranscript {
                         lastReply = item["text"]?.stringValue.flatMap(TranscriptText.reply) ?? lastReply
                     case "tool_use":
                         let name = item["name"]?.stringValue
+                        progress = TaskProgress.from(tool: name, input: item["input"]) ?? progress
                         if name == "AskUserQuestion" {
                             tool = Activity(verb: "has a question")
                         } else {
@@ -257,6 +275,8 @@ public enum ClaudeTranscript {
             title: title ?? agentName, firstPrompt: firstPrompt ?? lastPrompt, lastPrompt: lastPrompt, lastReply: lastReply,
             phase: phase, activity: activity, updatedAt: modified, phaseSince: since)
         snapshot.limitReached = limit
+        snapshot.progress = progress
+        snapshot.model = model
         return snapshot
     }
 
@@ -348,6 +368,8 @@ public enum CodexTranscript {
         var since: Date?
         var cwd = meta.cwd
         var question: String?
+        var progress: TaskProgress?
+        var model: String?
 
         for line in TranscriptText.lines(tail, dropFirst: !tailIsWholeFile) {
             // Reasoning and bookkeeping lines are most of a rollout; neither changes what we show.
@@ -359,12 +381,14 @@ public enum CodexTranscript {
             switch object["type"]?.stringValue {
             case "turn_context":
                 cwd = payload["cwd"]?.stringValue ?? cwd
+                model = payload["model"]?.stringValue ?? model
             case "event_msg":
                 switch kind {
                 case "task_started":
                     turn = .thinking
                     since = stamp ?? since
                     question = nil
+                    lastReply = nil   // the reply belongs to the turn before it
                 case "task_complete":
                     turn = .finished
                     since = stamp ?? since
@@ -394,7 +418,10 @@ public enum CodexTranscript {
                 case "function_call":
                     let name = payload["name"]?.stringValue
                     let arguments = payload["arguments"]?.stringValue.flatMap { try? JSONValue.parse(Data($0.utf8)) }
-                    if (name ?? "").contains("request_user_input") {
+                    if name == "update_plan" {
+                        // Bookkeeping, not work: the list is noted and the row keeps saying what it said.
+                        progress = TaskProgress.from(tool: name, input: arguments) ?? progress
+                    } else if (name ?? "").contains("request_user_input") {
                         question = payload["call_id"]?.stringValue ?? ""
                         turn = .attention(Activity(verb: "has a question"))
                     } else if turn != .finished {
@@ -421,10 +448,13 @@ public enum CodexTranscript {
         }
 
         let (phase, activity) = resolve(turn, modified: modified, now: now)
-        return TranscriptSnapshot(
+        var snapshot = TranscriptSnapshot(
             key: SessionKey(source: source, sessionID: meta.id), path: path, cwd: cwd, host: meta.host,
             title: meta.isSubagent ? meta.role : nil, firstPrompt: meta.firstPrompt ?? lastPrompt, lastPrompt: lastPrompt,
             lastReply: lastReply, phase: phase, activity: activity, updatedAt: modified, phaseSince: since,
             isSubagent: meta.isSubagent, parentID: meta.parentID)
+        snapshot.progress = progress
+        snapshot.model = model
+        return snapshot
     }
 }

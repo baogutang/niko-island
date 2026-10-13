@@ -192,11 +192,37 @@ final class DocsTests: XCTestCase {
         }
     }
 
+    /// What the pages say about 0.5.0's card, keys and rows is what the code does.
+    func testReadmesDescribeTheCardTheKeysAndTheRowsAsTheyAre() throws {
+        let settings = NikoSettings()
+        XCTAssertEqual(settings.completionStyle, .card, "the pages call the card what happens when an agent finishes")
+        XCTAssertFalse(settings.decisionHotkeys, "the pages say the keys are off until switched on")
+        XCTAssertEqual(settings.reminderMinutes, 0, "and the reminder too")
+        XCTAssertTrue(settings.quietWhenAway)
+        XCTAssertTrue(settings.showsChip(.branch))
+        XCTAssertFalse(settings.showsChip(.model), "the pages say the model is one switch away")
+        XCTAssertEqual(Hotkey.Key.allow.display, "⌃⌥A")
+        XCTAssertEqual(Hotkey.Key.deny.display, "⌃⌥D")
+        XCTAssertEqual(AppModel.reminderLimit, 3)
+        XCTAssertEqual(NikoSettings.reminderChoices, [0, 2, 5, 10])
+        for readme in ["README.md", "README.zh-CN.md"] {
+            let text = try read(readme)
+            for needle in ["⌃⌥A", "⌃⌥D", "docs/images/island-done.png", "codex://threads/", "~/.claude/tasks/", ".git/HEAD", "~/.codex/auth.json"] {
+                XCTAssertTrue(text.contains(needle), "\(readme): \(needle)")
+            }
+        }
+        let site = try read("website/index.html")
+        XCTAssertTrue(site.contains("⌃⌥A") && site.contains("⌃⌥D"))
+    }
+
     /// What the pages promise about sign-ins and the network is what the code does.
     func testPrivacyClaimsMatchTheCode() throws {
-        XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say both lookups are off until switched on")
+        XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say all three lookups are off until switched on")
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
-        XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai"])
+        XCTAssertFalse(NikoSettings().codexLimitsLookup)
+        XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com"])
+        XCTAssertEqual(CodexUsageAPI.request(CodexUsageAPI.usage, login: .init(token: "t")).value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"),
+                       true, "the pages say requests go out under this app's own name")
         for page in ["README.md", "README.zh-CN.md"] {
             let text = try read(page)
             for host in ProviderLimitsClient.hosts { XCTAssertTrue(text.contains("`\(host)`"), "\(page) names \(host)") }
@@ -208,6 +234,7 @@ final class DocsTests: XCTestCase {
         }
         let site = try read("website/index.html")
         XCTAssertTrue(site.contains("api.anthropic.com"))
+        XCTAssertTrue(site.contains("chatgpt.com"))
         XCTAssertFalse(site.contains("Your credentials are never read."))
         // The reset the usage view offers is a way to the agent's own app, and only where there is one.
         XCTAssertEqual(AgentRegistry.all.filter(\.quotaResetInApp).map(\.displayName), ["ZCode"])
