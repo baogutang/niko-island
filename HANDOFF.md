@@ -12,7 +12,8 @@
 | 旧版本 | v0.1.0（面板界面，只有 zip） |
 | 官网 | https://baogutang.github.io/niko-island/（已换成新设计） |
 | 测试 | 250 个，本机与 CI（macos-15）均通过；`scripts/smoke-launch.sh` 在本机与 CI 上均通过 |
-| CI | `ci.yml`、`pages.yml`、`release.yml`（v0.2.0）的结果见 `PROGRESS.md` 末尾的发布记录 |
+| CI | `ci.yml`、`pages.yml`、`release.yml`（v0.2.0）全部绿色 |
+| 发布核对 | dmg 与 zip 重新下载后校验和与 GitHub 记录一致；dmg 可挂载，内含应用签名有效、`x86_64 arm64`、版本 0.2.0。`SHA256SUMS` 文件本身因网络超时没能下载下来，用下载到的两个文件重建后与发布的摘要完全一致 |
 
 **最重要的两句实话：**
 
