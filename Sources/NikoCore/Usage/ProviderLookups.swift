@@ -82,13 +82,16 @@ public enum ClaudeUsageAPI {
     /// (`cachedUsageUtilization`). It needs no sign-in to read, and is as old
     /// as the last time Claude Code looked: windows that have reset since are
     /// dropped by whoever shows it.
-    public static func cached(home: URL) -> ProviderLimits? {
+    public static func cached(home: URL, includingReset: Bool = false) -> ProviderLimits? {
         guard let data = try? Data(contentsOf: home.appendingPathComponent(".claude.json")), data.count < 8_000_000,
               let root = try? JSONValue.parse(data, skipping: ["projects", "cachedGrowthBookFeatures", "cachedExperimentData", "cachedArtifactRoster"]),
               let cache = root["cachedUsageUtilization"], let answer = cache["utilization"], answer.objectValue != nil,
               let fetched = cache["fetchedAtMs"]?.doubleValue else { return nil }
         let at = Date(timeIntervalSince1970: fetched > 100_000_000_000 ? fetched / 1000 : fetched)
-        guard var limits = parse(answer.serializedData(.compact), now: at) else { return nil }
+        guard var limits = parse(answer.serializedData(.compact), now: at) else {
+            // Nothing in it that can be shown; when it was fetched is still worth knowing.
+            return includingReset ? ProviderLimits(windows: [], capturedAt: at, source: .agentCache) : nil
+        }
         limits.source = .agentCache
         return limits
     }

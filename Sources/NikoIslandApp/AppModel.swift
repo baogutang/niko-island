@@ -135,6 +135,9 @@ public final class AppModel: ObservableObject {
                 || settings.glmRegion != oldValue.glmRegion || settings.codexLimitsLookup != oldValue.codexLimitsLookup {
                 reconcileProviderLimits()
             }
+            if settings.claudeAsksItself != oldValue.claudeAsksItself {
+                if settings.claudeAsksItself { askClaudeCode(force: true) } else { claudeLookup = nil }
+            }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot() {
@@ -158,6 +161,12 @@ public final class AppModel: ObservableObject {
     @Published public internal(set) var providerLookups: [String: ProviderLimitsClient.Result] = [:]
     /// Whether a GLM Coding Plan key is in the Keychain (the key itself is never held here).
     @Published public internal(set) var hasGLMKey = false
+    /// How Claude Code's own look at the plan's usage last went; nil until it was asked to.
+    @Published public internal(set) var claudeLookup: ClaudeCodeUsage.Outcome?
+    @Published public internal(set) var claudeIsLooking = false
+    var claudeLookedAt: Date?
+    /// Tests replace this; the app runs the user's own `claude`.
+    var claudeAsker: @Sendable (URL, NikoPaths) -> ClaudeCodeUsage.Outcome = { home, paths in ClaudeCodeUsage.ask(home: home, paths: paths) }
     var limitsClient: ProviderLimitsClient?
     /// Tests and previews replace this so that no Keychain is opened and no request leaves.
     var makeLimitsClient: (@escaping @Sendable ([String: ProviderLimitsClient.Result]) -> Void) -> ProviderLimitsClient? = { _ in nil }
@@ -309,9 +318,37 @@ public final class AppModel: ObservableObject {
         return true
     }
 
+    /// Answers the oldest permission request of one session: what "Allow once" and
+    /// "Deny" on its notification do. A question is never answered this way; if
+    /// the request has gone, nothing happens.
+    @discardableResult
+    public func decide(forSession key: SessionKey, _ decision: KeyDecision) -> Bool {
+        guard let request = pending.first(where: { $0.sessionKey == key && !$0.isQuestion }) else { return false }
+        decide(request.id, decision == .allow ? .allowOnce : .deny)
+        return true
+    }
+
+    /// Goes to whatever needs the user most: the request that is waiting (the
+    /// island opens on it), else a session with a question, else the session
+    /// that stopped last.
+    @discardableResult
+    public func jumpToWhatNeedsMe() -> Bool {
+        if let request = pending.first {
+            route = .sessions
+            focusedRequestID = request.id
+            expand(.attention)
+            return true
+        }
+        let waiting = sessions.filter { $0.phase == .needsAttention } + sessions.filter { $0.phase == .waiting }.sorted { $0.phaseSince > $1.phaseSince }
+        guard let session = waiting.first else { return false }
+        jump(to: session.key)
+        return true
+    }
+
     func refreshPresence() {
         refreshBranches()
         remindAboutWaiting()
+        askClaudeCode()
         let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         Task.detached(priority: .utility) {
             let running = AgentPresence.running(apps: apps, processes: AgentPresence.runningProcessNames())
@@ -341,6 +378,13 @@ public final class AppModel: ObservableObject {
             guard state.count < Self.reminderLimit, now.timeIntervalSince(state.last) >= Double(minutes) * 60 else { continue }
             reminders[request.id] = (state.count + 1, now)
             due = true
+            // Still unanswered after the wait: whoever it is for is evidently not looking at this screen.
+            if let session = store[request.sessionKey] {
+                push(request.isQuestion ? .question : .permission, session: session,
+                     detail: request.isQuestion ? request.questions.first?.text
+                         : [request.event.toolName, request.summary.detail].compactMap { $0 }.joined(separator: ": "),
+                     now: now, escalated: true)
+            }
         }
         guard due else { return }
         play(.attention, now: now)
@@ -762,15 +806,16 @@ public final class AppModel: ObservableObject {
         }
     }
 
-    func push(_ kind: PushKind, session: Session, detail: String? = nil, now: Date = Date()) {
+    /// `escalated`: a request that has been left waiting; it goes out even at the Mac, and is a line of its own.
+    func push(_ kind: PushKind, session: Session, detail: String? = nil, now: Date = Date(), escalated: Bool = false) {
         guard settings.pushEnabled, hasPushKey, !settings.isQuiet(at: now) else { return }
-        if settings.pushOnlyWhenAway, !isAway { return }
+        if settings.pushOnlyWhenAway, !isAway, !escalated { return }
         if kind == .finished || kind == .failed {
             guard settings.pushWhenFinished else { return }
         }
         let words = detail ?? ((kind == .finished || kind == .failed) ? (kind == .failed ? (session.activity.detail ?? session.lastReply) : session.lastReply) : nil)
         send(pushMessage(kind, session: session, detail: words.map { ReplyText.flattened($0, limit: 140) }),
-             subject: "\(session.key.source)/\(session.key.sessionID)/\(kind)")
+             subject: "\(session.key.source)/\(session.key.sessionID)/\(kind)" + (escalated ? "/again/\(Int(now.timeIntervalSince1970))" : ""))
     }
 
     private func send(_ message: PushMessage, subject: String?) {

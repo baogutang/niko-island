@@ -144,6 +144,14 @@ public final class UsageEngine: @unchecked Sendable {
         }
     }
 
+    /// A local source of limits has something new (Claude Code refreshed its own file): draw again.
+    public func limitsChanged() {
+        queue.async { [self] in
+            claudeCacheStamp = nil
+            if running { publish() }
+        }
+    }
+
     /// Limits the providers reported when asked (see `ProviderLimitsClient`).
     public func setAskedLimits(_ limits: [String: ProviderLimits]) {
         queue.async { [self] in

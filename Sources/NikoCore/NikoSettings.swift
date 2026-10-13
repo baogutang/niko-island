@@ -261,6 +261,12 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["pushDetails"] = .bool(newValue) }
     }
 
+    /// ⌃⌥J goes to whatever needs the user: the waiting request, else the session that stopped last. Off unless switched on.
+    public var jumpHotkey: Bool {
+        get { bool("jumpHotkey", default: false) }
+        set { raw["jumpHotkey"] = .bool(newValue) }
+    }
+
     /// Minutes a request may wait unanswered before the app speaks up again. 0: never.
     public static let reminderChoices = [0, 2, 5, 10]
 
@@ -285,6 +291,13 @@ public struct NikoSettings: Sendable, Equatable {
     public var claudeLimitsLookup: Bool {
         get { bool("claudeLimitsLookup", default: false) }
         set { raw["claudeLimitsLookup"] = .bool(newValue) }
+    }
+
+    /// Let Claude Code look up the plan's usage itself (`claude -p /usage`) and
+    /// read what it keeps. No sign-in is read by this app. Off unless switched on.
+    public var claudeAsksItself: Bool {
+        get { bool("claudeAsksItself", default: false) }
+        set { raw["claudeAsksItself"] = .bool(newValue) }
     }
 
     /// Whether the provider behind an agent's plan is being asked.
@@ -368,10 +381,11 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     public enum RowChip: String, Sendable, CaseIterable {
-        case elapsed, agent, host, branch, model
+        case elapsed, agent, host, branch, model, context
 
-        /// The model's name is long and rarely changes: shown only on request.
-        public var shownByDefault: Bool { self != .model }
+        /// The model's name is long and rarely changes, and how full the context is matters
+        /// only near the end (when it is shown anyway): both only on request.
+        public var shownByDefault: Bool { self != .model && self != .context }
     }
 
     /// Whether a kind of chip is shown on session rows.

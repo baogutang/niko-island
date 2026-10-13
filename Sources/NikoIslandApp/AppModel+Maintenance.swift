@@ -149,8 +149,40 @@ extension AppModel {
 
     /// "Check now" in the usage view and in Settings.
     public func refreshProviderLimits() {
+        askClaudeCode(force: true)
         guard let client = limitsClient else { return }
         Task { await client.refresh(force: true) }
+    }
+
+    // MARK: Claude Code looks for itself (opt-in)
+
+    /// Has Claude Code look up the plan's usage (`claude -p /usage`) when that is due:
+    /// right after switching it on, every five minutes while a Claude Code session is
+    /// listed, and when "Check now" is pressed. What it keeps is read like any local file.
+    func askClaudeCode(force: Bool = false, now: Date = Date()) {
+        guard settings.claudeAsksItself, !claudeIsLooking else { return }
+        if let last = claudeLookedAt {
+            let wait: TimeInterval = force ? 20 : 300
+            guard now.timeIntervalSince(last) >= wait else { return }
+            // Nobody is using Claude Code: the figures can wait until somebody is, or asks.
+            guard force || sessions.contains(where: { $0.source == "claude" }) else { return }
+        }
+        claudeLookedAt = now
+        claudeIsLooking = true
+        let ask = claudeAsker
+        let home = self.home, paths = self.paths
+        let done: @MainActor @Sendable (ClaudeCodeUsage.Outcome) -> Void = { [weak self] outcome in
+            guard let self else { return }
+            self.claudeIsLooking = false
+            self.claudeLookup = outcome
+            self.usageEngine?.limitsChanged()
+        }
+        DispatchQueue.global(qos: .utility).async {
+            let outcome = ask(home, paths)
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { done(outcome) }
+            }
+        }
     }
 
     /// The key for the GLM Coding Plan, typed by the user. Kept in the Keychain, never in a file.

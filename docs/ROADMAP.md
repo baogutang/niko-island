@@ -78,22 +78,31 @@ to what turned up when somebody did.
 | Claude Code's own cached limits as a source; parser fixes from the real answer shape | Built and covered by tests; the parser was run on the real cached answer of one machine |
 | A real Claude Code turn through the card and the task bar | Done once, headless, with Claude Code 2.1.295 |
 
+## Released: 0.7.0
+
+| Area | State |
+|---|---|
+| Claude limits by letting Claude Code look (`claude -p /usage`, opt-in) | Built and covered by tests with a stand-in program; seen working in the running app on one Mac whose Claude Code is otherwise used through the desktop app |
+| What an edit would change, shown in the request | Built and covered by tests for the shapes agents use (whole file, one replacement, several, a patch); seen in renders, and the path of a real request was seen on the island |
+| Allow once / Deny on the notification banner | Built; the decision behind the buttons is tested, the banner was not clicked |
+| ⌃⌥J to what needs you; a waiting request escalated to the phone | Built and covered by tests |
+| How full the context is | Built and covered by tests; Codex's record was checked against a real file |
+| A real approval from the island | Done once: interactive Claude Code 2.1.295 in a terminal of its own, answered with ⌃⌥A |
+
 ## Next
 
 1. **Run the reply against real terminals** (tmux, iTerm2, Terminal) and take
    the "experimental" off, or take the feature out.
 2. **A line through the real Bark and ntfy services**, with the owner's key.
-3. **A live answer for the Anthropic and BigModel / Z.ai lookups.**
-4. **Claude limits for people who only use the desktop app.** Renewing Claude
-   Code's sign-in ourselves would mean acting as Claude Code and rewriting its
-   Keychain entry; that stays a decision for the owner of the Mac.
-5. **A real approval, given from the island**, with an interactive Claude Code
-   session (a headless run does not ask), and the beta adapters against their
-   live agents. `TESTPLAN.md` section 10.
+3. **Click the banner's buttons**, and approve a request with Terminal.app,
+   iTerm2 and the Claude desktop app in front.
+4. **A live answer for the BigModel / Z.ai lookup**; and whether ZCode can be
+   asked to look for itself the way Claude Code can.
+5. **Drive the beta adapters against their live agents.** `TESTPLAN.md`
+   section 10.
 6. **Try the island on a MacBook's own display** and with two displays.
 7. **Listen to the built-in sounds** and tune them by ear.
-8. **How full a session's context is**, on its row, once there is a reliable
-   way to know each model's window.
+8. **What a session has cost so far**, on its row.
 9. **Notarized builds** if the project gets a signing identity.
 
 ## Planned, not started

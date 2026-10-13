@@ -157,9 +157,66 @@ public struct RequestSummary: Sendable, Equatable {
         case other(tool: String)
     }
 
+    /// One line of what an edit would take out or put in.
+    public struct ChangeLine: Sendable, Equatable {
+        public enum Kind: Sendable, Equatable { case removed, added, more }
+        public var kind: Kind
+        public var text: String
+
+        public init(_ kind: Kind, _ text: String) {
+            self.kind = kind
+            self.text = text
+        }
+    }
+
     public var kind: Kind
     /// The command, path, URL or pattern in question (clipped).
     public var detail: String?
+    /// For an edit: the first lines of what goes and what comes. Empty when the request does not say.
+    public var changes: [ChangeLine] = []
+
+    static let changeLines = 6
+    static let changeWidth = 160
+
+    /// The first lines of a text, as lines of one kind; what was left out is counted, not shown.
+    static func lines(_ text: String?, _ kind: ChangeLine.Kind, limit: Int = changeLines) -> [ChangeLine] {
+        guard let text, !text.isEmpty else { return [] }
+        let all = text.split(omittingEmptySubsequences: false, whereSeparator: \.isNewline).map(String.init)
+        var out = all.prefix(limit).map { ChangeLine(kind, clip($0.replacingOccurrences(of: "\t", with: "  "), changeWidth)) }
+        if all.count > limit { out.append(ChangeLine(.more, "\(all.count - limit)")) }
+        return out
+    }
+
+    /// What an edit request would change, from the shapes agents use: a whole
+    /// file (`content`), one replacement (`old_string` → `new_string`), several
+    /// (`edits`), or a patch whose lines start with `+` and `-`.
+    static func changes(of input: JSONObject?) -> [ChangeLine] {
+        guard let input else { return [] }
+        func text(_ keys: String...) -> String? {
+            for key in keys { if let value = input[key]?.stringValue, !value.isEmpty { return value } }
+            return nil
+        }
+        if let edits = input["edits"]?.arrayValue, let first = edits.first {
+            var out = lines(first["old_string"]?.stringValue, .removed, limit: 3) + lines(first["new_string"]?.stringValue, .added, limit: 3)
+            if edits.count > 1 { out.append(ChangeLine(.more, "\(edits.count - 1) ✎")) }
+            return out
+        }
+        if input["old_string"] != nil || input["new_string"] != nil {
+            return lines(text("old_string"), .removed, limit: 4) + lines(text("new_string"), .added, limit: 4)
+        }
+        if let whole = text("content", "contents", "file_text", "new_source") { return lines(whole, .added) }
+        if let patch = text("patch", "input", "diff") {
+            let marked = patch.split(whereSeparator: \.isNewline).filter { line in
+                (line.hasPrefix("+") || line.hasPrefix("-")) && !line.hasPrefix("+++") && !line.hasPrefix("---")
+            }
+            var out = marked.prefix(changeLines).map { line in
+                ChangeLine(line.hasPrefix("+") ? .added : .removed, clip(String(line.dropFirst()).replacingOccurrences(of: "\t", with: "  "), changeWidth))
+            }
+            if marked.count > changeLines { out.append(ChangeLine(.more, "\(marked.count - changeLines)")) }
+            return out
+        }
+        return []
+    }
 
     public init(event: AgentEvent) {
         let tool = event.toolName ?? "tool"
@@ -177,6 +234,7 @@ public struct RequestSummary: Sendable, Equatable {
             let path = text("file_path", "path", "notebook_path")
             kind = .edit(file: fileName(path))
             detail = path
+            changes = RequestSummary.changes(of: input)
         case "reading":
             let path = text("file_path", "path")
             kind = .read(file: fileName(path))

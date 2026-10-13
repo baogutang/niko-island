@@ -1,5 +1,49 @@
 # Changelog
 
+## [0.7.0] - 2026-10-14
+
+Claude's limits for people who only use the desktop app, and the oldest
+unverified promise checked for real.
+
+### Added
+- **Let Claude Code look up its own limits (off by default).** The app runs
+  your own `claude` program with `/usage` every five minutes while a Claude
+  Code session is listed. Claude Code asks Anthropic with its own sign-in, and
+  renews it when it must, exactly as when you type `/usage`; the app reads the
+  answer Claude Code keeps in `~/.claude.json`. No sign-in is read by Niko
+  Island, nothing is saved as a session, your hooks and MCP servers are left
+  out of that run, and it works for sessions in the desktop app. Settings →
+  Usage.
+- **See an edit before you allow it.** A request to write or change a file
+  shows the first lines of what it would take out and put in, under the path.
+- **Answer on the banner.** A permission request's notification carries
+  *Allow once* and *Deny*.
+- **⌃⌥J goes to what needs you** (off by default): the waiting request, else a
+  session with a question, else the session that stopped last.
+- **A request left waiting also goes to your phone** when a reminder is due
+  and the phone is switched on, wherever you seem to be.
+- **How full the context is**, as a chip: a percentage for Codex, which says
+  how large its window is, a size for Claude Code, which does not. Shown on
+  request, and by itself once a known window is nearly full.
+
+### Checked against the real thing
+- **A real approval, given from the island.** An interactive Claude Code
+  session asked to write a file; the request appeared on the island with the
+  path; ⌃⌥A was pressed; only then did the file exist.
+- **Claude limits through Claude Code itself**, on a Mac whose Claude Code is
+  otherwise only used through the desktop app: both windows, with reset times.
+- What sits in the foreground of a terminal while Claude Code waits (its own
+  binary and `caffeinate`), which is what the reply's guard looks for.
+- Codex's `token_count` record, against a real session file.
+
+### Known limitations
+- The banner's buttons were not clicked; they call the same decision the
+  island's buttons do, which is tested.
+- The real approval ran in a terminal of its own, not with Terminal.app,
+  iTerm2 or the desktop app in front.
+- Replying from the island and a line through the real Bark or ntfy service
+  are still unrun against the real thing.
+
 ## [0.6.0] - 2026-10-13
 
 The rest of the list, and what running a real agent through it showed.

@@ -59,11 +59,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         Hotkey.shared.action = { [weak self] in self?.model.toggleExpanded() }
         Hotkey.shared.actions[.allow] = { [weak self] in self?.model.decideByKey(.allow) }
         Hotkey.shared.actions[.deny] = { [weak self] in self?.model.decideByKey(.deny) }
+        Hotkey.shared.actions[.jump] = { [weak self] in self?.model.jumpToWhatNeedsMe() }
         model.$settings
             .receive(on: DispatchQueue.main)
             .sink { settings in
                 Localization.use(language: settings.language)
                 Hotkey.shared.setEnabled(settings.hotkeyEnabled)
+                Hotkey.shared.set(.jump, enabled: settings.jumpHotkey)
             }
             .store(in: &subscriptions)
         // ⌃⌥A and ⌃⌥D belong to us only while a request is waiting; otherwise other apps keep them.

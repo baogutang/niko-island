@@ -99,6 +99,33 @@ struct PermissionForm: View {
         }
     }
 
+    /// What the edit would take out and put in: seen before it is allowed, not after.
+    private var changes: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            ForEach(Array(request.summary.changes.enumerated()), id: \.offset) { _, line in
+                switch line.kind {
+                case .more:
+                    Text(line.text.hasSuffix("✎") ? L("and %@ more edits", String(line.text.dropLast(2))) : L("and %@ more lines", line.text))
+                        .font(look.body(11)).foregroundStyle(Theme.tertiary).padding(.horizontal, 10).padding(.vertical, 2)
+                case .removed, .added:
+                    let added = line.kind == .added
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Text(added ? "+" : "−").font(look.mono(11.5, .bold)).foregroundStyle(added ? look.accent : Theme.coral).frame(width: 9)
+                        Text(line.text.isEmpty ? " " : line.text).font(look.mono(11.5, .regular))
+                            .foregroundStyle(Theme.primary.opacity(0.9)).lineLimit(1).truncationMode(.tail)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 10).padding(.vertical, 2)
+                    .background((added ? look.accent : Theme.coral).opacity(0.11))
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+        .accessibilityElement(children: .combine)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
@@ -118,6 +145,7 @@ struct PermissionForm: View {
                     .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.field))
                     .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
             }
+            if !request.summary.changes.isEmpty { changes }
             HStack(spacing: 8) {
                 Button { model.decide(request.id, .allowOnce) } label: { keyed(L("Allow once"), .allow) }
                     .buttonStyle(PillButtonStyle(kind: .primary, large: true))

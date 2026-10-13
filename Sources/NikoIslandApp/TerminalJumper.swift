@@ -115,7 +115,16 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
         self.center = SystemNotifier.isAvailable ? UNUserNotificationCenter.current() : nil
         super.init()
         center?.delegate = self
+        // A request for permission can be answered on its banner; a question cannot (it needs its answers).
+        let allow = UNNotificationAction(identifier: SystemNotifier.allowAction, title: L("Allow once"), options: [])
+        let deny = UNNotificationAction(identifier: SystemNotifier.denyAction, title: L("Deny"), options: [.destructive])
+        center?.setNotificationCategories([UNNotificationCategory(identifier: SystemNotifier.permissionCategory, actions: [allow, deny],
+                                                                  intentIdentifiers: [], options: [])])
     }
+
+    static let permissionCategory = "niko.permission"
+    static let allowAction = "niko.allow"
+    static let denyAction = "niko.deny"
 
     private func identifier(_ key: SessionKey) -> String { "session:" + key.description }
 
@@ -133,7 +142,8 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
         }
         let payload = Payload(identifier: identifier(session.key), title: session.title,
                               subtitle: AgentRegistry.displayName(for: session.source), body: text,
-                              source: session.key.source, session: session.key.sessionID)
+                              source: session.key.source, session: session.key.sessionID,
+                              category: kind == .permission ? SystemNotifier.permissionCategory : "")
         if askedForPermission {
             SystemNotifier.post(payload)
         } else {
@@ -145,7 +155,7 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
     }
 
     private struct Payload: Sendable {
-        let identifier, title, subtitle, body, source, session: String
+        let identifier, title, subtitle, body, source, session, category: String
     }
 
     nonisolated private static func post(_ payload: Payload) {
@@ -154,6 +164,7 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
         content.subtitle = payload.subtitle
         content.body = payload.body
         content.userInfo = ["source": payload.source, "session": payload.session]
+        if !payload.category.isEmpty { content.categoryIdentifier = payload.category }
         UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: payload.identifier, content: content, trigger: nil))
     }
 
@@ -166,10 +177,16 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
         let info = response.notification.request.content.userInfo
         let source = info["source"] as? String
         let session = info["session"] as? String
+        let action = response.actionIdentifier
         completionHandler()
         guard let source, let session else { return }
         Task { @MainActor in
-            self.model?.jump(to: SessionKey(source: source, sessionID: session))
+            let key = SessionKey(source: source, sessionID: session)
+            switch action {
+            case SystemNotifier.allowAction: self.model?.decide(forSession: key, .allow)
+            case SystemNotifier.denyAction: self.model?.decide(forSession: key, .deny)
+            default: self.model?.jump(to: key)
+            }
         }
     }
 

@@ -158,10 +158,18 @@ enum PreviewRenderer {
             send("claude", "PreToolUse", session: "f", project: "storefront", ago: 20, tool: "Edit",
                  input: ["file_path": .string("/Users/dev/code/storefront/src/CheckoutForm.test.tsx")])
             model.settings.sessionGrouping = .project
-        case .attention, .permission:
+        case .attention:
             fleet()
             send("claude", "PermissionRequest", session: "a", project: "atlas-api", ago: 12, tool: "Bash",
                  input: ["command": .string("git push origin fix/upload-retry-backoff")], blocking: true)
+        case .permission:
+            fleet()
+            // An edit: what it would take out and put in is shown before it is allowed.
+            send("claude", "PermissionRequest", session: "a", project: "atlas-api", ago: 12, tool: "Edit", input: [
+                "file_path": .string("/Users/dev/code/atlas-api/Sources/Upload/Retry.swift"),
+                "old_string": .string("    try await upload(part)\n    retries += 1"),
+                "new_string": .string("    try await stream.closed()\n    try await Task.sleep(for: .milliseconds(250))\n    try await upload(part)\n    retries += 1"),
+            ], blocking: true)
         case .question:
             fleet()
             let questions: JSONValue = .array([

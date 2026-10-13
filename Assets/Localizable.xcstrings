@@ -431,6 +431,16 @@
         }
       }
     },
+    "A percentage where the agent says how large the model's window is (Codex), a size where it does not (Claude Code). Once it is nearly full it shows by itself.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理写明了模型窗口大小时显示百分比（Codex），没写时显示大小（Claude Code）。快满的时候会自己出现。"
+          }
+        }
+      }
+    },
     "A permission request or a question is waiting.": {
       "localizations": {
         "zh-Hans": {
@@ -1001,12 +1011,52 @@
         }
       }
     },
+    "Claude Code could not be run, or took too long.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 没能运行，或者用时太长。"
+          }
+        }
+      }
+    },
     "Claude Code has not signed in on this Mac, so there is nothing to ask with.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code 还没有在这台 Mac 上登录，所以没有可用来查询的凭据。"
+          }
+        }
+      }
+    },
+    "Claude Code is looking…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 正在查询…"
+          }
+        }
+      }
+    },
+    "Claude Code looked, and the figures above are its own.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 查过了，上面就是它自己的数字。"
+          }
+        }
+      }
+    },
+    "Claude Code ran but kept no new answer. If it has never signed in on this Mac, run claude once in a terminal.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 运行了，但没有留下新的结果。如果它从没在这台 Mac 上登录过，请先在终端里运行一次 claude。"
           }
         }
       }
@@ -1501,6 +1551,16 @@
         }
       }
     },
+    "Go to what needs me with %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 %@ 跳到需要我的地方"
+          }
+        }
+      }
+    },
     "Has a question for you": {
       "localizations": {
         "zh-Hans": {
@@ -1581,12 +1641,12 @@
         }
       }
     },
-    "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on.": {
+    "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below gets them from one place, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "套餐用了多少，只有厂商知道，这台 Mac 上并没有记录（Codex 例外：它会把额度写进自己的会话文件）。下面每个开关只向一家厂商查询，用的是你自己的登录凭据，只保留百分比和恢复时间。所有开关默认都是关闭的。"
+            "value": "套餐用了多少，只有厂商知道，这台 Mac 上并没有记录（Codex 例外：它会把额度写进自己的会话文件）。下面每个开关各从一个地方取得这些数字，用的是你自己的登录，只保留百分比和恢复时间。所有开关默认都是关闭的。"
           }
         }
       }
@@ -1697,6 +1757,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "大"
+          }
+        }
+      }
+    },
+    "Let Claude Code look up my Claude limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "让 Claude Code 自己查询我的 Claude 额度"
           }
         }
       }
@@ -1957,6 +2027,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "当该会话所在的终端就在前台时，不会弹出横幅。"
+          }
+        }
+      }
+    },
+    "No claude program was found on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 上没有找到 claude 程序。"
           }
         }
       }
@@ -2291,6 +2371,16 @@
         }
       }
     },
+    "Opens the island on a waiting request; with none, goes to the session that stopped last.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有请求在等时，展开灵动岛并定位到它；没有时，跳到最近停下的那个会话。"
+          }
+        }
+      }
+    },
     "Out of the way": {
       "localizations": {
         "zh-Hans": {
@@ -2571,6 +2661,16 @@
         }
       }
     },
+    "Runs your own claude program with /usage, every five minutes while a Claude Code session is listed. Claude Code asks Anthropic with its own sign-in, exactly as when you type /usage, and this app reads the answer it keeps in ~/.claude.json. The sign-in is never read by this app. Works for sessions in the desktop app too, once Claude Code has signed in on this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "列表里有 Claude Code 会话时，每五分钟运行一次你自己的 claude 程序并执行 /usage。Claude Code 会用它自己的登录去问 Anthropic，和你手动输入 /usage 完全一样；本应用只读取它保存在 ~/.claude.json 里的结果，从不读取登录凭据。只要 Claude Code 在这台 Mac 上登录过，桌面端里的会话同样适用。"
+          }
+        }
+      }
+    },
     "Same as macOS": {
       "localizations": {
         "zh-Hans": {
@@ -2737,6 +2837,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "短"
+          }
+        }
+      }
+    },
+    "Show how full the context is": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示上下文用了多少"
           }
         }
       }
@@ -2961,12 +3071,12 @@
         }
       }
     },
-    "The cue plays again, up to three times. Not while the screen is locked.": {
+    "The cue plays again, up to three times, and a line goes to your phone if that is switched on. Not while the screen is locked.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "提示音会再响一次，最多三次。屏幕锁定时不提醒。"
+            "value": "提示音会再响一次，最多三次；如果开了手机推送，也会发一条。屏幕锁定时不提醒。"
           }
         }
       }
@@ -3461,6 +3571,26 @@
         }
       }
     },
+    "and %@ more edits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还有 %@ 处修改"
+          }
+        }
+      }
+    },
+    "and %@ more lines": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还有 %@ 行"
+          }
+        }
+      }
+    },
     "as %@ last saw them, %@": {
       "localizations": {
         "zh-Hans": {
@@ -3517,6 +3647,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "已接入"
+          }
+        }
+      }
+    },
+    "context %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上下文 %@"
           }
         }
       }

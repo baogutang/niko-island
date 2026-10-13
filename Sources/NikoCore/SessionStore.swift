@@ -41,6 +41,8 @@ public struct Session: Identifiable, Sendable, Equatable {
     public var progress: TaskProgress?
     /// The model the session last ran on, as the agent names it.
     public var model: String?
+    /// How much of the model's context it holds, where its record says.
+    public var context: ContextFill?
 
     public var source: String { key.source }
 
@@ -247,6 +249,7 @@ public struct SessionStore: Sendable {
                 session.subagents = subagents
                 session.progress = snapshot.progress
                 session.model = snapshot.model
+                session.context = snapshot.context
                 sessions[key] = session
                 changes.append(.updated(key))
                 continue
@@ -265,6 +268,7 @@ public struct SessionStore: Sendable {
             session.subagents = subagents
             session.progress = snapshot.progress ?? session.progress
             session.model = snapshot.model ?? session.model
+            session.context = snapshot.context ?? session.context
             if session.firstPrompt == nil, let prompt = snapshot.firstPrompt {
                 session.firstPrompt = prompt
                 session.title = AutoNamer.title(cwd: session.cwd ?? snapshot.cwd, prompt: prompt, source: key.source)

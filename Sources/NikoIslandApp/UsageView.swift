@@ -181,7 +181,9 @@ struct UsageView: View {
     /// The provider that can be asked about an agent's plan, if there is one.
     private func lookup(for agent: String) -> (enabled: Bool, provider: String)? {
         guard let provider = ProviderLookupText.provider(agent) else { return nil }
-        return (model.settings.asksProvider(agent), provider)
+        // For Claude Code, having it look for itself counts as asking.
+        let itself = agent == ProviderLimitsClient.claude && model.settings.claudeAsksItself
+        return (model.settings.asksProvider(agent) || itself, provider)
     }
 
     private func smallButton(_ title: String, primary: Bool = false, action: @escaping () -> Void) -> some View {
@@ -235,6 +237,12 @@ struct UsageView: View {
                                 Spacer(minLength: 4)
                                 smallButton(L("Show them…"), primary: true, action: openUsageSettings)
                             }
+                        }
+                    } else if agent.id == ProviderLimitsClient.claude, model.settings.claudeAsksItself, !model.settings.claudeLimitsLookup,
+                              let text = ProviderLookupText.claudeItself(model.claudeLookup, looking: model.claudeIsLooking, problemsOnly: true) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text(text).font(look.body(11.5)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
+                            Spacer(minLength: 4)
                         }
                     } else if let result, let text = ProviderLookupText.problem(result.state, agent: agent.id) {
                         HStack(alignment: .firstTextBaseline, spacing: 8) {
@@ -324,6 +332,17 @@ enum ProviderLookupText {
         case ProviderLimitsClient.glm: return "BigModel / Z.ai"
         case ProviderLimitsClient.codex: return "OpenAI"
         default: return nil
+        }
+    }
+
+    /// How Claude Code's own look went, in words. `problemsOnly`: say nothing while all is well.
+    static func claudeItself(_ outcome: ClaudeCodeUsage.Outcome?, looking: Bool, problemsOnly: Bool = false) -> String? {
+        switch outcome {
+        case nil: return problemsOnly ? nil : (looking ? L("Claude Code is looking…") : nil)
+        case .fresh?: return problemsOnly ? nil : L("Claude Code looked, and the figures above are its own.")
+        case .unchanged?: return L("Claude Code ran but kept no new answer. If it has never signed in on this Mac, run claude once in a terminal.")
+        case .noClaudeCode?: return L("No claude program was found on this Mac.")
+        case .failed?: return L("Claude Code could not be run, or took too long.")
         }
     }
 

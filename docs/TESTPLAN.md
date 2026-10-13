@@ -7,7 +7,7 @@ screen and ears: the island window, full-screen apps, sounds, notifications,
 and real agents. Nothing here touches your real agent configuration until
 section 10.
 
-Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 to 0.6.0, on one
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 to 0.7.0, on one
 setup: macOS 15 with an external display that has no camera housing. A ☑ says nothing about
 a MacBook's own display or two displays at once. Items marked **(not
 automated)** have no test at all behind them.
@@ -283,6 +283,22 @@ Back at the screen, the phone, quiet hours, the list (0.6.0):
   iTerm2 and in Terminal (macOS asks for permission to control them first).
   **(never run against a real terminal)**
 
+Seeing an edit, the jump key, the context chip (0.7.0):
+
+```bash
+echo '{"hook_event_name":"PermissionRequest","session_id":"t1","cwd":"'$PWD'","tool_name":"Edit","tool_input":{"file_path":"'$PWD'/a.swift","old_string":"let retries = 3","new_string":"let retries = 5\nlet backoff = 0.25"}}' | "$B" --source claude
+```
+
+- ☐ Under the path: one red line with "let retries = 3", two green lines with
+  what replaces it. A `Write` with `content` shows its first six lines and
+  "and N more lines".
+- ☐ Settings → General → *Go to what needs me with ⌃⌥J*: with a request
+  waiting and the island closed, the key opens it on that request; with none,
+  it brings the session that stopped last to the front.
+- ☐ Settings → Island → *Show how full the context is*: Codex rows show a
+  percentage, Claude Code rows a size; a Codex session above 85 % shows the
+  chip in amber without the switch.
+
 ## 6. Usage and limits
 
 Click the bars icon in the island's header.
@@ -313,6 +329,12 @@ switches are off on a fresh install; **check that first**, and that nothing is
 asked while they are off (no `provider-limits.json` appears in
 `~/.niko-island/cache/`).
 
+- ☑ **Let Claude Code look up my Claude limits**: within about ten seconds the
+  Claude tab shows a 5-hour and a weekly bar with reset times and "as Claude
+  Code last saw them, just now". No Keychain question appears, no new session
+  shows up on the island, and `~/.claude/projects/` gains no transcript (only
+  an empty folder for the app's own working directory). ☐ On a Mac where
+  Claude Code never signed in: the note says to run `claude` once.
 - ☐ **Ask Anthropic**, with Claude Code signed in and used in a terminal
   recently: within a few seconds the Claude tab shows a 5-hour and a weekly
   percentage, "asked just now". macOS may ask for access to "Claude
@@ -426,8 +448,14 @@ hook file that points at a development build's bridge
   with its bold drawn as bold.
 - ☑ The agent kept its list with `TaskCreate` / `TaskUpdate`; the files under
   `~/.claude/tasks/<session id>/` were read and the card showed 1/3.
-- ☐ The same with an interactive session, and a request approved from the
-  island (a headless run does not ask for permission).
+- ☑ An interactive session (`claude --permission-mode default`, in a terminal
+  of its own, same temporary hook file) asked to write a file: the island
+  opened with "Claude Code wants to edit approved.txt" and the path; the file
+  did not exist; ⌃⌥A; the file existed. (In that account's usual mode Claude
+  Code ran the same write without asking anybody, so there was nothing to
+  approve: the island only sees requests the agent actually makes.)
+- ☐ The same with Terminal.app, iTerm2 and the Claude desktop app in front,
+  and with the banner's *Allow once* / *Deny*.
 
 This is the first step that changes a real config. It is reversible.
 

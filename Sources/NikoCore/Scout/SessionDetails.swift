@@ -103,3 +103,45 @@ public enum ModelLabel {
         return name
     }
 }
+
+/// How much of a model's context a session is holding right now.
+public struct ContextFill: Sendable, Equatable {
+    /// Tokens in the last request the agent made.
+    public var tokens: Int
+    /// The model's window, where the agent says how large it is.
+    public var window: Int?
+
+    public init(tokens: Int, window: Int? = nil) {
+        self.tokens = tokens
+        self.window = window
+    }
+
+    public var fraction: Double? {
+        guard let window, window > 0 else { return nil }
+        return min(1, Double(tokens) / Double(window))
+    }
+
+    /// Nearly full, and known to be: the agent is about to compact or to stop.
+    public var isNearlyFull: Bool { (fraction ?? 0) >= 0.85 }
+
+    /// "62%" where the window is known, "132k" where it is not.
+    public var label: String {
+        if let fraction { return "\(Int((fraction * 100).rounded()))%" }
+        return tokens >= 1_000_000 ? String(format: "%.1fM", Double(tokens) / 1_000_000) : "\(max(1, tokens / 1000))k"
+    }
+
+    /// Claude Code: what the last answer was given to read (`message.usage`). The window is not written down.
+    public static func claude(usage: JSONValue?) -> ContextFill? {
+        guard let usage, usage.objectValue != nil else { return nil }
+        let tokens = ["input_tokens", "cache_read_input_tokens", "cache_creation_input_tokens"].reduce(0) { $0 + (usage[$1]?.intValue ?? 0) }
+        return tokens > 0 ? ContextFill(tokens: tokens) : nil
+    }
+
+    /// Codex: `token_count` carries both the last request's size and the model's window.
+    public static func codex(info: JSONValue?) -> ContextFill? {
+        guard let info, info.objectValue != nil, let last = info["last_token_usage"], last.objectValue != nil else { return nil }
+        let tokens = last["total_tokens"]?.intValue ?? ((last["input_tokens"]?.intValue ?? 0) + (last["output_tokens"]?.intValue ?? 0))
+        guard tokens > 0 else { return nil }
+        return ContextFill(tokens: tokens, window: info["model_context_window"]?.intValue.flatMap { $0 > 0 ? $0 : nil })
+    }
+}

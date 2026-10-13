@@ -240,6 +240,28 @@ final class DocsTests: XCTestCase {
         XCTAssertTrue(site.contains("Bark") && site.contains("ntfy"))
     }
 
+    /// What the pages say about 0.7.0 is what the code does.
+    func testReadmesDescribeClaudeLookingForItselfAndTheNewKeys() throws {
+        let settings = NikoSettings()
+        XCTAssertFalse(settings.claudeAsksItself, "the pages say it is off until switched on")
+        XCTAssertFalse(settings.jumpHotkey)
+        XCTAssertFalse(settings.showsChip(.context))
+        XCTAssertEqual(Hotkey.Key.jump.display, "⌃⌥J")
+        // The pages say: nothing saved as a session, settings (hooks) and MCP servers left out.
+        for flag in ["/usage", "--no-session-persistence", "--setting-sources", "--strict-mcp-config"] {
+            XCTAssertTrue(ClaudeCodeUsage.arguments.contains(flag), flag)
+        }
+        for readme in ["README.md", "README.zh-CN.md"] {
+            let text = try read(readme)
+            for needle in ["`/usage`", "`~/.claude.json`", "⌃⌥J"] { XCTAssertTrue(text.contains(needle), "\(readme): \(needle)") }
+        }
+        XCTAssertTrue(try read("README.md").contains("No sign-in is read by Niko Island"))
+        XCTAssertTrue(try read("README.zh-CN.md").contains("Niko Island 不读取任何登录凭据"))
+        // That promise, in the code: the file that runs Claude Code holds no network or Keychain call.
+        let source = try read("Sources/NikoCore/Usage/ClaudeCodeUsage.swift")
+        XCTAssertFalse(source.contains("URLSession") || source.contains("SecItem"))
+    }
+
     /// What the pages promise about sign-ins and the network is what the code does.
     func testPrivacyClaimsMatchTheCode() throws {
         XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say all three lookups are off until switched on")

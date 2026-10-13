@@ -45,6 +45,8 @@ public struct TranscriptSnapshot: Sendable, Equatable {
     public var progress: TaskProgress?
     /// The model the session last ran on.
     public var model: String?
+    /// How much of the model's context the session holds.
+    public var context: ContextFill?
 
     public init(key: SessionKey, path: String, cwd: String? = nil, host: SessionHost? = nil, title: String? = nil,
                 firstPrompt: String? = nil, lastPrompt: String? = nil, lastReply: String? = nil,
@@ -182,6 +184,7 @@ public enum ClaudeTranscript {
         var stoppedByLimit = false
         var progress: TaskProgress?
         var model: String?
+        var context: ContextFill?
 
         for line in TranscriptText.lines(tail, dropFirst: !tailIsWholeFile) {
             guard let object = TranscriptText.object(line) else {
@@ -231,7 +234,10 @@ public enum ClaudeTranscript {
                     continue
                 }
                 let message = object["message"]
-                if let name = message?["model"]?.stringValue, !name.isEmpty, name != "<synthetic>" { model = name }
+                if let name = message?["model"]?.stringValue, !name.isEmpty, name != "<synthetic>" {
+                    model = name
+                    context = ContextFill.claude(usage: message?["usage"]) ?? context
+                }
                 var tool: Activity?
                 for item in message?["content"]?.arrayValue ?? [] {
                     switch item["type"]?.stringValue {
@@ -277,6 +283,7 @@ public enum ClaudeTranscript {
         snapshot.limitReached = limit
         snapshot.progress = progress
         snapshot.model = model
+        snapshot.context = context
         return snapshot
     }
 
@@ -370,11 +377,18 @@ public enum CodexTranscript {
         var question: String?
         var progress: TaskProgress?
         var model: String?
+        var context: ContextFill?
 
         for line in TranscriptText.lines(tail, dropFirst: !tailIsWholeFile) {
-            // Reasoning and bookkeeping lines are most of a rollout; neither changes what we show.
-            if TranscriptText.contains(line, "\"token_count\"", within: 400) || TranscriptText.contains(line, "\"token_usage_record\"", within: 200)
-                || TranscriptText.contains(line, "\"item_completed\"", within: 400) { continue }
+            // Reasoning and bookkeeping lines are most of a rollout; they change nothing we show, except that
+            // a token count says how full the context is (it is small, and only the size and the window are taken).
+            if TranscriptText.contains(line, "\"token_count\"", within: 400) {
+                if line.count < 8192, let payload = TranscriptText.object(line)?["payload"] {
+                    context = ContextFill.codex(info: payload["info"]) ?? context
+                }
+                continue
+            }
+            if TranscriptText.contains(line, "\"token_usage_record\"", within: 200) || TranscriptText.contains(line, "\"item_completed\"", within: 400) { continue }
             guard let object = TranscriptText.object(line), let payload = object["payload"]?.objectValue else { continue }
             let stamp = TranscriptText.date(object["timestamp"])
             let kind = payload["type"]?.stringValue ?? ""
@@ -455,6 +469,7 @@ public enum CodexTranscript {
             isSubagent: meta.isSubagent, parentID: meta.parentID)
         snapshot.progress = progress
         snapshot.model = model
+        snapshot.context = context
         return snapshot
     }
 }

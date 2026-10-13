@@ -821,6 +821,150 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(outbox.sent[4]["title"]?.stringValue, "Niko Island")
     }
 
+    // MARK: Claude Code looks for itself
+
+    func testClaudeCodeIsAskedToLookOnlyWhenSwitchedOnAndNotTooOften() async throws {
+        final class Asked: @unchecked Sendable {
+            private let lock = NSLock()
+            private var _count = 0
+            var outcome = ClaudeCodeUsage.Outcome.fresh
+            var count: Int { lock.lock(); defer { lock.unlock() }; return _count }
+            func ask() -> ClaudeCodeUsage.Outcome { lock.lock(); defer { lock.unlock() }; _count += 1; return outcome }
+        }
+        let asked = Asked()
+        model.claudeAsker = { _, _ in asked.ask() }
+        let start = Date()
+
+        model.askClaudeCode(force: true)
+        XCTAssertEqual(asked.count, 0, "off until switched on, whatever is pressed")
+
+        // Switching it on asks at once.
+        model.settings.claudeAsksItself = true
+        let first = await eventually { asked.count == 1 && self.model.claudeLookup == .fresh && !self.model.claudeIsLooking }
+        XCTAssertTrue(first)
+
+        // Not again for five minutes; and after that only while a Claude Code session is listed.
+        model.askClaudeCode(now: start.addingTimeInterval(200))
+        model.askClaudeCode(now: start.addingTimeInterval(400))
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(asked.count, 1, "nobody is using Claude Code: the figures can wait")
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\""))
+        let listed = await eventually { self.model.sessions.contains { $0.source == "claude" } }
+        XCTAssertTrue(listed)
+        model.askClaudeCode(now: start.addingTimeInterval(200))
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(asked.count, 1, "too soon")
+        model.askClaudeCode(now: start.addingTimeInterval(400))
+        let second = await eventually { asked.count == 2 && !self.model.claudeIsLooking }
+        XCTAssertTrue(second)
+
+        // "Check now" asks after twenty seconds, session or not, and how it went is kept for the page that shows it.
+        asked.outcome = .unchanged
+        model.claudeLookedAt = Date().addingTimeInterval(-25)
+        model.refreshProviderLimits()
+        let third = await eventually { asked.count == 3 && self.model.claudeLookup == .unchanged }
+        XCTAssertTrue(third)
+        model.refreshProviderLimits()
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(asked.count, 3, "pressed again at once: not asked again")
+
+        model.settings.claudeAsksItself = false
+        XCTAssertNil(model.claudeLookup)
+        model.claudeLookedAt = nil
+        model.askClaudeCode(force: true)
+        XCTAssertEqual(asked.count, 3)
+    }
+
+    // MARK: A banner that can be answered, a key that goes where you are needed
+
+    func testARequestCanBeAnsweredFromItsBannerAndAKeyGoesToWhatNeedsYou() async throws {
+        model.settings.expandOnAttention = false
+        XCTAssertFalse(model.jumpToWhatNeedsMe(), "nothing needs anybody")
+
+        async let first = bridge(event("PermissionRequest", tool: "Bash", command: "git push"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        // The key opens the island on the request, and decides nothing.
+        XCTAssertTrue(model.jumpToWhatNeedsMe())
+        XCTAssertTrue(model.isExpanded)
+        XCTAssertEqual(model.focusedRequest?.id, model.pending.first?.id)
+        XCTAssertEqual(model.pending.count, 1)
+        // "Allow once" on the banner answers that session's request.
+        XCTAssertFalse(model.decide(forSession: SessionKey(source: "claude", sessionID: "someone-else"), .allow))
+        XCTAssertTrue(model.decide(forSession: key, .allow))
+        let allowed = await first
+        XCTAssertEqual(behavior(allowed), "allow")
+        XCTAssertFalse(model.decide(forSession: key, .deny), "the request has gone: nothing happens")
+
+        async let second = bridge(event("PermissionRequest", tool: "Bash"))
+        let again = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(again)
+        XCTAssertTrue(model.decide(forSession: key, .deny))
+        let denied = await second
+        XCTAssertEqual(behavior(denied), "deny")
+
+        // A question is not answered from a banner.
+        let question = """
+        {"hook_event_name":"PermissionRequest","session_id":"s1","cwd":"/tmp/demo-project","tool_name":"AskUserQuestion",
+         "tool_input":{"questions":[{"question":"Which database?","header":"DB","multiSelect":false,"options":[{"label":"Postgres"},{"label":"SQLite"}]}]}}
+        """
+        async let asking = bridge(question)
+        let asked = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(asked)
+        XCTAssertFalse(model.decide(forSession: key, .allow))
+        XCTAssertEqual(model.pending.count, 1)
+        model.decide(model.pending[0].id, .passToTerminal)
+        _ = await asking
+
+        // With no request, the key goes to the session that stopped last.
+        model.collapse()
+        _ = await bridge(event("UserPromptSubmit", session: "older", extra: ",\"prompt\":\"one\""))
+        _ = await bridge(event("Stop", session: "older"))
+        _ = await bridge(event("UserPromptSubmit", session: "newer", extra: ",\"prompt\":\"two\""))
+        _ = await bridge(event("Stop", session: "newer"))
+        let stopped = await eventually { self.model.sessions.filter { $0.phase == .waiting }.count >= 2 }
+        XCTAssertTrue(stopped)
+        jumps = []
+        // The session whose question was handed to its terminal still needs an answer there: it comes first.
+        XCTAssertTrue(model.jumpToWhatNeedsMe())
+        XCTAssertEqual(jumps.map(\.sessionID), ["s1"])
+        model.dismiss(key)
+        XCTAssertTrue(model.jumpToWhatNeedsMe())
+        XCTAssertEqual(jumps.map(\.sessionID), ["s1", "newer"])
+        XCTAssertFalse(NikoSettings().jumpHotkey, "a global key is not claimed unasked")
+        XCTAssertEqual(Hotkey.Key.jump.display, "⌃⌥J")
+    }
+
+    func testARequestLeftWaitingAlsoGoesToThePhone() async throws {
+        let outbox = Outbox()
+        model.makePushClient = { PushClient(transport: { request in outbox.take(request); return (Data(), 200) }, key: { "device-key" }) }
+        model.settings.expandOnAttention = false
+        model.settings.pushEnabled = true
+        model.hasPushKey = true
+        XCTAssertTrue(model.settings.pushOnlyWhenAway)
+        async let waiting = bridge(event("PermissionRequest", tool: "Bash", command: "git push"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertTrue(outbox.sent.isEmpty, "at the Mac, the island is how you are told")
+        let asked = model.pending[0].receivedAt
+
+        // Left alone for the wait the user chose: whoever it is for is evidently not looking at this screen.
+        model.settings.reminderMinutes = 5
+        model.remindAboutWaiting(now: asked.addingTimeInterval(301))
+        let escalated = await eventually { outbox.sent.count == 1 }
+        XCTAssertTrue(escalated)
+        XCTAssertEqual(outbox.sent[0]["body"]?.stringValue, "Needs your decision")
+        model.remindAboutWaiting(now: asked.addingTimeInterval(400))
+        try await Task.sleep(nanoseconds: 100_000_000)
+        XCTAssertEqual(outbox.sent.count, 1, "one line per reminder, not one per tick")
+        model.remindAboutWaiting(now: asked.addingTimeInterval(610))
+        let twice = await eventually { outbox.sent.count == 2 }
+        XCTAssertTrue(twice)
+        model.decide(model.pending[0].id, .deny)
+        _ = await waiting
+    }
+
     // MARK: Answering from the island
 
     func testAFollowUpGoesToTheTerminalOnlyWhenThereIsAWayIn() async throws {

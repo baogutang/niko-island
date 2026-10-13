@@ -279,9 +279,12 @@ struct SettingsPageView: View {
                 toggleRow(L("Allow with %@, deny with %@", Hotkey.Key.allow.display, Hotkey.Key.deny.display),
                           L("Only for a request the island is showing: with the island closed, the first press opens it. The keys are left to other apps while nothing is waiting. Questions are never answered this way."),
                           isOn: settingsBinding(\.decisionHotkeys))
+                toggleRow(L("Go to what needs me with %@", Hotkey.Key.jump.display),
+                          L("Opens the island on a waiting request; with none, goes to the session that stopped last."),
+                          isOn: settingsBinding(\.jumpHotkey))
                 toggleRow(L("Stay quiet while the screen is locked or asleep"),
                           L("No sounds and no cards while nobody is there to notice. Requests still wait for you."), isOn: settingsBinding(\.quietWhenAway))
-                choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times. Not while the screen is locked."),
+                choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times, and a line goes to your phone if that is switched on. Not while the screen is locked."),
                           options: NikoSettings.reminderChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
                           selection: settingsBinding(\.reminderMinutes))
                 toggleRow(L("Quiet hours"), L("No sounds and nothing sent to a phone between these times. The island itself shows what it always shows."),
@@ -428,6 +431,9 @@ struct SettingsPageView: View {
                 toggleRow(L("Show which terminal or app"), isOn: chipBinding(.host))
                 toggleRow(L("Show the git branch"), L("Next to the project's name."), isOn: chipBinding(.branch))
                 toggleRow(L("Show the model"), isOn: chipBinding(.model))
+                toggleRow(L("Show how full the context is"),
+                          L("A percentage where the agent says how large the model's window is (Codex), a size where it does not (Claude Code). Once it is nearly full it shows by itself."),
+                          isOn: chipBinding(.context))
                 choiceRow(L("Lines of the agent's last reply"), L("Shown on a row once the agent has stopped."), divider: false,
                           options: [(0, L("None")), (1, "1"), (2, "2"), (3, "3")], selection: settingsBinding(\.replyLines))
             }
@@ -710,10 +716,14 @@ struct SettingsPageView: View {
                 .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.card))
                 .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(Theme.cardStroke))
             card(L("Limits the provider keeps")) {
-                Text(L("How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below asks one provider, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on."))
+                Text(L("How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below gets them from one place, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on."))
                     .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
                     .padding(.vertical, 10)
                 Rectangle().fill(Theme.hairline).frame(height: 1)
+                toggleRow(L("Let Claude Code look up my Claude limits"),
+                          L("Runs your own claude program with /usage, every five minutes while a Claude Code session is listed. Claude Code asks Anthropic with its own sign-in, exactly as when you type /usage, and this app reads the answer it keeps in ~/.claude.json. The sign-in is never read by this app. Works for sessions in the desktop app too, once Claude Code has signed in on this Mac."),
+                          divider: claudeItselfNote != nil, isOn: settingsBinding(\.claudeAsksItself))
+                if let note = claudeItselfNote { lookupStatus(note, divider: true) } else { Rectangle().fill(Theme.hairline).frame(height: 1) }
                 toggleRow(L("Ask Anthropic for my Claude limits"),
                           L("Reads the sign-in Claude Code keeps in your Keychain (macOS may ask you first) and sends it to api.anthropic.com, nowhere else. Asked every five minutes."),
                           divider: lookupNote(ProviderLimitsClient.claude) != nil, isOn: settingsBinding(\.claudeLimitsLookup))
@@ -736,6 +746,11 @@ struct SettingsPageView: View {
                           divider: false, isOn: settingsBinding(\.pricingRefreshEnabled))
             }
         }
+    }
+
+    private var claudeItselfNote: String? {
+        guard model.settings.claudeAsksItself else { return nil }
+        return ProviderLookupText.claudeItself(model.claudeLookup, looking: model.claudeIsLooking) ?? L("Asking…")
     }
 
     /// What the last lookup said, in words; nil while that lookup is switched off.
