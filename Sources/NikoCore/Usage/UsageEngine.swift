@@ -35,8 +35,14 @@ public final class UsageEngine: @unchecked Sendable {
     private var flushScheduled = false
     private var indexing = false
     private var lastRateLimits = RateLimits.Cache()
+    private var codexLimits = ProviderLimits()
+    /// When the user last reset each counter ("all" or an agent id).
+    private var resets: [String: Date] = [:]
+    private var zcodePending = false
     private var failure: String?
     private var running = false
+    private let home: URL
+    static let codexLimitsKey = "limits.codex"
 
     public static func defaultSources(home: URL) -> [Source] {
         let h = home.path
@@ -59,6 +65,7 @@ public final class UsageEngine: @unchecked Sendable {
     public init(paths: NikoPaths, home: URL, pricing: Pricing, sources: [Source]? = nil, log: NikoLog = .shared,
                 onSnapshot: @escaping @Sendable (UsageSnapshot) -> Void) {
         self.paths = paths
+        self.home = home
         self.pricing = pricing
         self.sources = sources ?? UsageEngine.defaultSources(home: home)
         self.log = log
@@ -135,6 +142,15 @@ public final class UsageEngine: @unchecked Sendable {
         }
     }
 
+    /// The moments the user reset a counter; "since reset" is counted from them.
+    public func setResets(_ resets: [String: Date]) {
+        queue.async { [self] in
+            guard resets != self.resets else { return }
+            self.resets = resets
+            if running { publish() }
+        }
+    }
+
     public func setPricing(_ pricing: Pricing) {
         queue.async { [self] in
             self.pricing = pricing
@@ -159,6 +175,9 @@ public final class UsageEngine: @unchecked Sendable {
             }
             self.store = store
             tailer = TranscriptTailer(store: store, pricing: pricing)
+            if let saved = (try? store.meta(UsageEngine.codexLimitsKey)).flatMap({ $0 }).flatMap(ProviderLimits.init(json:)) {
+                codexLimits = saved
+            }
             known = [:]
             for (path, state) in try store.allLatestStates() where state.status == "active" && state.size == state.committedOffset {
                 known[path] = (state.size, state.mtime)
@@ -217,12 +236,19 @@ public final class UsageEngine: @unchecked Sendable {
     private func fullScan() {
         let files = discover()
         var lastPublish = Date()
+        var newestCodex: (path: String, mtime: Double)?
+        defer {
+            // Codex states its limits in the rollout it wrote last.
+            if let newestCodex, newestCodex.mtime > (codexLimits.capturedAt?.timeIntervalSince1970 ?? 0) { noteCodexLimits(newestCodex.path) }
+            syncZCode()
+        }
         for (path, provider) in files {
             guard store != nil else { return }
             var st = stat()
             guard stat(path, &st) == 0 else { continue }
             let size = Int(st.st_size)
             let mtime = Double(st.st_mtimespec.tv_sec) + Double(st.st_mtimespec.tv_nsec) / 1e9
+            if provider == .codex, mtime > (newestCodex?.mtime ?? 0) { newestCodex = (path, mtime) }
             if let seen = known[path], seen.size == size, seen.mtime == mtime { continue }
             sync(path, provider)
             if indexing, Date().timeIntervalSince(lastPublish) > 2 {
@@ -249,6 +275,29 @@ public final class UsageEngine: @unchecked Sendable {
         }
     }
 
+    /// Keeps the newest limits Codex has written, and remembers them across launches.
+    private func noteCodexLimits(_ path: String) {
+        guard let found = CodexLimits.latest(inFile: path), !found.windows.isEmpty else { return }
+        if let captured = found.capturedAt, let current = codexLimits.capturedAt, captured < current { return }
+        guard found != codexLimits else { return }
+        codexLimits = found
+        try? store?.setMeta(UsageEngine.codexLimitsKey, found.json)
+    }
+
+    /// ZCode's usage lives in its own database; new rows are copied over.
+    private func syncZCode() {
+        guard let store else { return }
+        do {
+            try ZCodeUsage.sync(home: home, store: store, pricing: pricing)
+        } catch let error as SQLiteError where error.isCorruption {
+            log.warn("usage: ZCode's database could not be read: \(error)")
+        } catch {
+            // Busy or mid-migration: the next pass will pick the rows up.
+        }
+    }
+
+    private var zcodeDirectory: String { (ZCodeUsage.databasePath(home: home) as NSString).deletingLastPathComponent }
+
     // MARK: FSEvents
 
     fileprivate func filesChanged(_ changed: [String]) {
@@ -256,7 +305,8 @@ public final class UsageEngine: @unchecked Sendable {
         for path in changed where provider(forPath: path) != nil || path == paths.rateLimitCache.path {
             pendingPaths.insert(path)
         }
-        guard !pendingPaths.isEmpty, !flushScheduled else { return }
+        if changed.contains(where: { $0.hasPrefix(zcodeDirectory + "/") }) { zcodePending = true }
+        guard !pendingPaths.isEmpty || zcodePending, !flushScheduled else { return }
         flushScheduled = true
         queue.asyncAfter(deadline: .now() + 1.0) { [weak self] in
             guard let self else { return }
@@ -264,14 +314,21 @@ public final class UsageEngine: @unchecked Sendable {
             let batch = self.pendingPaths
             self.pendingPaths = []
             for path in batch {
-                if let provider = self.provider(forPath: path) { self.sync(path, provider) }
+                if let provider = self.provider(forPath: path) {
+                    self.sync(path, provider)
+                    if provider == .codex { self.noteCodexLimits(path) }
+                }
+            }
+            if self.zcodePending {
+                self.zcodePending = false
+                self.syncZCode()
             }
             self.publish()
         }
     }
 
     private func restartStreamIfNeeded() {
-        let roots = (sources.map(\.root) + [paths.cache.path]).filter { FileManager.default.fileExists(atPath: $0) }
+        let roots = (sources.map(\.root) + [paths.cache.path, zcodeDirectory]).filter { FileManager.default.fileExists(atPath: $0) }
         guard roots != watchedRoots else { return }
         stopStream()
         guard !roots.isEmpty else { return }
@@ -317,8 +374,9 @@ public final class UsageEngine: @unchecked Sendable {
         snapshot.pricingSource = pricing.source
         snapshot.failure = failure
         lastRateLimits = RateLimits.load(paths: paths, now: now)
-        snapshot.rateLimits = lastRateLimits.windows
-        snapshot.rateLimitsCapturedAt = lastRateLimits.capturedAt
+        let codex = codexLimits.current(now: now)
+        snapshot.rateLimits = lastRateLimits.windows + codex.windows
+        snapshot.rateLimitsCapturedAt = lastRateLimits.capturedAt ?? codex.capturedAt
         guard let store else { return snapshot }
         do {
             let today = store.day(for: now.timeIntervalSince1970)
@@ -335,6 +393,41 @@ public final class UsageEngine: @unchecked Sendable {
             let daily = try store.dailyTotals(fromDay: first, toDay: today)
             snapshot.days = dayIDs.map { UsageSnapshot.Day(id: $0, tokens: daily[$0]?.tokens ?? 0, cost: daily[$0]?.cost ?? 0) }
             snapshot.unpricedModels = try store.unpricedModels(fromDay: first, toDay: today)
+
+            // One entry per agent, and one for everything together.
+            let fiveHours = try store.totals(since: now.timeIntervalSince1970 - 5 * 3600)
+            let perDay = try store.dailyTotalsByAgent(fromDay: first, toDay: today)
+            var limits: [String: ProviderLimits] = [:]
+            if !lastRateLimits.windows.isEmpty {
+                limits["claude"] = ProviderLimits(windows: lastRateLimits.windows, capturedAt: lastRateLimits.capturedAt)
+            }
+            if !codex.windows.isEmpty { limits["codex"] = codex }
+            var sinceReset: [String: [UsageTotals]] = [:]
+            for (id, date) in resets { sinceReset[id] = try store.totals(since: date.timeIntervalSince1970) }
+
+            func usage(_ id: String) -> UsageSnapshot.AgentUsage {
+                func pick(_ rows: [UsageTotals]) -> [UsageTotals] { id == "all" ? rows : rows.filter { $0.agent == id } }
+                var agent = UsageSnapshot.AgentUsage(id: id)
+                agent.fiveHours = .init(pick(fiveHours))
+                agent.today = .init(pick(snapshot.today))
+                agent.week = .init(pick(snapshot.week))
+                agent.models = pick(snapshot.week)
+                agent.days = id == "all" ? snapshot.days : dayIDs.map {
+                    UsageSnapshot.Day(id: $0, tokens: perDay[id]?[$0]?.tokens ?? 0, cost: perDay[id]?[$0]?.cost ?? 0)
+                }
+                if let date = resets[id] {
+                    agent.resetAt = date
+                    agent.sinceReset = .init(pick(sinceReset[id] ?? []))
+                }
+                agent.limits = limits[id]?.windows ?? []
+                agent.limitsCapturedAt = limits[id]?.capturedAt
+                agent.plan = limits[id]?.plan
+                return agent
+            }
+            var ids = Set(snapshot.week.map(\.agent)).union(fiveHours.map(\.agent)).union(limits.keys)
+            ids.remove("")
+            let ranked = ids.map(usage).sorted { ($0.week.cost, $0.week.tokens, $1.id) > ($1.week.cost, $1.week.tokens, $0.id) }
+            snapshot.agents = [usage("all")] + ranked
         } catch {
             recover(from: error)
         }

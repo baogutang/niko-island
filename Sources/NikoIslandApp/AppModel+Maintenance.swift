@@ -111,8 +111,20 @@ extension AppModel {
             }
         }
         usageEngine = engine
+        engine.setResets(settings.usageResets)
         engine.start()
         refreshPricingIfDue()
+    }
+
+    /// Starts a counter from now ("all" or an agent id). Nothing is deleted:
+    /// the usage history stays, a "since reset" figure appears next to it.
+    public func resetUsage(_ counter: String, now: Date = Date()) {
+        settings.setUsageReset(now, for: counter)
+    }
+
+    /// Takes the "since reset" figure away again.
+    public func clearUsageReset(_ counter: String) {
+        settings.setUsageReset(nil, for: counter)
     }
 
     /// The only network request the app makes on its own, and only after the

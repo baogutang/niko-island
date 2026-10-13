@@ -20,6 +20,16 @@ public enum UsageProvider: String, Sendable, CaseIterable {
         }
     }
 
+    /// Keys whose values hold conversation text, tool traffic or instructions:
+    /// big, and never looked at when counting tokens.
+    var skippedKeys: Set<String> {
+        switch self {
+        case .claude: return ["content", "toolUseResult", "thinking", "signature"]
+        case .codex: return ["base_instructions", "instructions", "content", "encrypted_content", "arguments", "output", "input", "tools"]
+        case .opencode: return []
+        }
+    }
+
     func makeParser() -> any UsageParser {
         switch self {
         case .claude: return ClaudeUsageParser()
@@ -139,6 +149,7 @@ public final class TranscriptTailer {
         var carryStart = from
         var skippingOversize = false
         let needles = provider.needles
+        let skipped = provider.skippedKeys
         var buffer = [UInt8](repeating: 0, count: chunkSize)
 
         while offset < to {
@@ -154,7 +165,7 @@ public final class TranscriptTailer {
                 if skippingOversize {
                     skippingOversize = false
                 } else if !line.isEmpty, needles.contains(where: { line.range(of: $0) != nil }),
-                          let json = try? JSONValue.parse(Data(line)) {
+                          let json = try? JSONValue.parse(Data(line), skipping: skipped) {
                     records.append(contentsOf: parser.parse(line: json, offset: base + (lineStart - data.startIndex), file: path))
                 }
                 lineStart = data.index(after: newline)

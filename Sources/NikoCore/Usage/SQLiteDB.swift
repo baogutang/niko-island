@@ -36,10 +36,12 @@ public final class SQLiteDB {
     public let path: String
     private static let transient = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
-    public init(path: String) throws {
+    /// `readOnly` opens someone else's database: nothing is created, nothing is written.
+    public init(path: String, readOnly: Bool = false) throws {
         self.path = path
         var db: OpaquePointer?
-        let flags = SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
+        let flags = readOnly ? SQLITE_OPEN_READONLY | SQLITE_OPEN_FULLMUTEX
+            : SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX
         let code = sqlite3_open_v2(path, &db, flags, nil)
         guard code == SQLITE_OK, let db else {
             let message = db.map { String(cString: sqlite3_errmsg($0)) } ?? "cannot open"

@@ -68,6 +68,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             settingsWindow.show(page: page)
         }
 
+        // …and `-NikoOpenIsland sessions|usage` opens the island and keeps it open.
+        if let route = UserDefaults.standard.string(forKey: "NikoOpenIsland") {
+            model.route = route == "usage" ? .usage : .sessions
+            model.expand(.click)
+        }
+
         // The first launch gets the welcome (scripted launches say no thanks).
         if !model.settings.onboardingDone, !UserDefaults.standard.bool(forKey: "NikoOnboardingDisabled") {
             model.wantsOnboarding = true

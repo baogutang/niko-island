@@ -139,6 +139,23 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["showIslandWhenIdle"] = .bool(newValue) }
     }
 
+    // MARK: Usage
+
+    /// When the user last pressed Reset for a counter ("all" or an agent id).
+    public var usageResets: [String: Date] {
+        var out: [String: Date] = [:]
+        for member in raw["usageResets"]?.objectValue?.members ?? [] {
+            if let seconds = member.value.doubleValue, seconds > 0 { out[member.key] = Date(timeIntervalSince1970: seconds) }
+        }
+        return out
+    }
+
+    public mutating func setUsageReset(_ date: Date?, for counter: String) {
+        var object = raw["usageResets"]?.objectValue ?? JSONObject()
+        object[counter] = date.map { .number(String(Int($0.timeIntervalSince1970))) }
+        raw["usageResets"] = object.isEmpty ? nil : .object(object)
+    }
+
     // MARK: Appearance
 
     public enum IslandWidth: String, Sendable, CaseIterable {

@@ -150,6 +150,18 @@ extension JSONValue {
         }
     }
 
+    /// Parses a document but leaves out every object member whose key is in
+    /// `skipping`, at any depth. A skipped value is stepped over, checking
+    /// only that its strings end and its brackets balance; it is never built.
+    /// For reading a few numbers out of lines that are mostly something else.
+    public static func parse(_ data: Data, skipping: Set<String>) throws -> JSONValue {
+        try data.withUnsafeBytes { raw -> JSONValue in
+            var parser = Parser(bytes: raw.bindMemory(to: UInt8.self))
+            parser.skipping = skipping
+            return try parser.parseDocument()
+        }
+    }
+
     public static func parse(_ text: String) throws -> JSONValue {
         try parse(Data(text.utf8))
     }
@@ -157,6 +169,7 @@ extension JSONValue {
     private struct Parser {
         let bytes: UnsafeBufferPointer<UInt8>
         var i = 0
+        var skipping: Set<String> = []
 
         init(bytes: UnsafeBufferPointer<UInt8>) {
             self.bytes = bytes
@@ -221,6 +234,14 @@ extension JSONValue {
                 guard i < bytes.count, bytes[i] == UInt8(ascii: ":") else { throw fail("expected ':'") }
                 i += 1
                 skipWhitespace()
+                if !skipping.isEmpty, skipping.contains(key) {
+                    try skipValue(depth: depth + 1)
+                    skipWhitespace()
+                    guard i < bytes.count else { throw fail("unterminated object") }
+                    if bytes[i] == UInt8(ascii: ",") { i += 1; continue }
+                    if bytes[i] == UInt8(ascii: "}") { i += 1; return .object(JSONObject(members)) }
+                    throw fail("expected ',' or '}'")
+                }
                 let value = try parseValue(depth: depth + 1)
                 if let existing = members.firstIndex(where: { $0.key == key }) {
                     members[existing].value = value   // duplicate key: last one wins, first position kept
@@ -233,6 +254,50 @@ extension JSONValue {
                 if bytes[i] == UInt8(ascii: "}") { i += 1; return .object(JSONObject(members)) }
                 throw fail("expected ',' or '}'")
             }
+        }
+
+        /// Steps over one value without building it.
+        mutating func skipValue(depth: Int) throws {
+            guard depth <= JSONValue.maxDepth else { throw fail("nesting too deep") }
+            guard i < bytes.count else { throw fail("unexpected end of input") }
+            switch bytes[i] {
+            case UInt8(ascii: "\""):
+                try skipString()
+            case UInt8(ascii: "{"), UInt8(ascii: "["):
+                // Brackets only have to balance; strings are the one place they do not count.
+                var open = 0
+                while i < bytes.count {
+                    let b = bytes[i]
+                    if b == UInt8(ascii: "\"") {
+                        try skipString()
+                        continue
+                    }
+                    if b == UInt8(ascii: "{") || b == UInt8(ascii: "[") {
+                        open += 1
+                        guard open + depth <= JSONValue.maxDepth else { throw fail("nesting too deep") }
+                    } else if b == UInt8(ascii: "}") || b == UInt8(ascii: "]") {
+                        open -= 1
+                        if open == 0 { i += 1; return }
+                    }
+                    i += 1
+                }
+                throw fail("unterminated value")
+            case UInt8(ascii: "t"): try expect("true")
+            case UInt8(ascii: "f"): try expect("false")
+            case UInt8(ascii: "n"): try expect("null")
+            case UInt8(ascii: "-"), UInt8(ascii: "0")...UInt8(ascii: "9"): _ = try parseNumber()
+            default: throw fail("unexpected character")
+            }
+        }
+
+        mutating func skipString() throws {
+            i += 1
+            while i < bytes.count {
+                let b = bytes[i]
+                if b == UInt8(ascii: "\"") { i += 1; return }
+                i += b == UInt8(ascii: "\\") ? 2 : 1
+            }
+            throw fail("unterminated string")
         }
 
         mutating func parseArray(depth: Int) throws -> JSONValue {

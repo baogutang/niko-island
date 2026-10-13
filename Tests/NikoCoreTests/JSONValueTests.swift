@@ -50,3 +50,34 @@ final class JSONValueTests: XCTestCase {
         XCTAssertNotEqual(a, b)
     }
 }
+
+final class JSONSkippingTests: XCTestCase {
+    func testSkippedMembersAreNeverBuiltButStillHaveToBeWellFormed() throws {
+        let line = #"{"type":"assistant","message":{"id":"m1","usage":{"input_tokens":3,"output_tokens":5},"content":[{"type":"text","text":"a \"quoted\" } ] brace"},{"type":"tool_use","input":{"nested":[1,2,{"x":"}"}]}}]},"content":"top-level too","n":-1.5e3,"ok":true,"none":null}"#
+        let lean = try JSONValue.parse(Data(line.utf8), skipping: ["content"])
+        XCTAssertNil(lean["content"])
+        XCTAssertNil(lean["message"]?["content"])
+        XCTAssertEqual(lean["message"]?["usage"]?["output_tokens"]?.intValue, 5)
+        XCTAssertEqual(lean["message"]?["id"]?.stringValue, "m1")
+        XCTAssertEqual(lean["n"]?.doubleValue, -1500)
+        XCTAssertEqual(lean["ok"]?.boolValue, true)
+        XCTAssertEqual(lean["none"], .null)
+        // Everything else is exactly what a full parse gives.
+        var full = try XCTUnwrap(JSONValue.parse(Data(line.utf8)).objectValue)
+        full["content"] = nil
+        var message = try XCTUnwrap(full["message"]?.objectValue)
+        message["content"] = nil
+        full["message"] = .object(message)
+        XCTAssertEqual(lean, .object(full))
+        // Nothing to skip: identical to the plain parser.
+        XCTAssertEqual(try JSONValue.parse(Data(line.utf8), skipping: []), try JSONValue.parse(Data(line.utf8)))
+        XCTAssertEqual(try JSONValue.parse(Data(#"{"content":"only"}"#.utf8), skipping: ["content"]), .object(JSONObject()))
+        XCTAssertEqual(try JSONValue.parse(Data(#"{"content":{},"a":1}"#.utf8), skipping: ["content"])["a"]?.intValue, 1)
+    }
+
+    func testBrokenInputInsideASkippedValueIsStillAnError() {
+        for broken in [#"{"content":[1,2"#, #"{"content":"unterminated}"#, #"{"content":{"a":[}"#, #"{"content":tru,"a":1}"#, #"{"content":"x" "a":1}"#] {
+            XCTAssertThrowsError(try JSONValue.parse(Data(broken.utf8), skipping: ["content"]), broken)
+        }
+    }
+}

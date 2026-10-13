@@ -7,6 +7,23 @@ public struct RateLimitWindow: Sendable, Equatable, Identifiable {
     public var id: String
     public var usedPercent: Double
     public var resetsAt: Date?
+    /// Length of the window, when the source says (300 = five hours, 10080 = a week).
+    public var windowMinutes: Int?
+
+    public init(id: String, usedPercent: Double, resetsAt: Date? = nil, windowMinutes: Int? = nil) {
+        self.id = id
+        self.usedPercent = usedPercent
+        self.resetsAt = resetsAt
+        self.windowMinutes = windowMinutes
+    }
+
+    /// Minutes in the window, from the source or from the conventional key names.
+    public var minutes: Int? {
+        if let windowMinutes { return windowMinutes }
+        if id.contains("five_hour") { return 300 }
+        if id.contains("seven_day") || id.contains("week") { return 10080 }
+        return nil
+    }
 }
 
 public enum RateLimits {
@@ -48,6 +65,50 @@ public struct UsageSnapshot: Sendable, Equatable {
         public var tokens: Int
         public var cost: Double
     }
+
+    /// Tokens and estimated cost over one stretch of time.
+    public struct Window: Sendable, Equatable {
+        public var tokens = 0
+        public var cost = 0.0
+        public var messages = 0
+
+        public init(tokens: Int = 0, cost: Double = 0, messages: Int = 0) {
+            self.tokens = tokens
+            self.cost = cost
+            self.messages = messages
+        }
+
+        public init(_ rows: [UsageTotals]) {
+            tokens = rows.reduce(0) { $0 + $1.tokens }
+            cost = rows.reduce(0) { $0 + $1.cost }
+            messages = rows.reduce(0) { $0 + $1.messages }
+        }
+    }
+
+    /// One agent's usage: the rolling five hours, today, the last seven days,
+    /// since the user last reset the counter, and the provider's own limits
+    /// where it reports them.
+    public struct AgentUsage: Sendable, Equatable, Identifiable {
+        public var id: String
+        public var fiveHours = Window()
+        public var today = Window()
+        public var week = Window()
+        public var sinceReset: Window?
+        public var resetAt: Date?
+        /// Per model, last seven days.
+        public var models: [UsageTotals] = []
+        public var days: [Day] = []
+        public var limits: [RateLimitWindow] = []
+        public var limitsCapturedAt: Date?
+        public var plan: String?
+
+        public init(id: String) { self.id = id }
+    }
+
+    /// "all" first, then every agent with usage or limits, busiest first.
+    public var agents: [AgentUsage] = []
+
+    public func agent(_ id: String) -> AgentUsage? { agents.first { $0.id == id } }
 
     public var today: [UsageTotals] = []
     public var week: [UsageTotals] = []
@@ -114,6 +175,32 @@ public struct UsageSnapshot: Sendable, Equatable {
             RateLimitWindow(id: "seven_day", usedPercent: 61, resetsAt: now.addingTimeInterval(3.2 * 86_400)),
         ]
         snapshot.rateLimitsCapturedAt = now.addingTimeInterval(-40)
+        func usage(_ id: String, five: (Int, Double), limits: [RateLimitWindow], reset: Double?) -> AgentUsage {
+            var agent = AgentUsage(id: id)
+            let today = id == "all" ? snapshot.today : snapshot.today.filter { $0.agent == id }
+            let week = id == "all" ? snapshot.week : snapshot.week.filter { $0.agent == id }
+            agent.fiveHours = Window(tokens: five.0, cost: five.1, messages: 40)
+            agent.today = Window(today)
+            agent.week = Window(week)
+            agent.models = week
+            let share = snapshot.weekCost > 0 ? agent.week.cost / snapshot.weekCost : 1
+            agent.days = snapshot.days.map { Day(id: $0.id, tokens: Int(Double($0.tokens) * share), cost: $0.cost * share) }
+            agent.limits = limits
+            agent.limitsCapturedAt = limits.isEmpty ? nil : now.addingTimeInterval(-40)
+            if let reset {
+                agent.resetAt = now.addingTimeInterval(-reset * 3600)
+                agent.sinceReset = Window(tokens: Int(Double(agent.today.tokens) * 0.4), cost: agent.today.cost * 0.4, messages: 60)
+            }
+            return agent
+        }
+        snapshot.agents = [
+            usage("all", five: (2_240_000, 3.86), limits: [], reset: nil),
+            usage("claude", five: (1_900_000, 3.41), limits: snapshot.rateLimits, reset: 3.5),
+            usage("codex", five: (340_000, 0.45), limits: [
+                RateLimitWindow(id: "primary", usedPercent: 22, resetsAt: now.addingTimeInterval(1.6 * 3600), windowMinutes: 300),
+                RateLimitWindow(id: "secondary", usedPercent: 48, resetsAt: now.addingTimeInterval(4.1 * 86_400), windowMinutes: 10080),
+            ], reset: nil),
+        ]
         snapshot.updatedAt = now
         snapshot.pricingSource = "bundled"
         return snapshot

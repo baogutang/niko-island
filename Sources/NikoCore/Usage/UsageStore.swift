@@ -68,6 +68,7 @@ public final class UsageStore {
       committed_offset INTEGER NOT NULL, tail_hash TEXT NOT NULL,
       parser_version INTEGER NOT NULL, status TEXT NOT NULL,
       UNIQUE(path, generation));
+    CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY, value TEXT);
     CREATE TABLE IF NOT EXISTS events(
       id INTEGER PRIMARY KEY, identity_key TEXT NOT NULL UNIQUE,
       event_kind TEXT NOT NULL, ts REAL NOT NULL, day TEXT NOT NULL,
@@ -79,7 +80,7 @@ public final class UsageStore {
     CREATE INDEX IF NOT EXISTS events_day ON events(day);
     """
 
-    private var db: SQLiteDB
+    var db: SQLiteDB
     public let path: String
     public let timeZone: TimeZone
     /// Set when the previous database had to be set aside on open.

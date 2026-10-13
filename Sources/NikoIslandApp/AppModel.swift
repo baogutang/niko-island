@@ -90,6 +90,7 @@ public final class AppModel: ObservableObject {
             if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
             if settings.sessionRetentionMinutes != oldValue.sessionRetentionMinutes { scout?.setWindow(settings.sessionRetention) }
             if settings.discoverSessions != oldValue.discoverSessions { reconcileScout() }
+            if settings.usageResets != oldValue.usageResets { usageEngine?.setResets(settings.usageResets) }
         }
     }
     @Published public internal(set) var usage = UsageSnapshot() {
@@ -107,6 +108,8 @@ public final class AppModel: ObservableObject {
     public var onPreviewSound: ((SoundEvent) -> Void)?
     /// The settings page that is showing (raw value of `SettingsPage`).
     @Published public var settingsPage = "general"
+    /// Whose usage the usage view shows: "all" or an agent id.
+    @Published public var usageAgent = "all"
     /// Agents whose app or command-line tool is running right now.
     @Published public internal(set) var runningAgents: [String] = []
     /// Shown instead of the island's usual content the first time the app runs.

@@ -121,12 +121,32 @@
         }
       }
     },
+    "%lld days ago": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 天前"
+          }
+        }
+      }
+    },
     "%lld helpers": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个子代理"
+          }
+        }
+      }
+    },
+    "%lld min ago": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分钟前"
           }
         }
       }
@@ -171,6 +191,36 @@
         }
       }
     },
+    "%lld-day limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 天限额"
+          }
+        }
+      }
+    },
+    "%lld-hour limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时限额"
+          }
+        }
+      }
+    },
+    "%lldh %lldm ago": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时 %lld 分钟前"
+          }
+        }
+      }
+    },
     "+ %lld more": {
       "localizations": {
         "zh-Hans": {
@@ -211,22 +261,32 @@
         }
       }
     },
-    "5-hour window": {
+    "5 hours": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "5 小时窗口"
+            "value": "5 小时"
           }
         }
       }
     },
-    "7-day window": {
+    "5-hour limit": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "7 天窗口"
+            "value": "5 小时限额"
+          }
+        }
+      }
+    },
+    "7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天"
           }
         }
       }
@@ -327,6 +387,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理会继续工作；等待中的请求会回到各自的终端。"
+          }
+        }
+      }
+    },
+    "All": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部"
           }
         }
       }
@@ -581,16 +651,6 @@
         }
       }
     },
-    "Claude rate limits": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Claude 速率限制"
-          }
-        }
-      }
-    },
     "Click a session and its terminal tab or app comes forward. Sessions show up even for agents you have not connected.": {
       "localizations": {
         "zh-Hans": {
@@ -741,12 +801,22 @@
         }
       }
     },
-    "Costs are estimates from public list prices; your plan or invoice may differ. Counted from transcripts on this Mac only.": {
+    "Costs are estimates from public list prices; your plan or invoice may differ. Counted from what the agents wrote on this Mac only.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "费用按公开标价估算，可能与你的套餐或账单不同。仅统计这台 Mac 上的会话记录。"
+            "value": "费用是按公开标价估算的，可能与你的套餐或账单不同。仅统计各代理在这台 Mac 上写下的记录。"
+          }
+        }
+      }
+    },
+    "Count from now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "从现在开始计数"
           }
         }
       }
@@ -1141,22 +1211,32 @@
         }
       }
     },
-    "Last 7 days": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "最近 7 天"
-          }
-        }
-      }
-    },
     "Limit close": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "额度告急"
+          }
+        }
+      }
+    },
+    "Limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "限额"
+          }
+        }
+      }
+    },
+    "Limits, as %@ reports them": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "限额（%@ 自己报告的）"
           }
         }
       }
@@ -1731,6 +1811,16 @@
         }
       }
     },
+    "Reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置"
+          }
+        }
+      }
+    },
     "Rest the pointer on the island to open it, or press ⌃⌥I from anywhere.": {
       "localizations": {
         "zh-Hans": {
@@ -1911,6 +2001,16 @@
         }
       }
     },
+    "Since reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重置以来"
+          }
+        }
+      }
+    },
     "Skip": {
       "localizations": {
         "zh-Hans": {
@@ -1987,6 +2087,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止自动批准"
+          }
+        }
+      }
+    },
+    "Stop this counter": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "停止这个计数"
           }
         }
       }
@@ -2187,6 +2297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "看屏幕顶部的小岛：这就是它每天做的事。"
+          }
+        }
+      }
+    },
+    "Weekly limit": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每周限额"
           }
         }
       }
@@ -2417,6 +2537,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "出错了"
+          }
+        }
+      }
+    },
+    "just now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "刚刚"
           }
         }
       }

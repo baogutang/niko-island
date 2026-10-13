@@ -614,3 +614,121 @@ final class UsageEngineIntegrationTests: XCTestCase {
         XCTAssertTrue(log.lines.contains { $0.contains("rebuilt from the transcripts") })
     }
 }
+
+final class UsageWindowTests: XCTestCase {
+    private func record(_ agent: String, _ id: String, at timestamp: Double, input: Int = 100, output: Int = 50) -> UsageRecord {
+        UsageRecord(identityKey: UsageRecord.identity(agent, id), timestamp: timestamp, agent: agent, model: "\(agent)-model",
+                    session: "s", project: nil, input: input, output: output)
+    }
+
+    func testPerAgentWindowsLimitsAndResets() throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let now = Date()
+        let engine = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
+        _ = engine.scanNow()                      // creates the store
+        engine.stop()
+        let store = try UsageStore(path: paths.usageDB.path)
+        let t = now.timeIntervalSince1970
+        try store.commit(records: [
+            record("claude", "a", at: t - 600), record("claude", "b", at: t - 7 * 3600), record("claude", "c", at: t - 3 * 86_400),
+            record("codex", "d", at: t - 1200, input: 1000, output: 0), record("zcode", "e", at: t - 60, input: 10, output: 5),
+        ], pricing: Pricing(rates: [:], source: "test"), file: nil)
+        store.close()
+
+        let again = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
+        again.setResets(["claude": now.addingTimeInterval(-3600), "all": now.addingTimeInterval(-900)])
+        let snapshot = again.scanNow()
+        again.stop()
+
+        XCTAssertEqual(snapshot.agents.first?.id, "all")
+        XCTAssertEqual(Set(snapshot.agents.map(\.id)), ["all", "claude", "codex", "zcode"])
+        let claude = try XCTUnwrap(snapshot.agent("claude"))
+        XCTAssertEqual(claude.fiveHours.tokens, 150, "only what happened in the last five hours")
+        XCTAssertEqual(claude.week.tokens, 450)
+        XCTAssertEqual(claude.week.messages, 3)
+        XCTAssertEqual(claude.sinceReset?.tokens, 150, "counted from the reset, an hour ago")
+        XCTAssertEqual(claude.days.count, 7)
+        XCTAssertEqual(claude.days.reduce(0) { $0 + $1.tokens }, 450)
+        XCTAssertEqual(claude.models.map(\.model), ["claude-model"])
+        XCTAssertNil(try XCTUnwrap(snapshot.agent("codex")).sinceReset, "no reset asked for")
+        let all = try XCTUnwrap(snapshot.agent("all"))
+        XCTAssertEqual(all.fiveHours.tokens, 150 + 1000 + 15)
+        XCTAssertEqual(all.sinceReset?.tokens, 150 + 15, "the last fifteen minutes, every agent")
+        XCTAssertEqual(all.week.tokens, snapshot.weekTokens)
+    }
+
+    func testCodexLimitsAreReadFromTheNewestRolloutAndRemembered() throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        let home = scratch.file("home")
+        let resets = Int(Date().timeIntervalSince1970) + 7200
+        let rollout = """
+        {"timestamp":"2027-01-15T08:00:00.000Z","type":"session_meta","payload":{"id":"cx","cwd":"/tmp/p"}}
+        {"timestamp":"2027-01-15T08:00:05.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":10,"cached_input_tokens":0,"output_tokens":5,"reasoning_output_tokens":0,"total_tokens":15}},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300,"resets_at":\(resets)},"secondary":null,"plan_type":"pro"}}}
+        {"timestamp":"2027-01-15T08:01:05.000Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":30,"cached_input_tokens":0,"output_tokens":9,"reasoning_output_tokens":0,"total_tokens":39}},"rate_limits":{"primary":{"used_percent":31,"window_minutes":300,"resets_at":\(resets)},"secondary":{"used_percent":64,"window_minutes":10080,"resets_at":\(resets + 86_400)},"plan_type":"pro"}}}
+
+        """
+        scratch.write("home/.codex/sessions/2027/01/15/rollout-2027-01-15T08-00-00-cx.jsonl", rollout)
+        let engine = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
+        let snapshot = engine.scanNow()
+        engine.stop()
+        let codex = try XCTUnwrap(snapshot.agent("codex"))
+        XCTAssertEqual(codex.limits.map(\.usedPercent), [31, 64], "the newest reading wins")
+        XCTAssertEqual(codex.limits.map(\.minutes), [300, 10080])
+        XCTAssertEqual(codex.plan, "pro")
+        XCTAssertEqual(snapshot.rateLimits.map(\.usedPercent).max(), 64, "the limit cue watches every provider")
+
+        // The rollout goes away; the limits were remembered.
+        try FileManager.default.removeItem(at: scratch.file("home/.codex"))
+        let later = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
+        let remembered = later.scanNow()
+        later.stop()
+        XCTAssertEqual(remembered.agent("codex")?.limits.count, 2)
+
+        // A window that has already reset is not shown as if it still applied.
+        let stale = ProviderLimits(windows: [RateLimitWindow(id: "primary", usedPercent: 90, resetsAt: Date().addingTimeInterval(-10), windowMinutes: 300)])
+        XCTAssertTrue(stale.current(now: Date()).windows.isEmpty)
+        XCTAssertNil(CodexLimits.latest(inTail: Data(#"{"type":"event_msg","payload":{"type":"token_count"}}"#.utf8)))
+    }
+
+    func testZCodeUsageIsCopiedFromItsDatabaseOnce() throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: scratch.file("home/.zcode/cli/db"), withIntermediateDirectories: true)
+        let theirs = try SQLiteDB(path: ZCodeUsage.databasePath(home: home))
+        try theirs.execute("""
+            CREATE TABLE model_usage(id TEXT, session_id TEXT, model_id TEXT, completed_at INTEGER, status TEXT,
+              input_tokens INTEGER, output_tokens INTEGER, reasoning_tokens INTEGER,
+              cache_creation_input_tokens INTEGER, cache_read_input_tokens INTEGER);
+            """)
+        let nowMS = Int64(Date().timeIntervalSince1970 * 1000)
+        func insert(_ id: String, input: Int, output: Int, cacheRead: Int, completed: Int64?) throws {
+            try theirs.run("INSERT INTO model_usage VALUES(?,?,?,?,?,?,?,?,?,?)",
+                           [.text(id), .text("sess_1"), .text("GLM-5.3"), completed.map(SQLiteDB.Value.integer) ?? .null, .text("completed"),
+                            .integer(Int64(input)), .integer(Int64(output)), .integer(0), .integer(0), .integer(Int64(cacheRead))])
+        }
+        try insert("r1", input: 1000, output: 40, cacheRead: 900, completed: nowMS - 60_000)
+        try insert("r2", input: 500, output: 10, cacheRead: 0, completed: nowMS - 30_000)
+        try insert("running", input: 5, output: 0, cacheRead: 0, completed: nil)
+
+        let engine = UsageEngine(paths: paths, home: home, pricing: Pricing(rates: [:], source: "test")) { _ in }
+        var snapshot = engine.scanNow()
+        let zcode = try XCTUnwrap(snapshot.agent("zcode"))
+        // Input is counted without what came from the cache: 100 + 500, plus 900 read from cache and 50 out.
+        XCTAssertEqual(zcode.today.tokens, 100 + 500 + 900 + 50)
+        XCTAssertEqual(zcode.models.first?.model, "GLM-5.3")
+        XCTAssertEqual(zcode.models.first?.cacheRead, 900)
+        XCTAssertEqual(zcode.today.messages, 2, "a request that has not completed is not counted")
+
+        try insert("r3", input: 7, output: 3, cacheRead: 0, completed: nowMS)
+        snapshot = engine.scanNow()
+        engine.stop()
+        XCTAssertEqual(snapshot.agent("zcode")?.today.messages, 3, "new rows are picked up, old ones are not counted twice")
+        XCTAssertEqual(snapshot.agent("zcode")?.today.tokens, 1550 + 10)
+        theirs.close()
+    }
+}
