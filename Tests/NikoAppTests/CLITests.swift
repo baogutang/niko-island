@@ -32,7 +32,7 @@ final class CLITests: XCTestCase {
         }
         XCTAssertEqual(niko("frobnicate").status, 64)
         XCTAssertEqual(niko("install", "--agents", "nonexistent").status, 64)
-        XCTAssertEqual(niko("install", "--agents", "kimi").status, 64, "planned agents have no adapter")
+        XCTAssertEqual(niko("install", "--agents", "vibe").status, 64, "planned agents have no adapter")
         XCTAssertEqual(niko("install", "--bogus-flag").status, 64)
         XCTAssertEqual(niko("install", "--purge").status, 64)
         XCTAssertEqual(scratch.read("home/.claude/settings.json"), fixture)

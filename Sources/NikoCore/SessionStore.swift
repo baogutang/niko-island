@@ -181,7 +181,9 @@ public struct SessionStore: Sendable {
             session.phase = .working
             session.activity = .thinking
         default:
-            session.activity = Activity(verb: "working", detail: event.name)
+            // An event we have no meaning for (a heartbeat, a helper starting): it says the
+            // session is alive, not what it is doing.
+            break
         }
 
         if session.phase != previousPhase || sessions[key] == nil { session.phaseSince = now }

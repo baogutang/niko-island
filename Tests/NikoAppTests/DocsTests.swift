@@ -181,7 +181,7 @@ final class DocsTests: XCTestCase {
         XCTAssertTrue(NikoSettings().discoverSessions, "the READMEs say sessions are found without connecting anything")
         XCTAssertEqual(NikoSettings().fullScreenPolicy, .followMenuBar, "the READMEs call following the menu bar the default")
         XCTAssertEqual(Hotkey.display, "⌃⌥I")
-        XCTAssertTrue(AgentRegistry.all.filter(\.approvals).map(\.id).sorted() == ["claude", "codex", "zcode"],
+        XCTAssertTrue(AgentRegistry.all.filter(\.approvals).map(\.id).sorted() == ["claude", "codex", "devin", "zcode"],
                       "the READMEs name the agents that can be approved from the island")
         for readme in ["README.md", "README.zh-CN.md"] {
             let text = try read(readme)
@@ -234,10 +234,13 @@ final class DocsTests: XCTestCase {
             XCTAssertFalse(text.contains("two optional things"), readme)
             XCTAssertFalse(text.contains("两件可选的事"), readme)
         }
-        XCTAssertTrue(try read("README.md").contains("Three optional uses of the network"))
-        XCTAssertTrue(try read("README.zh-CN.md").contains("只有三件可选的事会用到网络"))
+        // 0.9.0 added the version check: four, and the site no longer says there is no update check.
+        XCTAssertTrue(try read("README.md").contains("Four optional uses of the network"))
+        XCTAssertTrue(try read("README.zh-CN.md").contains("只有四件可选的事会用到网络"))
         let site = try read("website/index.html")
         XCTAssertTrue(site.contains("Bark") && site.contains("ntfy"))
+        XCTAssertTrue(site.contains("Four optional uses of the network") && site.contains("只有四件可选的事会用到网络"))
+        XCTAssertFalse(site.contains("or update check in the app") || site.contains("崩溃上报或更新检查"))
     }
 
     /// What the pages say about 0.7.0 is what the code does.
@@ -267,7 +270,11 @@ final class DocsTests: XCTestCase {
         XCTAssertFalse(NikoSettings().claudeLimitsLookup, "the pages say all three lookups are off until switched on")
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
         XCTAssertFalse(NikoSettings().codexLimitsLookup)
-        XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com"])
+        XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
+                                                    "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com"])
+        XCTAssertFalse(NikoSettings().kimiLimitsLookup || NikoSettings().minimaxLimitsLookup || NikoSettings().geminiLimitsLookup)
+        XCTAssertFalse(NikoSettings().updateChecks, "the pages say the version check is off until switched on")
+        XCTAssertEqual(UpdateCheck.latest.host, "api.github.com")
         XCTAssertEqual(CodexUsageAPI.request(CodexUsageAPI.usage, login: .init(token: "t")).value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"),
                        true, "the pages say requests go out under this app's own name")
         for page in ["README.md", "README.zh-CN.md"] {

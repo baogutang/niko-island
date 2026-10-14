@@ -62,15 +62,27 @@ struct IslandLook: Equatable {
     var textScale: CGFloat = NikoSettings.TextSize.regular.scale
     /// How long the island takes to open and close, relative to the standard.
     var motion: Double = 1
+    var style = NikoSettings.IslandStyle.classic
 
     init() {}
 
     // Type inside the island: semibold rather than bold, so a list of sessions reads as a list.
-    func title(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font { .system(size: size * textScale, weight: weight, design: .rounded) }
-    func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font { .system(size: size * textScale, weight: weight) }
+    func title(_ size: CGFloat, _ weight: Font.Weight = .semibold) -> Font {
+        .system(size: size * textScale, weight: weight, design: style == .pixel ? .monospaced : .rounded)
+    }
+    func body(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size * textScale, weight: weight, design: style == .pixel ? .monospaced : .default)
+    }
     func mono(_ size: CGFloat, _ weight: Font.Weight = .medium) -> Font { .system(size: size * textScale, weight: weight, design: .monospaced) }
 
+    /// A corner as the style draws it: the pixel style keeps them nearly square.
+    func radius(_ value: CGFloat) -> CGFloat { style == .pixel ? min(value, 3) : value }
+
+    /// The island's own corners, relative to the standard ones.
+    var islandRadiusScale: CGFloat { style == .pixel ? 0.2 : 1 }
+
     init(settings: NikoSettings) {
+        style = settings.islandStyle
         textScale = settings.textSize.scale
         motion = settings.motion.factor
         replyLines = settings.replyLines
@@ -80,6 +92,58 @@ struct IslandLook: Equatable {
         compact = settings.rowDensity == .compact
         chips = Set(NikoSettings.RowChip.allCases.filter(settings.showsChip))
     }
+}
+
+/// What the island is drawn on, in the user's style. The collapsed island on a
+/// display with a camera housing stays black whatever the style: it has to
+/// read as part of the housing.
+struct IslandSurface<S: Shape>: View {
+    var shape: S
+    var style: NikoSettings.IslandStyle
+    var housing = false
+    @Environment(\.isStaticPreview) private var isStaticPreview
+
+    var body: some View {
+        switch housing ? .classic : style {
+        case .classic:
+            shape.fill(Theme.island)
+        case .glass:
+            ZStack {
+                // A picture has no desktop behind it to blur: a frosted grey stands in.
+                if isStaticPreview { shape.fill(Color(white: 0.22).opacity(0.92)) } else { GlassBackdrop() }
+                shape.fill(Color.black.opacity(0.5))
+                shape.stroke(Color.white.opacity(0.16), lineWidth: 2)
+            }
+            .clipShape(shape)
+        case .pixel:
+            ZStack {
+                shape.fill(Color(red: 0.035, green: 0.04, blue: 0.05))
+                shape.stroke(Color.white.opacity(0.26), lineWidth: 3)
+            }
+            .clipShape(shape)
+        case .midnight:
+            ZStack {
+                shape.fill(LinearGradient(colors: [Color(red: 0.08, green: 0.10, blue: 0.20), Color(red: 0.03, green: 0.04, blue: 0.10)],
+                                          startPoint: .top, endPoint: .bottom))
+                shape.stroke(Color(red: 0.55, green: 0.65, blue: 1.0).opacity(0.14), lineWidth: 2)
+            }
+            .clipShape(shape)
+        }
+    }
+}
+
+/// The desktop behind the island, blurred and darkened.
+struct GlassBackdrop: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSVisualEffectView {
+        let view = NSVisualEffectView()
+        view.material = .hudWindow
+        view.blendingMode = .behindWindow
+        view.state = .active
+        view.appearance = NSAppearance(named: .darkAqua)
+        return view
+    }
+
+    func updateNSView(_ view: NSVisualEffectView, context: Context) {}
 }
 
 private struct IslandLookKey: EnvironmentKey {
@@ -111,6 +175,11 @@ enum AgentTint {
         case "windsurf": return Color(red: 0.45, green: 0.88, blue: 0.80)
         case "kiro": return Color(red: 0.78, green: 0.66, blue: 1.00)
         case "factory": return Color(red: 0.95, green: 0.72, blue: 0.45)
+        case "qoder", "qoder-cn", "qoderwork": return Color(red: 0.47, green: 0.86, blue: 0.77)
+        case "kimi": return Color(red: 0.74, green: 0.76, blue: 0.84)
+        case "minimax": return Color(red: 0.94, green: 0.48, blue: 0.62)
+        case "devin": return Color(red: 0.48, green: 0.68, blue: 0.98)
+        case "amp": return Color(red: 0.98, green: 0.56, blue: 0.40)
         default: return Color.white.opacity(0.75)
         }
     }
@@ -132,7 +201,9 @@ struct Chip: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .foregroundStyle(tint ?? Theme.primary.opacity(0.88))
-            .background(Capsule().fill(tint.map { $0.opacity(0.20) } ?? Theme.chip))
+            // A corner larger than half the height is drawn as a capsule.
+            .background(RoundedRectangle(cornerRadius: look.radius(100), style: .continuous)
+                .fill(tint.map { $0.opacity(0.20) } ?? Theme.chip))
     }
 }
 

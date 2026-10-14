@@ -88,7 +88,7 @@ struct UsageView: View {
     }
 
     private func tileFrame<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: look.radius(14), style: .continuous)
         return VStack(alignment: .leading, spacing: 2) { content() }
             .padding(.horizontal, 11).padding(.vertical, 9)
             .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72, alignment: .topLeading)
@@ -123,6 +123,9 @@ struct UsageView: View {
         switch window.id {
         case "tools_month": return L("Tool calls, monthly")
         case "extra_usage": return L("Extra usage")
+        case "daily_pro": return L("Pro models, daily")
+        case "daily_flash": return L("Flash models, daily")
+        case "daily_flash_lite": return L("Flash-Lite models, daily")
         case let id where id.hasPrefix("seven_day_"):
             // One model's share of the week, or a share this version has no name for.
             return L("Weekly, %@", id.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized)
@@ -278,7 +281,7 @@ struct UsageView: View {
         return HStack(alignment: .bottom, spacing: 6) {
             ForEach(days) { day in
                 VStack(spacing: 4) {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    RoundedRectangle(cornerRadius: look.radius(4), style: .continuous)
                         .fill(day.id == days.last?.id ? look.accent : look.accent.opacity(0.35))
                         .frame(height: max(3, 50 * CGFloat(day.tokens) / CGFloat(peak)))
                     Text(String(day.id.suffix(2))).font(look.mono(9, .regular)).foregroundStyle(Theme.tertiary)
@@ -331,9 +334,15 @@ enum ProviderLookupText {
         case ProviderLimitsClient.claude: return "Anthropic"
         case ProviderLimitsClient.glm: return "BigModel / Z.ai"
         case ProviderLimitsClient.codex: return "OpenAI"
+        case ProviderLimitsClient.kimi: return "Kimi"
+        case ProviderLimitsClient.minimax: return "MiniMax"
+        case ProviderLimitsClient.gemini: return "Google"
         default: return nil
         }
     }
+
+    /// Plans asked with a key the user typed in, rather than with the agent's own sign-in.
+    static func usesKey(_ agent: String) -> Bool { AppModel.keyAccounts[agent] != nil }
 
     /// How Claude Code's own look went, in words. `problemsOnly`: say nothing while all is well.
     static func claudeItself(_ outcome: ClaudeCodeUsage.Outcome?, looking: Bool, problemsOnly: Bool = false) -> String? {
@@ -347,19 +356,21 @@ enum ProviderLookupText {
     }
 
     static func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
-        let codex = agent == ProviderLimitsClient.codex
+        let codex = agent == ProviderLimitsClient.codex, gemini = agent == ProviderLimitsClient.gemini
         switch state {
         case .ok: return nil
         case .noLogin:
+            if gemini { return L("Gemini CLI has not signed in with a Google account on this Mac, so there is nothing to ask with.") }
             return codex ? L("Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.")
                 : L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
         case .loginExpired:
+            if gemini { return L("Gemini CLI's sign-in on this Mac has run out. It renews itself the next time Gemini CLI runs.") }
             return codex ? L("Codex's sign-in on this Mac has run out. It renews itself the next time Codex runs.")
                 : L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
         case .denied: return L("macOS was told not to share %@'s sign-in.", AgentRegistry.displayName(for: agent))
         case .noKey: return L("No Coding Plan key has been added yet.")
         case .unauthorized:
-            return agent == ProviderLimitsClient.glm ? L("The key was not accepted.") : L("%@ did not accept the sign-in.", provider(agent) ?? "")
+            return usesKey(agent) ? L("The key was not accepted.") : L("%@ did not accept the sign-in.", provider(agent) ?? "")
         case .rateLimited: return L("The provider asked for a pause. Trying again in a few minutes.")
         case .unreachable: return L("The provider could not be reached.")
         case .unreadable: return L("The provider answered in a form this version does not read.")

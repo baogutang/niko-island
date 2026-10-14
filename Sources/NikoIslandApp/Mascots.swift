@@ -346,6 +346,16 @@ enum Mascots {
             return octopus.recolored(["a": rgb(190, 160, 250), "b": rgb(136, 104, 206), "c": rgb(228, 214, 255)])
         case "windsurf":
             return boat.recolored(["w": rgb(160, 236, 220), "b": rgb(70, 150, 150)])
+        case "qoder", "qoder-cn", "qoderwork":
+            return turtle.recolored(["a": rgb(120, 220, 196), "b": rgb(52, 150, 132)])
+        case "kimi":
+            return whale.recolored(["a": rgb(120, 120, 140), "c": rgb(196, 198, 214)])
+        case "minimax":
+            return starfish.recolored(["a": rgb(240, 110, 150), "b": rgb(190, 70, 110), "c": rgb(255, 196, 214)])
+        case "devin":
+            return crab.recolored(["a": rgb(110, 170, 250), "b": rgb(64, 116, 200)])
+        case "amp":
+            return puffer.recolored(["a": rgb(250, 130, 90), "b": rgb(204, 86, 56), "c": rgb(255, 206, 186)])
         default: return island
         }
     }

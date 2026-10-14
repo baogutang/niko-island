@@ -749,3 +749,41 @@ final class UsageWindowTests: XCTestCase {
         theirs.close()
     }
 }
+
+/// A large transcript is read and written down a stretch at a time; what comes out is the same.
+final class UsageStretchTests: XCTestCase {
+    func testALargeFileIsWrittenDownInStretchesAndAddsUpTheSame() throws {
+        let scratch = Scratch()
+        try SecureDirectory.ensureTree(scratch.paths)
+        let utc = TimeZone(identifier: "UTC")!
+        let pricing = Pricing(rates: ["claude-opus-4-5-20251101": .init(input: 5e-6, output: 25e-6, cacheRead: 5e-7, cacheWrite: 6.25e-6)], source: "test")
+        var lines: [String] = []
+        for index in 0..<400 {
+            lines.append(claudeLine(id: "msg-\(index)", request: "req-\(index)", output: 10 + index))
+            if index == 200 {
+                // One line far longer than a stretch: it is read in one go, not lost and not looped over.
+                lines.append(#"{"type":"user","sessionId":"sess-1","message":{"role":"user","content":""# + String(repeating: "x", count: 20_000) + #""}}"#)
+            }
+        }
+        let text = lines.joined(separator: "\n") + "\n" + #"{"type":"assistant","partial":"#   // a last line still being written
+        let file = scratch.file("transcript.jsonl")
+        try Data(text.utf8).write(to: file)
+
+        func run(segment: Int, database: String) throws -> (records: Int, tokens: Int, committed: Int) {
+            let store = try UsageStore(path: scratch.file(database).path, timeZone: utc)
+            defer { store.close() }
+            let tailer = TranscriptTailer(store: store, pricing: pricing, segmentBytes: segment)
+            guard case .read(let records, _) = try tailer.sync(path: file.path, provider: .claude) else { XCTFail("not read"); return (0, 0, 0) }
+            let totals = try store.totals(fromDay: "2026-10-01", toDay: "2026-10-31")
+            let committed = try store.latestState(for: file.path)?.committedOffset ?? -1
+            return (records, totals.reduce(0) { $0 + $1.output }, committed)
+        }
+        let whole = try run(segment: 64 << 20, database: "whole.sqlite")
+        let stretched = try run(segment: 4096, database: "stretched.sqlite")
+        XCTAssertEqual(whole.records, 400)
+        XCTAssertEqual(stretched.records, whole.records)
+        XCTAssertEqual(stretched.tokens, whole.tokens)
+        XCTAssertEqual(stretched.committed, whole.committed, "both stop before the line still being written")
+        XCTAssertEqual(whole.committed, text.utf8.count - #"{"type":"assistant","partial":"#.utf8.count)
+    }
+}

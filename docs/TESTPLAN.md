@@ -441,6 +441,16 @@ is also a listening test: note anything harsh, too long or too quiet.
 - ☐ General → "Open Niko Island at login" registers the app (works only from
   the bundled app, ideally in /Applications). **(not automated)**
 - ☐ About → "Export diagnostics" writes a report and shows its path.
+- ☐ Island → Theme: Classic, Glass, Pixel, Midnight each change the open
+  island at once. Glass shows the desktop blurred behind it; Pixel has square
+  corners, square chips and monospaced type. On a display with a camera
+  housing the closed island stays black in every theme.
+- ☐ Agents: a connected agent says "last event …" once its hooks have fired,
+  and "no event since Niko Island started" before that.
+- ☐ About → "Tell me when there is a new version": with an older build, the
+  status row says which version is out and the island's header shows a chip;
+  "Install and restart" downloads, checks and replaces the app (old one in the
+  Trash) and the new version starts. **(not run against /Applications)**
 
 ## 9. Notifications and jump-back **(not automated)**
 
@@ -516,6 +526,27 @@ Codex and ZCode (beta). **None of this has been done with the live agents.**
 - ☐ Any other beta agent you use (Cursor, Windsurf, Gemini CLI, Trae, Qwen
   Code, CodeBuddy, Factory, Grok CLI): after `install --agents <id>` its
   sessions show up with live status, and the agent shows no hook errors.
+
+Added in 0.9.0 (beta: Copilot CLI, Qoder, Qoder CN, Kimi Code, Devin;
+experimental: QoderWork, Kiro, MiniMax Code, Amp). **None of these has been
+run against the live agent.**
+
+- ☐ Kimi Code: `install --agents kimi`; `~/.kimi-code/config.toml` ends with
+  one block between `# >>> niko-island` and `# <<< niko-island`; `kimi` starts
+  without a config error; a session shows up and a permission prompt shows as
+  "needs permission" (answered in Kimi Code). `uninstall` leaves the file as
+  it was.
+- ☐ Devin: a permission request decided on the island is honoured
+  (`{"decision":"approve"}` / block). With Devin's own hooks connected, the
+  hooks it borrows from Claude Code's settings do not show a second session.
+- ☐ Copilot CLI: `~/.copilot/hooks/niko.json`; a session shows up with live
+  status; tool calls are never held up.
+- ☐ Kiro CLI 3: `~/.kiro/hooks/niko.json` runs in a workspace without
+  `--agent`; an older `~/.kiro/settings/cli.json` lost only our entries.
+- ☐ MiniMax Code: the plugin pack is picked up by `mcode` at the next session.
+- ☐ Amp: after reloading plugins, a thread shows up with its last tool and
+  its reply at the end of a turn.
+- ☐ Qoder / Qoder CN / QoderWork: a session shows up with live status.
 
 ```bash
 "dist/Niko Island.app/Contents/MacOS/niko-island" uninstall

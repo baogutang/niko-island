@@ -131,8 +131,8 @@ public final class AppModel: ObservableObject {
             if settings.pricingRefreshEnabled, !oldValue.pricingRefreshEnabled { refreshPricingIfDue() }
             if settings.sessionRetentionMinutes != oldValue.sessionRetentionMinutes { scout?.setWindow(settings.sessionRetention) }
             if settings.discoverSessions != oldValue.discoverSessions { reconcileScout() }
-            if settings.claudeLimitsLookup != oldValue.claudeLimitsLookup || settings.glmLimitsLookup != oldValue.glmLimitsLookup
-                || settings.glmRegion != oldValue.glmRegion || settings.codexLimitsLookup != oldValue.codexLimitsLookup {
+            if ProviderLimitsClient.providers.contains(where: { settings.asksProvider($0) != oldValue.asksProvider($0) })
+                || settings.glmRegion != oldValue.glmRegion || settings.minimaxRegion != oldValue.minimaxRegion {
                 reconcileProviderLimits()
             }
             if settings.claudeAsksItself != oldValue.claudeAsksItself {
@@ -161,6 +161,17 @@ public final class AppModel: ObservableObject {
     @Published public internal(set) var providerLookups: [String: ProviderLimitsClient.Result] = [:]
     /// Whether a GLM Coding Plan key is in the Keychain (the key itself is never held here).
     @Published public internal(set) var hasGLMKey = false
+    @Published public internal(set) var hasKimiKey = false
+    @Published public internal(set) var hasMiniMaxKey = false
+    /// A newer release, once GitHub has said so (only when the user switched the check on).
+    @Published public internal(set) var availableUpdate: ReleaseInfo?
+    public enum UpdateState: Equatable, Sendable { case idle, checking, upToDate, installing, failed(String) }
+    @Published public internal(set) var updateState: UpdateState = .idle
+    /// Tests replace this.
+    var makeUpdater: () -> Updater = { Updater() }
+    /// How the latest-version answer is turned into the running app being replaced (the app delegate sets it).
+    var relaunch: (URL) -> Void = { _ in }
+
     /// How Claude Code's own look at the plan's usage last went; nil until it was asked to.
     @Published public internal(set) var claudeLookup: ClaudeCodeUsage.Outcome?
     @Published public internal(set) var claudeIsLooking = false
@@ -172,6 +183,9 @@ public final class AppModel: ObservableObject {
     var makeLimitsClient: (@escaping @Sendable ([String: ProviderLimitsClient.Result]) -> Void) -> ProviderLimitsClient? = { _ in nil }
     /// Agents whose app or command-line tool is running right now.
     @Published public internal(set) var runningAgents: [String] = []
+    /// When each agent's hooks last reached the app (this run only): Settings shows it, so a hook
+    /// that never fires is noticed. Updated at most every 20 seconds per agent.
+    @Published public internal(set) var lastHeard: [String: Date] = [:]
     /// Shown instead of the island's usual content the first time the app runs.
     @Published public var wantsOnboarding = false
     /// Brings the session's terminal to the front; replaced in tests.
@@ -248,7 +262,10 @@ public final class AppModel: ObservableObject {
 
         let timer = Timer(timeInterval: 300, repeats: true) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated { self.pruneStaleSessions() }
+            MainActor.assumeIsolated {
+                self.pruneStaleSessions()
+                self.checkForUpdates()
+            }
         }
         RunLoop.main.add(timer, forMode: .common)
         pruneTimer = timer
@@ -521,6 +538,7 @@ public final class AppModel: ObservableObject {
     private func process(_ delivery: IngressDelivery, now: Date) {
         let event = delivery.event
         let change = store.apply(event, evidence: delivery.evidence, now: now)
+        if lastHeard[event.source].map({ now.timeIntervalSince($0) >= 20 }) ?? true { lastHeard[event.source] = now }
 
         if let replier = delivery.replier {
             if grants.covers(event) {

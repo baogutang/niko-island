@@ -174,6 +174,20 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["quietWhenAway"] = .bool(newValue) }
     }
 
+    // MARK: New versions (opt-in)
+
+    /// Ask GitHub once a day whether a newer release is out. Off unless switched on.
+    public var updateChecks: Bool {
+        get { bool("updateChecks", default: false) }
+        set { raw["updateChecks"] = .bool(newValue) }
+    }
+
+    /// When GitHub was last asked (seconds since 1970).
+    public var lastUpdateCheck: Double {
+        get { raw["lastUpdateCheck"]?.doubleValue ?? 0 }
+        set { raw["lastUpdateCheck"] = .number(String(newValue)) }
+    }
+
     // MARK: Quiet hours
 
     /// A stretch of the day in which nothing makes a sound and nothing is pushed
@@ -306,8 +320,38 @@ public struct NikoSettings: Sendable, Equatable {
         case "claude": return claudeLimitsLookup
         case "zcode": return glmLimitsLookup
         case "codex": return codexLimitsLookup
+        case "kimi": return kimiLimitsLookup
+        case "minimax": return minimaxLimitsLookup
+        case "gemini": return geminiLimitsLookup
         default: return false
         }
+    }
+
+    /// Ask Kimi about the Kimi Code plan, with a key of that plan the user typed in.
+    public var kimiLimitsLookup: Bool {
+        get { bool("kimiLimitsLookup", default: false) }
+        set { raw["kimiLimitsLookup"] = .bool(newValue) }
+    }
+
+    /// Ask MiniMax about its Coding Plan, with a key of that plan the user typed in.
+    public var minimaxLimitsLookup: Bool {
+        get { bool("minimaxLimitsLookup", default: false) }
+        set { raw["minimaxLimitsLookup"] = .bool(newValue) }
+    }
+
+    /// "cn" (minimaxi.com) or "global" (minimax.io).
+    public var minimaxRegion: String {
+        get {
+            let value = raw["minimaxRegion"]?.stringValue ?? "cn"
+            return ["cn", "global"].contains(value) ? value : "cn"
+        }
+        set { raw["minimaxRegion"] = .string(newValue) }
+    }
+
+    /// Ask Google about Gemini CLI's daily quotas, with the sign-in Gemini CLI saved, while it is still good.
+    public var geminiLimitsLookup: Bool {
+        get { bool("geminiLimitsLookup", default: false) }
+        set { raw["geminiLimitsLookup"] = .bool(newValue) }
     }
 
     /// Ask ChatGPT about the Codex plan with Codex's own sign-in. Codex already
@@ -369,6 +413,23 @@ public struct NikoSettings: Sendable, Equatable {
     public var accent: Accent {
         get { raw["accent"]?.stringValue.flatMap(Accent.init(rawValue:)) ?? .mint }
         set { raw["accent"] = .string(newValue.rawValue) }
+    }
+
+    /// The island's surface and type, beyond its colour.
+    public enum IslandStyle: String, Sendable, CaseIterable {
+        /// Black, like the camera housing it grows out of.
+        case classic
+        /// Frosted: what is behind the island shows through, blurred.
+        case glass
+        /// Square corners, monospaced type, a hard edge.
+        case pixel
+        /// Deep blue instead of black.
+        case midnight
+    }
+
+    public var islandStyle: IslandStyle {
+        get { raw["islandStyle"]?.stringValue.flatMap(IslandStyle.init(rawValue:)) ?? .classic }
+        set { raw["islandStyle"] = .string(newValue.rawValue) }
     }
 
     public enum Density: String, Sendable, CaseIterable {

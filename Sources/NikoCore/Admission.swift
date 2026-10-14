@@ -37,6 +37,28 @@ public enum ProcessInspector {
         bsdInfo(of: pid).map { pid_t($0.pbi_ppid) }
     }
 
+    /// The command line a process was started with (no environment). Same-uid processes only.
+    public static func arguments(of pid: pid_t) -> [String] {
+        guard pid > 0 else { return [] }
+        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
+        var size = 0
+        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size else { return [] }
+        var buffer = [UInt8](repeating: 0, count: size)
+        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0, size > MemoryLayout<Int32>.size else { return [] }
+        let count = buffer.withUnsafeBytes { $0.loadUnaligned(as: Int32.self) }
+        var index = MemoryLayout<Int32>.size
+        while index < size, buffer[index] != 0 { index += 1 }      // the executable path
+        while index < size, buffer[index] == 0 { index += 1 }      // its padding
+        var arguments: [String] = []
+        while arguments.count < Int(count), index < size {
+            let start = index
+            while index < size, buffer[index] != 0 { index += 1 }
+            arguments.append(String(decoding: buffer[start..<index], as: UTF8.self))
+            index += 1
+        }
+        return arguments
+    }
+
     /// `ttys003`-style name of the controlling terminal, if any.
     public static func controllingTTY(of pid: pid_t) -> String? {
         guard let info = bsdInfo(of: pid) else { return nil }

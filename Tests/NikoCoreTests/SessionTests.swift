@@ -62,11 +62,14 @@ final class SessionStoreTests: XCTestCase {
         store.apply(event("Notification", fields: ["message": .string("Build finished\nwith details")]), now: t0 + 7)
         XCTAssertEqual(store[key]?.phase, .working)
         XCTAssertEqual(store[key]?.activity.detail, "Build finished")
+        // An event with no meaning here says the session is alive, not what it is doing.
+        let before = store[key]?.activity
         store.apply(event("TotallyNewEvent"), now: t0 + 8)
-        XCTAssertEqual(store[key]?.activity, Activity(verb: "working", detail: "TotallyNewEvent"))
+        XCTAssertEqual(store[key]?.activity, before)
+        XCTAssertEqual(store[key]?.lastEventAt, t0 + 8)
 
-        store.resolveAttention(key, activity: .thinking)   // no-op when not waiting on the user
-        XCTAssertEqual(store[key]?.activity.verb, "working")
+        store.resolveAttention(key, activity: Activity(verb: "running"))   // no-op when not waiting on the user
+        XCTAssertEqual(store[key]?.activity, before)
     }
 
     func testOrderingKeysAndPruning() {

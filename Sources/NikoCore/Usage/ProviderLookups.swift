@@ -391,12 +391,21 @@ public actor ProviderLimitsClient {
         public var glm = false
         public var glmRegion = GLMQuotaAPI.Region.bigmodel
         public var codex = false
+        public var kimi = false
+        public var minimax = false
+        public var minimaxRegion = MiniMaxQuotaAPI.Region.cn
+        public var gemini = false
 
-        public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false) {
+        public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false,
+                    kimi: Bool = false, minimax: Bool = false, minimaxRegion: MiniMaxQuotaAPI.Region = .cn, gemini: Bool = false) {
             self.claude = claude
             self.glm = glm
             self.glmRegion = glmRegion
             self.codex = codex
+            self.kimi = kimi
+            self.minimax = minimax
+            self.minimaxRegion = minimaxRegion
+            self.gemini = gemini
         }
 
         public func asks(_ provider: String) -> Bool {
@@ -404,11 +413,14 @@ public actor ProviderLimitsClient {
             case ProviderLimitsClient.claude: return claude
             case ProviderLimitsClient.glm: return glm
             case ProviderLimitsClient.codex: return codex
+            case ProviderLimitsClient.kimi: return kimi
+            case ProviderLimitsClient.minimax: return minimax
+            case ProviderLimitsClient.gemini: return gemini
             default: return false
             }
         }
 
-        public var asksAnyone: Bool { claude || glm || codex }
+        public var asksAnyone: Bool { ProviderLimitsClient.providers.contains(where: asks) }
     }
 
     public enum State: Sendable, Equatable {
@@ -444,17 +456,28 @@ public actor ProviderLimitsClient {
         public var claudeLogin: @Sendable () -> ClaudeCodeLogin.Outcome
         public var glmKey: @Sendable () -> String?
         public var codexLogin: @Sendable () -> CodexLogin.Outcome
+        public var kimiKey: @Sendable () -> String?
+        public var minimaxKey: @Sendable () -> String?
+        public var geminiLogin: @Sendable () -> GeminiLogin.Outcome
 
         public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?,
-                    codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing }) {
+                    codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing },
+                    kimiKey: @escaping @Sendable () -> String? = { nil }, minimaxKey: @escaping @Sendable () -> String? = { nil },
+                    geminiLogin: @escaping @Sendable () -> GeminiLogin.Outcome = { .missing }) {
             self.claudeLogin = claudeLogin
             self.glmKey = glmKey
             self.codexLogin = codexLogin
+            self.kimiKey = kimiKey
+            self.minimaxKey = minimaxKey
+            self.geminiLogin = geminiLogin
         }
 
         public static func system(home: URL) -> Secrets {
             Secrets(claudeLogin: { ClaudeCodeLogin.read(home: home) }, glmKey: { ProviderKeychain.read(ProviderLimitsClient.glmAccount) },
-                    codexLogin: { CodexLogin.read(home: home) })
+                    codexLogin: { CodexLogin.read(home: home) },
+                    kimiKey: { ProviderKeychain.read(ProviderLimitsClient.kimiAccount) },
+                    minimaxKey: { ProviderKeychain.read(ProviderLimitsClient.minimaxAccount) },
+                    geminiLogin: { GeminiLogin.read(home: home) })
         }
     }
 
@@ -466,11 +489,17 @@ public actor ProviderLimitsClient {
     public static let glm = "zcode"
     public static let glmAccount = "glm-coding-plan"
     public static let codex = "codex"
-    public static let providers = [claude, glm, codex]
+    public static let kimi = "kimi"
+    public static let kimiAccount = "kimi-code-plan"
+    public static let minimax = "minimax"
+    public static let minimaxAccount = "minimax-coding-plan"
+    public static let gemini = "gemini"
+    public static let providers = [claude, glm, codex, kimi, minimax, gemini]
     /// The only hosts a request may go to.
-    public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com"]
+    public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
+                                            "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host]
 
-    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300]
+    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300]
     static let forcedInterval: TimeInterval = 30
 
     private let cacheFile: URL
@@ -509,6 +538,7 @@ public actor ProviderLimitsClient {
         }
         if !new.claude { claudeLogin = nil }
         if new.glmRegion != old.glmRegion { results[Self.glm] = nil }
+        if new.minimaxRegion != old.minimaxRegion { results[Self.minimax] = nil }
         if old != new {
             save()
             onChange(results)
@@ -540,6 +570,9 @@ public actor ProviderLimitsClient {
             switch provider {
             case Self.claude: result = await askClaude(now: now)
             case Self.glm: result = await askGLM(now: now)
+            case Self.kimi: result = await askKimi(now: now)
+            case Self.minimax: result = await askMiniMax(now: now)
+            case Self.gemini: result = await askGemini(now: now)
             default: result = await askCodex(now: now)
             }
             asking.remove(provider)
@@ -615,6 +648,58 @@ public actor ProviderLimitsClient {
     private func askGLM(now: Date) async -> Result {
         guard let key = secrets.glmKey(), !key.isEmpty else { return Result(state: .noKey, checkedAt: now) }
         let (state, limits) = await ask(GLMQuotaAPI.request(key: key, region: config.glmRegion)) { GLMQuotaAPI.parse($0, now: now) }
+        return Result(limits: limits, state: state, checkedAt: now)
+    }
+
+    private func askKimi(now: Date) async -> Result {
+        guard let key = secrets.kimiKey(), !key.isEmpty else { return Result(state: .noKey, checkedAt: now) }
+        let (state, limits) = await ask(KimiUsageAPI.request(key: key)) { KimiUsageAPI.parse($0, now: now) }
+        return Result(limits: limits, state: state, checkedAt: now)
+    }
+
+    private func askMiniMax(now: Date) async -> Result {
+        guard let key = secrets.minimaxKey(), !key.isEmpty else { return Result(state: .noKey, checkedAt: now) }
+        var answer = MiniMaxQuotaAPI.Answer.unreadable
+        let (state, _) = await ask(MiniMaxQuotaAPI.request(key: key, region: config.minimaxRegion)) { data in
+            answer = MiniMaxQuotaAPI.parse(data, now: now)
+            // Only a well-formed answer counts as one; a refusal in the body is told apart below.
+            if case .limits(let limits) = answer { return limits }
+            return answer == .refused ? ProviderLimits(windows: [], capturedAt: now, source: .provider) : nil
+        }
+        switch (state, answer) {
+        case (.ok, .limits(let limits)): return Result(limits: limits, state: .ok, checkedAt: now)
+        case (.ok, .refused): return Result(state: .unauthorized, checkedAt: now)
+        default: return Result(state: state == .ok ? .unreadable : state, checkedAt: now)
+        }
+    }
+
+    private func askGemini(now: Date) async -> Result {
+        let login: GeminiLogin.Login
+        switch secrets.geminiLogin() {
+        case .found(let found): login = found
+        case .missing: return Result(state: .noLogin, checkedAt: now)
+        case .denied: return Result(state: .denied, checkedAt: now)
+        }
+        // The token is Gemini CLI's; once it has run out, Gemini CLI renews it, never this app.
+        if let expiry = login.expiresAt, expiry <= now { return Result(state: .loginExpired, checkedAt: now) }
+        if refused[Self.gemini] == login.token { return Result(state: .loginExpired, checkedAt: now) }
+        var project: (id: String?, plan: String?) = (nil, nil)
+        let (first, _) = await ask(GeminiQuotaAPI.projectRequest(token: login.token)) { data in
+            project = GeminiQuotaAPI.project(data)
+            return ProviderLimits(windows: [], capturedAt: now, source: .provider)
+        }
+        guard first == .ok else {
+            if first == .unauthorized { refused[Self.gemini] = login.token }
+            return Result(state: first == .unauthorized ? .loginExpired : first, checkedAt: now)
+        }
+        var (state, limits) = await ask(GeminiQuotaAPI.quotaRequest(token: login.token, project: project.id)) {
+            GeminiQuotaAPI.parse($0, now: now)
+        }
+        if state == .unauthorized {
+            refused[Self.gemini] = login.token
+            state = .loginExpired
+        }
+        if limits != nil, let plan = project.plan, plan.count <= 24 { limits?.plan = plan }
         return Result(limits: limits, state: state, checkedAt: now)
     }
 

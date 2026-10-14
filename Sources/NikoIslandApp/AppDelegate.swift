@@ -43,6 +43,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             ProviderLimitsClient(paths: paths, secrets: .system(home: home), onChange: onChange)
         }
         model.hasGLMKey = ProviderKeychain.exists(ProviderLimitsClient.glmAccount)
+        model.hasKimiKey = ProviderKeychain.exists(ProviderLimitsClient.kimiAccount)
+        model.hasMiniMaxKey = ProviderKeychain.exists(ProviderLimitsClient.minimaxAccount)
         model.hasPushKey = ProviderKeychain.exists(PushClient.account)
         model.start()
         if model.startFailure == .anotherInstanceRunning {
@@ -79,6 +81,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             .store(in: &subscriptions)
         model.isFrontmost = { TerminalJumper.isFrontmost($0) }
         model.replySender = { session, text in await TerminalJumper.reply(text, to: session) }
+        // After an update is in place: start it once this process has gone, then go.
+        model.relaunch = { app in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", app.path]
+            try? process.run()
+            NSApp.terminate(nil)
+        }
+        model.checkForUpdates()
         watchScreen()
         model.$wantsOnboarding
             .receive(on: DispatchQueue.main)

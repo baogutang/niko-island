@@ -68,7 +68,7 @@ struct CompletionCard: View {
                 Button { model.dismissCompletion() } label: {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.secondary)
                         .frame(width: 22, height: 18)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white.opacity(hovering ? 0.14 : 0.08)))
+                        .background(RoundedRectangle(cornerRadius: look.radius(6), style: .continuous).fill(Color.white.opacity(hovering ? 0.14 : 0.08)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L("Dismiss"))
@@ -168,8 +168,8 @@ struct ReplyField: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Theme.field))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+        .background(RoundedRectangle(cornerRadius: look.radius(10), style: .continuous).fill(Theme.field))
+        .overlay(RoundedRectangle(cornerRadius: look.radius(10), style: .continuous).strokeBorder(Theme.hairline))
         .onChange(of: focused) { _, now in onFocus(now) }
     }
 }
@@ -193,7 +193,7 @@ struct RecapCard: View {
                 Button { model.dismissRecap() } label: {
                     Image(systemName: "xmark").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.secondary)
                         .frame(width: 22, height: 18)
-                        .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(Color.white.opacity(hovering ? 0.14 : 0.08)))
+                        .background(RoundedRectangle(cornerRadius: look.radius(6), style: .continuous).fill(Color.white.opacity(hovering ? 0.14 : 0.08)))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(L("Dismiss"))
@@ -236,7 +236,7 @@ private struct RecapLine: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(hovering ? Theme.hover : Color.clear))
+        .background(RoundedRectangle(cornerRadius: look.radius(10), style: .continuous).fill(hovering ? Theme.hover : Color.clear))
         .contentShape(Rectangle())
         .onHover { hovering = $0 }
         .onTapGesture(perform: action)

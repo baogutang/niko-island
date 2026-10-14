@@ -98,6 +98,18 @@ to what turned up when somebody did.
 | A line through the real ntfy service | Done once, on a random throwaway topic, read back from the service |
 | ZCode limits without a key | Looked into: not possible with what ZCode offers today (no usage command in its CLI, nothing on disk) |
 
+## Released: 0.9.0
+
+| Area | State |
+|---|---|
+| Copilot CLI and Kiro in their own formats; Qoder, Qoder CN, QoderWork, Kimi Code (TOML), MiniMax Code (plugin pack), Devin (approvals), Amp (plugin) | Built against each agent's hook reference and the registrations CodeIsland ships; covered by tests, the Amp plugin run under Node against the real loopback ingress; not run against any of the live agents |
+| Hooks that Devin and Copilot CLI borrow from Claude Code's settings | Told apart by the bridge's process ancestry; covered by tests with stand-in chains |
+| Plan limits from Kimi, MiniMax and Google (Gemini CLI) | Built and covered by tests with recorded shapes and a stand-in network; never answered live (no keys or Gemini sign-in on the test Mac) |
+| Themes: Classic, Glass, Pixel, Midnight | Built; seen in renders and in the running app |
+| "There is a new version", and installing it | Built and covered by tests (parsing, checksums, a signed stand-in package, replacing into a scratch folder); the check and the download were run against the real GitHub release; replacing the app in /Applications was not |
+| The first count of a large transcript collection | Peak memory of the counting process from 91 MB to 48 MB (resident 211 MB to 125 MB) and 30 s to 18 s on a few gigabytes of real transcripts |
+| When each connected agent was last heard from | Built; shown in Settings → Agents |
+
 ## Next
 
 Everything below needs something only the owner of a Mac can give, or hardware
@@ -118,19 +130,11 @@ that was not there.
 
 ## Planned, not started
 
-- Adapters for Kimi Code, Devin, Mistral Vibe, DeepSeek CLI, Pi / OhMyPi,
-  OpenClaw, Amp. Several of these configure hooks in TOML, which the installer
-  does not write yet.
-- Themes beyond the accent colour.
+- Adapters for Mistral Vibe, DeepSeek CLI, Pi / OhMyPi and OpenClaw.
+- Kimi Code's older home (`~/.kimi`), for installations that have not moved.
 - Sounds that respect Focus modes.
-- Plan limits for more providers (Gemini, Kimi, MiniMax and others), asked
-  the same way as the three there are: opt-in, the user's own sign-in or key,
-  one host each.
 - Monitoring agents on remote machines over SSH.
 - Opening a new terminal window to re-attach a detached tmux session.
-- An in-app "new version available" check. It needs a network request that is
-  not on the privacy allow-list today, so for now there is only a menu item
-  that opens the Releases page.
 
 ## Not planned
 

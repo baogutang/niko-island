@@ -644,8 +644,8 @@ final class InstallerTests: XCTestCase {
         XCTAssertEqual(AgentRegistry.defaultIDs, ["claude"])
         let recommended = Set(AgentRegistry.recommendedIDs)
         XCTAssertTrue(recommended.isSuperset(of: ["claude", "codex", "zcode", "cursor", "windsurf", "gemini"]))
-        XCTAssertFalse(recommended.contains("copilot"), "format taken on trust: opt-in only")
-        XCTAssertEqual(AgentRegistry.all.filter(\.approvals).map(\.id), ["claude", "codex", "zcode"])
+        XCTAssertFalse(recommended.contains("amp"), "format taken on trust: opt-in only")
+        XCTAssertEqual(AgentRegistry.all.filter(\.approvals).map(\.id), ["claude", "codex", "zcode", "devin"])
         XCTAssertEqual(AgentRegistry.agent(forApp: "com.openai.codex")?.id, "codex")
         XCTAssertEqual(AgentRegistry.agent(forApp: "dev.zcode.app")?.id, "zcode")
         XCTAssertEqual(AgentRegistry.agent(forApp: "com.anthropic.claudefordesktop")?.id, "claude")
@@ -683,7 +683,7 @@ final class InstallerTests: XCTestCase {
     }
 
     func testPlannedAgentsHaveNoAdapter() {
-        XCTAssertTrue(Installer(options: options(agents: ["kimi", "droid"])).agents(for: .install).isEmpty)
+        XCTAssertTrue(Installer(options: options(agents: ["vibe", "droid"])).agents(for: .install).isEmpty)
         XCTAssertEqual(AgentRegistry.defaultIDs, ["claude"])
         XCTAssertEqual(Set(AgentRegistry.all.map(\.id)).count, AgentRegistry.all.count, "ids are unique")
     }

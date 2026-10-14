@@ -165,6 +165,8 @@ struct SettingsPageView: View {
     @State private var loginItemError: String?
     @State private var exportedPath: String?
     @State private var glmKeyDraft = ""
+    @State private var kimiKeyDraft = ""
+    @State private var minimaxKeyDraft = ""
     @State private var pushKeyDraft = ""
     @Environment(\.look) private var look
 
@@ -315,6 +317,20 @@ struct SettingsPageView: View {
 
     static func clock(_ minutes: Int) -> String { String(format: "%02d:%02d", minutes / 60, minutes % 60) }
 
+    /// Where the version check stands, in words.
+    private var updateNote: String {
+        if let release = model.availableUpdate {
+            if case .failed(let why) = model.updateState { return why }
+            return L("Version %@ is out. Installing puts the old app in the Trash.", release.version)
+        }
+        switch model.updateState {
+        case .checking: return L("Asking GitHub…")
+        case .upToDate: return L("This is the latest version.")
+        case .failed(let why): return why
+        default: return L("Version %@", NikoVersion.current)
+        }
+    }
+
     // MARK: A phone
 
     private var phone: some View {
@@ -409,6 +425,10 @@ struct SettingsPageView: View {
                         }
                     }
                 }
+                choiceRow(L("Theme"), L("What the island is drawn on. On a display with a camera housing the closed island stays black, to match it."),
+                          options: [(NikoSettings.IslandStyle.classic, L("Classic")), (.glass, L("Glass")), (.pixel, L("Pixel")),
+                                    (.midnight, L("Midnight"))],
+                          selection: settingsBinding(\.islandStyle))
                 if NSScreen.screens.count > 1 {
                     choiceRow(L("Display"), L("Automatic: the display with a camera housing, else the main one."),
                               options: [("auto", L("Automatic"))] + NSScreen.screens.map { ($0.localizedName, $0.localizedName) },
@@ -554,6 +574,10 @@ struct SettingsPageView: View {
                             Text((agent.wired ? L("connected") : L("not connected")) + " · "
                                  + (agent.approvals ? L("status and approvals") : L("status")))
                                 .font(Theme.body(11.5)).foregroundStyle(agent.wired ? look.accent : Theme.tertiary)
+                            if agent.wired, !isStaticPreview {
+                                // Whether the hooks actually fire: a connected agent that is never heard from needs a look.
+                                Text(heardText(agent.id)).font(Theme.body(11)).foregroundStyle(Theme.tertiary)
+                            }
                         }
                         Spacer()
                         Button(agent.wired ? L("Remove") : L("Connect")) {
@@ -740,8 +764,24 @@ struct SettingsPageView: View {
                 if let note = lookupNote(ProviderLimitsClient.glm) { lookupStatus(note, divider: true) }
                 toggleRow(L("Ask OpenAI for my Codex limits"),
                           L("Codex's own files already say most of it. This adds a current answer while Codex is idle, and the resets your account has saved. Reads the ChatGPT sign-in Codex keeps on this Mac and sends it to chatgpt.com, nowhere else. Asked every five minutes."),
-                          divider: lookupNote(ProviderLimitsClient.codex) != nil, isOn: settingsBinding(\.codexLimitsLookup))
-                if let note = lookupNote(ProviderLimitsClient.codex) { lookupStatus(note, divider: false) }
+                          divider: true, isOn: settingsBinding(\.codexLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.codex) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask Kimi for my Kimi Code plan limits"),
+                          L("Kimi Code keeps its sign-in to itself, so this needs an API key of your Kimi Code plan. It is stored in your Keychain and sent to api.kimi.com, nowhere else."),
+                          isOn: settingsBinding(\.kimiLimitsLookup))
+                keyRow(ProviderLimitsClient.kimi, draft: $kimiKeyDraft, enable: { model.settings.kimiLimitsLookup = true })
+                if let note = lookupNote(ProviderLimitsClient.kimi) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask MiniMax for my Coding Plan limits"),
+                          L("Needs an API key of your MiniMax Coding Plan. It is stored in your Keychain and sent only to the service chosen below."),
+                          isOn: settingsBinding(\.minimaxLimitsLookup))
+                keyRow(ProviderLimitsClient.minimax, draft: $minimaxKeyDraft, enable: { model.settings.minimaxLimitsLookup = true })
+                choiceRow(L("Service"), L("Where your MiniMax account is: minimaxi.com in mainland China, minimax.io elsewhere."), divider: true,
+                          options: [("cn", "minimaxi.com"), ("global", "minimax.io")], selection: settingsBinding(\.minimaxRegion))
+                if let note = lookupNote(ProviderLimitsClient.minimax) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask Google for my Gemini CLI quotas"),
+                          L("Reads the sign-in Gemini CLI saved on this Mac (in ~/.gemini, or your Keychain: macOS may ask you first) and sends it to cloudcode-pa.googleapis.com, nowhere else, while it is still good. It is never renewed here: Gemini CLI does that the next time it runs. Asked every five minutes."),
+                          divider: lookupNote(ProviderLimitsClient.gemini) != nil, isOn: settingsBinding(\.geminiLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.gemini) { lookupStatus(note, divider: false) }
             }
             card(L("Price list")) {
                 toggleRow(L("Refresh the model price list from the network (weekly)"),
@@ -749,6 +789,14 @@ struct SettingsPageView: View {
                           divider: false, isOn: settingsBinding(\.pricingRefreshEnabled))
             }
         }
+    }
+
+    private func heardText(_ agent: String) -> String {
+        guard let date = model.lastHeard[agent] else { return L("no event since Niko Island started") }
+        let seconds = max(0, Date().timeIntervalSince(date).wholeSeconds)
+        let since = seconds < 90 ? L("just now") : seconds < 3600 ? L("%lld min ago", seconds / 60)
+            : L("%lldh %lldm ago", seconds / 3600, (seconds % 3600) / 60)
+        return L("last event %@", since)
     }
 
     private var claudeItselfNote: String? {
@@ -777,15 +825,20 @@ struct SettingsPageView: View {
     }
 
     private var glmKeyRow: some View {
+        keyRow(ProviderLimitsClient.glm, draft: $glmKeyDraft, enable: { model.settings.glmLimitsLookup = true })
+    }
+
+    /// Where a plan's key is typed in, or said to be saved.
+    private func keyRow(_ provider: String, draft: Binding<String>, enable: @escaping () -> Void) -> some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                if model.hasGLMKey {
+                if model.hasKey(for: provider) {
                     Image(systemName: "key.fill").font(.system(size: 11)).foregroundStyle(look.accent)
                     Text(L("A key is saved in your Keychain.")).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
                     Spacer(minLength: 8)
                     Button(L("Remove")) {
-                        model.setGLMKey(nil)
-                        glmKeyDraft = ""
+                        model.setProviderKey(nil, for: provider)
+                        draft.wrappedValue = ""
                     }.buttonStyle(PillButtonStyle())
                 } else if isStaticPreview {
                     Text(L("Paste the plan's API key")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
@@ -793,17 +846,17 @@ struct SettingsPageView: View {
                         .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
                     Button(L("Save")) {}.buttonStyle(PillButtonStyle(kind: .primary))
                 } else {
-                    SecureField(L("Paste the plan's API key"), text: $glmKeyDraft)
+                    SecureField(L("Paste the plan's API key"), text: draft)
                         .textFieldStyle(.plain).font(Theme.mono(12))
                         .padding(.horizontal, 10).padding(.vertical, 7)
                         .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
                     Button(L("Save")) {
-                        model.setGLMKey(glmKeyDraft)
-                        glmKeyDraft = ""
-                        if model.hasGLMKey { model.settings.glmLimitsLookup = true }
+                        model.setProviderKey(draft.wrappedValue, for: provider)
+                        draft.wrappedValue = ""
+                        if model.hasKey(for: provider) { enable() }
                     }
                     .buttonStyle(PillButtonStyle(kind: .primary))
-                    .disabled(glmKeyDraft.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
+                    .disabled(draft.wrappedValue.trimmingCharacters(in: .whitespacesAndNewlines).count < 8)
                 }
             }
             .padding(.vertical, 10)
@@ -844,9 +897,23 @@ struct SettingsPageView: View {
                     }
                     .buttonStyle(PillButtonStyle())
                 }
+                toggleRow(L("Tell me when there is a new version"),
+                          L("Asks GitHub once a day which release is the latest. The request says nothing but this app's name and version. Off until you turn it on."),
+                          isOn: settingsBinding(\.updateChecks))
+                row(updateNote, divider: true) {
+                    HStack(spacing: 8) {
+                        if model.availableUpdate != nil {
+                            Button(model.updateState == .installing ? L("Installing…") : L("Install and restart")) { model.installUpdate() }
+                                .buttonStyle(PillButtonStyle(kind: .primary)).disabled(model.updateState == .installing)
+                        } else {
+                            Button(L("Check now")) { model.checkForUpdates(force: true) }.buttonStyle(PillButtonStyle())
+                                .disabled(model.updateState == .checking)
+                        }
+                    }
+                }
                 row(L("Releases"), L("Opens the download page in your browser."), divider: true) {
                     Button(L("Open Releases Page")) {
-                        if let url = URL(string: NikoVersion.releasesURL) { NSWorkspace.shared.open(url) }
+                        if let url = model.availableUpdate?.page ?? URL(string: NikoVersion.releasesURL) { NSWorkspace.shared.open(url) }
                     }
                     .buttonStyle(PillButtonStyle())
                 }

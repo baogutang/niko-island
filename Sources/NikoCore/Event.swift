@@ -162,10 +162,69 @@ enum EventDialect {
         case "cursor": cursor(&object)
         case "windsurf": windsurf(&object)
         case "gemini": gemini(&object)
-        case "codex":
-            if object["hook_event_name"]?.stringValue == "Interrupt" { object["hook_event_name"] = .string(HookEvent.stop) }
+        case "copilot": copilot(&object)
+        case "kiro": camelCase(&object)
         default: break
         }
+        common(&object)
+    }
+
+    /// Names several agents share beyond Claude Code's own set.
+    private static func common(_ object: inout JSONObject) {
+        guard let native = object["hook_event_name"]?.stringValue else { return }
+        let canonical: String
+        switch native {
+        // A tool that failed, or an answer to a permission prompt: the agent carries on.
+        case "PostToolUseFailure", "PermissionResult": canonical = HookEvent.postToolUse
+        case "PostCompaction": canonical = HookEvent.postCompact
+        case "Interrupt": canonical = HookEvent.stop
+        default: return
+        }
+        if object["native_event"] == nil { object["native_event"] = .string(native) }
+        object["hook_event_name"] = .string(canonical)
+    }
+
+    /// Copilot CLI: with Claude's event names it sends Claude's payloads; its
+    /// own camelCase format (sessionId, toolName, toolArgs as JSON text) is
+    /// read too.
+    private static func copilot(_ object: inout JSONObject) {
+        if object["session_id"]?.stringValue?.isEmpty ?? true, let id = object["sessionId"]?.stringValue, !id.isEmpty {
+            object["session_id"] = .string(id)
+        }
+        if object["tool_name"] == nil, let tool = object["toolName"] { object["tool_name"] = tool }
+        if object["tool_input"] == nil, let args = object["toolArgs"] {
+            if args.objectValue != nil {
+                object["tool_input"] = args
+            } else if let text = args.stringValue, let parsed = try? JSONValue.parse(Data(text.utf8)), parsed.objectValue != nil {
+                object["tool_input"] = parsed
+            }
+        }
+        if object["transcript_path"] == nil, let path = object["transcriptPath"] { object["transcript_path"] = path }
+        if let error = object["error"]?.objectValue, object["message"] == nil, let message = error["message"] {
+            object["message"] = message
+        }
+        camelCase(&object)
+    }
+
+    /// camelCase event names (Copilot CLI's own format, Kiro's older one).
+    private static func camelCase(_ object: inout JSONObject) {
+        guard let native = object["hook_event_name"]?.stringValue else { return }
+        let canonical: String
+        switch native {
+        case "sessionStart", "agentSpawn": canonical = HookEvent.sessionStart
+        case "sessionEnd": canonical = HookEvent.sessionEnd
+        case "userPromptSubmitted", "userPromptSubmit": canonical = HookEvent.userPromptSubmit
+        case "preToolUse": canonical = HookEvent.preToolUse
+        case "postToolUse", "postToolUseFailure": canonical = HookEvent.postToolUse
+        case "agentStop", "stop": canonical = HookEvent.stop
+        case "subagentStop": canonical = HookEvent.subagentStop
+        case "preCompact": canonical = HookEvent.preCompact
+        case "notification": canonical = HookEvent.notification
+        case "errorOccurred": canonical = HookEvent.stopFailure
+        default: return
+        }
+        object["native_event"] = .string(native)
+        object["hook_event_name"] = .string(canonical)
     }
 
     private static func tool(_ object: inout JSONObject, name: String, input: JSONObject) {

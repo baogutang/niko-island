@@ -9,6 +9,8 @@ public struct BridgeInvocation: Sendable, Equatable {
         /// closed on anything more (Codex, ZCode).
         case jsonStrict = "json-strict"
         case exitCode = "exit-code"
+        /// Devin: `{"decision": "approve"}`, or `{"decision": "block", "reason": …}` and exit 2.
+        case devin
     }
 
     public var source = "unknown"
@@ -19,6 +21,10 @@ public struct BridgeInvocation: Sendable, Equatable {
     /// Adapter says this event blocks for a decision even though it is not a PermissionRequest.
     public var forceBlocking = false
     public var replyMode: ReplyMode = .json
+    /// The event, for agents whose payload does not name it (Copilot CLI's own format).
+    public var event: String?
+    /// The agent's approval hook can only watch: report the request, never hold the agent up.
+    public var observeOnly = false
 
     public init() {}
 
@@ -39,6 +45,8 @@ public struct BridgeInvocation: Sendable, Equatable {
             case "--integrity-check": invocation.integrityCheck = value()
             case "--reply": if let v = value(), let mode = ReplyMode(rawValue: v) { invocation.replyMode = mode }
             case "--blocking": invocation.forceBlocking = true
+            case "--event": invocation.event = value()
+            case "--observe": invocation.observeOnly = true
             case "--version": invocation.showVersion = true
             default: break
             }
@@ -138,16 +146,44 @@ public enum BridgeRunner {
 
     static func forward(_ invocation: BridgeInvocation, stdin: Data, configuration: BridgeConfiguration) -> BridgeResult {
         guard let parsed = try? JSONValue.parse(stdin), var object = parsed.objectValue else { return .silentSuccess }
-        // Most agents name the event `hook_event_name`; Cascade calls it `agent_action_name`.
-        guard let name = (object["hook_event_name"] ?? object["agent_action_name"])?.stringValue, !name.isEmpty else {
+        // Most agents name the event `hook_event_name`; Cascade calls it `agent_action_name`;
+        // Copilot CLI's own format leaves it to the command line.
+        if (object["hook_event_name"] ?? object["agent_action_name"])?.stringValue?.isEmpty ?? true, let event = invocation.event {
+            object["hook_event_name"] = .string(event)
+        }
+        guard var name = (object["hook_event_name"] ?? object["agent_action_name"])?.stringValue, !name.isEmpty else {
             return .silentSuccess
+        }
+
+        var invocation = invocation
+        let chain = ancestry()
+        let context = terminalContext(environment: configuration.environment, chain: chain)
+        // Devin and Copilot CLI also run the hooks in Claude Code's settings. An
+        // event that comes in as Claude Code's from inside one of them is theirs;
+        // when their own hooks of ours are in place it is a copy, and goes.
+        if invocation.source == "claude", let borrower = BorrowedHooks.borrower(in: chain) {
+            if BorrowedHooks.ownHooksInstalled(borrower, home: configuration.environment["HOME"] ?? NikoPaths.userHome().path) {
+                return .silentSuccess
+            }
+            invocation.source = borrower.agent
+            invocation.replyMode = borrower.reply
+            invocation.observeOnly = borrower.observeOnly
+        }
+
+        if invocation.observeOnly, name == HookEvent.permissionRequest {
+            // Shown as "needs permission"; the agent asks in its own window as always.
+            object["native_event"] = .string(name)
+            object["hook_event_name"] = .string(HookEvent.notification)
+            object["notification_type"] = .string("permission_prompt")
+            object["message"] = .string(object["tool_name"]?.stringValue ?? "permission")
+            name = HookEvent.notification
         }
 
         object["ts"] = .number(String(Int64(Date().timeIntervalSince1970 * 1000)))
         if invocation.forceBlocking { object[AgentEvent.blockingKey] = .bool(true) }
         let blocking = name == HookEvent.permissionRequest || invocation.forceBlocking
 
-        var meta = terminalContext(environment: configuration.environment).json.objectValue ?? JSONObject()
+        var meta = context.json.objectValue ?? JSONObject()
         // Which adapter this is travels in our own envelope: agents use a
         // top-level "source" for other things (how a session started, for one).
         meta["source"] = .string(invocation.source)
@@ -261,7 +297,7 @@ public enum BridgeRunner {
 
     /// Terminal coordinates for click-to-jump, read from our own inherited
     /// environment (we are a child of the agent, inside its terminal).
-    static func terminalContext(environment: [String: String]) -> TerminalContext {
+    static func terminalContext(environment: [String: String], chain: [BorrowedHooks.Ancestor]? = nil) -> TerminalContext {
         var context = TerminalContext()
         func value(_ key: String) -> String? { environment[key].flatMap { $0.isEmpty ? nil : $0 } }
         context.termProgram = value("TERM_PROGRAM")
@@ -271,17 +307,22 @@ public enum BridgeRunner {
         context.bundleID = value("__CFBundleIdentifier")
         context.tty = ProcessInspector.controllingTTY(of: getpid())
         context.pid = getppid()
-        var ancestors: [String] = []
+        context.ancestors = (chain ?? ancestry()).map(\.path)
+        return context
+    }
+
+    /// The bridge's parents, nearest first.
+    static func ancestry() -> [BorrowedHooks.Ancestor] {
+        var chain: [BorrowedHooks.Ancestor] = []
         var current = getppid()
         var seen: Set<pid_t> = []
-        while current > 1, ancestors.count < 12, seen.insert(current).inserted,
+        while current > 1, chain.count < 12, seen.insert(current).inserted,
               let path = ProcessInspector.path(of: current) {
-            ancestors.append(path)
+            chain.append(BorrowedHooks.Ancestor(pid: current, path: path))
             guard let parent = ProcessInspector.parent(of: current) else { break }
             current = parent
         }
-        context.ancestors = ancestors
-        return context
+        return chain
     }
 
     // MARK: Reply translation
@@ -294,6 +335,17 @@ public enum BridgeRunner {
             switch decision.behavior {
             case .allow: return .silentSuccess
             case .deny: return BridgeResult(exitCode: 2, stderr: Data((denyMessage + "\n").utf8))
+            }
+        }
+        if mode == .devin {
+            switch decision.behavior {
+            case .allow:
+                return BridgeResult(stdout: Data((JSONValue.object(["decision": .string("approve")]).serialized(.compact) + "\n").utf8))
+            case .deny:
+                // Exit 2 denies whatever Devin makes of the output; the reason goes both ways.
+                let body = JSONValue.object(["decision": .string("block"), "reason": .string(denyMessage)])
+                return BridgeResult(exitCode: 2, stdout: Data((body.serialized(.compact) + "\n").utf8),
+                                    stderr: Data((denyMessage + "\n").utf8))
             }
         }
 
@@ -425,6 +477,62 @@ public enum BridgeRunner {
         var text = notes.map { "ok: \($0)" }.joined(separator: "\n")
         if !problems.isEmpty { text += "\n" + problems.map { "fail: \($0)" }.joined(separator: "\n") }
         return BridgeResult(exitCode: problems.isEmpty ? 0 : 1, stdout: Data((text + "\n").utf8))
+    }
+}
+
+/// Agents that run the hooks in Claude Code's settings as well as their own:
+/// Devin does by default, and Copilot CLI reads them too.
+public enum BorrowedHooks {
+    public struct Ancestor: Sendable, Equatable {
+        public var pid: pid_t
+        public var path: String
+        public init(pid: pid_t, path: String) {
+            self.pid = pid
+            self.path = path
+        }
+        var name: String { (path as NSString).lastPathComponent }
+    }
+
+    public struct Borrower: Sendable, Equatable {
+        public var agent: String
+        /// Executable names of its command-line tool.
+        var names: Set<String>
+        /// For one run by a script host (node, bun): what its script path contains.
+        var scriptHints: [String]
+        /// The file of ours that means its own hooks are in place.
+        var ownHooks: String
+        var reply: BridgeInvocation.ReplyMode
+        var observeOnly: Bool
+    }
+
+    static let borrowers: [Borrower] = [
+        Borrower(agent: "devin", names: ["devin"], scriptHints: [], ownHooks: ".config/devin/config.json",
+                 reply: .devin, observeOnly: false),
+        Borrower(agent: "copilot", names: ["copilot"], scriptHints: ["@github/copilot"], ownHooks: ".copilot/hooks/niko.json",
+                 reply: .json, observeOnly: true),
+    ]
+    static let scriptHosts: Set<String> = ["node", "bun", "deno"]
+    static let claudeHints = ["@anthropic-ai/claude-code"]
+
+    /// The agent that ran the hook, looking up from the bridge until Claude Code itself turns up.
+    static func borrower(in chain: [Ancestor], arguments: (pid_t) -> [String] = ProcessInspector.arguments(of:)) -> Borrower? {
+        for ancestor in chain {
+            let name = ancestor.name
+            if name == "claude" { return nil }
+            if let found = borrowers.first(where: { $0.names.contains(name) }) { return found }
+            guard scriptHosts.contains(name) else { continue }
+            let script = arguments(ancestor.pid).dropFirst().prefix(3).joined(separator: " ")
+            if claudeHints.contains(where: script.contains) { return nil }
+            if let found = borrowers.first(where: { $0.scriptHints.contains(where: script.contains) }) { return found }
+        }
+        return nil
+    }
+
+    static func ownHooksInstalled(_ borrower: Borrower, home: String) -> Bool {
+        guard let data = FileManager.default.contents(atPath: home + "/" + borrower.ownHooks), data.count <= ScanProbe.sizeCap else {
+            return false
+        }
+        return HookMerge.isOurs(command: String(decoding: data, as: UTF8.self))
     }
 }
 

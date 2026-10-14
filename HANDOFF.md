@@ -8,13 +8,49 @@
 | | |
 |---|---|
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
-| 本轮版本 | **v0.8.2 — 修复第一条通知时退出（0.8.1），并排查、加固其它可能让应用退出的地方**（2026-10-14） |
-| 发布产物 | 每种架构一份：`Niko-Island-0.8.2-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.8.2-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
-| 发布核对 | `ci.yml` 与 `release.yml`（v0.8.2）全部绿色。五个发布文件重新下载后校验和、挂载、单架构、ad-hoc 签名、版本 0.8.2 都核对过；直接运行下载下来的发布版，开着通知连发三条横幅，应用照常运行、没有崩溃报告。`releases/latest` → v0.8.2 |
+| 本轮版本 | **v0.9.0 — 更多代理、更多厂商额度、主题、新版本提醒、首次统计省内存**（2026-10-14） |
+| 发布产物 | 每种架构一份：`Niko-Island-0.9.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.9.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
+| 发布核对 | 见下方“0.9.0 发布记录” |
 | 你机器上装的 | 我没有替你覆盖 `/Applications` 里的应用，请下载 `apple-silicon` 的 dmg 自己装 |
-| 旧版本 | v0.8.1、v0.8.0（第一条通知时会退出，请勿使用）、v0.7.0、v0.6.0、v0.5.0、v0.4.0、v0.3.0、v0.2.0（universal）、v0.1.0（面板界面，只有 zip） |
+| 旧版本 | v0.8.2、v0.8.1、v0.8.0（第一条通知时会退出，请勿使用）、v0.7.0 及更早 |
 | 官网 | https://baogutang.github.io/niko-island/ |
-| 测试 | 354 个，本机通过；`scripts/smoke-launch.sh` 对两个架构的应用都通过（Intel 版在 Rosetta 下） |
+| 测试 | 约 400 个，本机通过 |
+
+## 0.9.0 做了什么（以及哪些没验证）
+
+参考的开源项目：CodeIsland（wxtsky/CodeIsland，代理接入的格式与事件列表）、open-vibe-island
+（钩子健康检查的思路）、cc-switch（Kimi / MiniMax / Gemini 额度接口的形状）、ping-island
+（主题的分法：标准 / 毛玻璃 / 像素）。只读了它们的源码，没有复制代码或文案。
+
+- **新代理**：Qoder、Qoder CN、QoderWork（Claude 格式的 settings.json）；Kimi Code
+  （`~/.kimi-code/config.toml` 末尾一段带标记的 `[[hooks]]`，配置里已有别的 `hooks` 写法就不动）；
+  Devin（`~/.config/devin/config.json`，可在岛上审批，回 `{"decision":"approve"|"block"}`）；
+  MiniMax Code（`~/.minimax/plugins/niko/` 插件包）；Amp（只监听的 TS 插件，不碰 `tool.call`）。
+  Copilot CLI 改成它官方的文件格式（升为测试版）；Kiro 改成全局钩子文件 `~/.kiro/hooks/niko.json`，
+  旧版本写错地方的条目会被清掉。Cursor 按参考项目对照过，没有要改的。
+- **只能看不能答的权限请求**（Kimi Code、Qoder、MiniMax Code）：岛上显示“需要许可”，不卡住代理。
+- **Devin 和 Copilot CLI 也会执行 Claude Code 设置里的钩子**：桥接程序按进程链判断真正的代理，
+  改记到它名下；它自己的钩子已接入时直接丢弃，不会重复。
+- **额度**：Kimi、MiniMax（粘贴密钥，存钥匙串）、Google（Gemini CLI 自己保存的登录，只在未过期时用，
+  绝不续期）。都默认关闭。
+- **主题**：经典、毛玻璃、像素、午夜。有刘海的屏幕上，收起的岛保持黑色。
+- **新版本提醒**（你批准的第四个联网用途，默认关闭）：每天问一次 GitHub；“安装并重启”会下载
+  对应架构的 zip，核对 SHA256SUMS、包标识、版本、签名后，旧应用进废纸篓，新应用启动。
+- **首次统计用量**：分段读、分段提交。几 GB 的真实会话记录上，进程内存峰值 91 MB → 48 MB
+  （常驻 211 MB → 125 MB），30 秒 → 18 秒。issue #6 里的 225 MB 是常驻内存，不是峰值占用。
+- **设置 → 代理**：每个已接入的代理显示“最近一次事件”时间，钩子不触发能看出来。
+- **修了**：不认识的事件不再把会话行的状态改成原始事件名；文档截图一直用默认外观的问题。
+
+**没验证的（实话）：**
+
+1. 新代理一个都没有在真实代理上跑过（这台 Mac 上没有装它们）。格式来自官方文档和
+   CodeIsland 正在用的注册方式；Amp 插件在 Node 下对着真实的本地接口跑通过。
+2. Kimi / MiniMax / Gemini 的额度没有真实回答过（没有密钥，也没有 Gemini 登录）；解析按
+   cc-switch 读的形状写，测试用录制的形状。
+3. “安装并重启”没有在 `/Applications` 里真的替换过；下载、校验、解包、核对包体对着真实的
+   GitHub 发布跑通过，替换和“放回原处”在临时目录里测过。
+4. Devin 的审批：开发版里从岛上 ⌃⌥A 批准，桥接程序回了 `{"decision":"approve"}`；
+   没有真的 Devin。和以前一样，脚本发的第一下按键没被收到，第二下才生效（疑似合成按键的问题）。
 
 **0.8.1 先说：你遇到的“运行得好好的自己退出”是我的 bug，已修复。**
 

@@ -249,6 +249,7 @@ enum PreviewRenderer {
             .fixedSize(horizontal: false, vertical: height == nil)
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
             .environment(\.colorScheme, .dark)
+            .environment(\.look, IslandLook(settings: model.settings))
         }
 
         private var menuBar: some View {
@@ -301,9 +302,14 @@ enum PreviewRenderer {
         return (try? png.write(to: url)) != nil
     }
 
-    static func render(_ scene: Scene, to url: URL, scale: CGFloat = 1.5, metrics: IslandMetrics = .notched) -> Bool {
+    static func render(_ scene: Scene, to url: URL, scale: CGFloat = 1.5, metrics: IslandMetrics = .notched,
+                       style: NikoSettings.IslandStyle? = nil) -> Bool {
+        let model = demoModel(scene)
+        if let style { model.settings.islandStyle = style }
         // The welcome screens are a whole display with a star field: at 1.5× they weigh 2 MB each.
-        guard let image = cgImage(of: view(for: scene, metrics: metrics), scale: scene.isOnboarding ? 1 : scale) else { return false }
+        guard let image = cgImage(of: view(for: scene, metrics: metrics, model: model), scale: scene.isOnboarding ? 1 : scale) else {
+            return false
+        }
         return writePNG(image, to: url)
     }
 

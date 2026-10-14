@@ -32,15 +32,37 @@ public struct AgentDescriptor: Sendable, Equatable {
         case planned
     }
 
+    /// How a hook file that is entirely ours is spelled.
+    public enum HookFileFormat: Sendable, Equatable {
+        /// Claude Code's shape: `{ "hooks": { event: [group] } }`.
+        case claude
+        /// Copilot CLI (hooks reference): `{ "version": 1, "hooks": { event: [{ "type", "bash", "timeoutSec" }] } }`.
+        /// Claude's event names select its Claude-shaped payloads.
+        case copilot
+        /// Kiro (hooks reference, CLI V3 and the IDE): `{ "version": "v1", "hooks": [{ "name", "trigger", "action", … }] }`.
+        case kiro
+    }
+
+    /// Which in-process plugin we generate.
+    public enum PluginFlavor: Sendable, Equatable {
+        /// OpenCode and its relatives: `export const NikoIsland = async ({ client, directory }) => hooks`.
+        case openCode
+        /// Amp (plugin API): `export default function (amp) { amp.on(event, handler) }`, run by Bun.
+        case amp
+    }
+
     public enum Mechanism: Sendable, Equatable {
         /// Our entries are merged into a JSON config the agent shares with the user.
         case sharedSettings(file: String, events: [HookSpec], statusLine: Bool, dialect: HookDialect = .claude)
         /// A hook file that is entirely ours.
-        case ownedHookFile(file: String, events: [HookSpec])
-        /// A plugin directory that is entirely ours (manifest + hooks file).
-        case ownedPluginDirectory(directory: String, events: [HookSpec])
+        case ownedHookFile(file: String, events: [HookSpec], format: HookFileFormat = .claude)
+        /// A plugin pack that is entirely ours, laid out as Claude Code plugins are:
+        /// `.claude-plugin/plugin.json` and `hooks/hooks.json`.
+        case pluginPack(directory: String, events: [HookSpec])
+        /// A block of `[[hooks]]` tables of ours at the end of a TOML config the agent shares with the user.
+        case tomlHooks(file: String, events: [HookSpec])
         /// An in-process JS plugin that talks to the loopback HTTP ingress.
-        case jsPlugin(file: String)
+        case jsPlugin(file: String, flavor: PluginFlavor = .openCode)
         case none
     }
 
@@ -68,20 +90,30 @@ public struct AgentDescriptor: Sendable, Equatable {
     public var followUp: String?
     /// Files an earlier version of ours wrote for this agent and no longer uses.
     public var legacyFiles: [String] = []
+    /// Configs the agent shares with the user where an earlier version of ours
+    /// put hook entries (Claude's shape) the agent never read. Only our entries
+    /// are taken out of them; the files themselves stay.
+    public var legacySettings: [String] = []
 
     /// HOME-relative files the scan has to read for this agent.
     public var files: [String] {
+        let current: [String]
         switch mechanism {
-        case .sharedSettings(let file, _, _, _): return [file] + legacyFiles
-        case .ownedHookFile(let file, _): return [file] + legacyFiles
-        case .ownedPluginDirectory(let directory, _): return [directory + "/hooks.json", directory + "/plugin.json"] + legacyFiles
-        case .jsPlugin(let file): return [file] + legacyFiles
-        case .none: return []
+        case .sharedSettings(let file, _, _, _), .ownedHookFile(let file, _, _), .tomlHooks(let file, _), .jsPlugin(let file, _):
+            current = [file]
+        case .pluginPack(let directory, _):
+            current = [directory + "/" + AgentDescriptor.packManifest, directory + "/" + AgentDescriptor.packHooks]
+        case .none:
+            return []
         }
+        return current + legacyFiles + legacySettings
     }
 
+    static let packManifest = ".claude-plugin/plugin.json"
+    static let packHooks = "hooks/hooks.json"
+
     /// The files that hold this agent's current wiring (legacy leftovers excluded).
-    public var activeFiles: [String] { files.filter { !legacyFiles.contains($0) } }
+    public var activeFiles: [String] { files.filter { !legacyFiles.contains($0) && !legacySettings.contains($0) } }
 
     public var usesHTTPIngress: Bool {
         if case .jsPlugin = mechanism { return true }
@@ -174,6 +206,72 @@ public enum AgentRegistry {
         HookSpec(HookEvent.stop, matcher: nil),
     ]
 
+    /// Qoder, Qoder CN and QoderWork read Claude Code's format from their own
+    /// settings file (the registration CodeIsland ships). Their approval hook
+    /// is only watched: the bridge says "needs permission" and returns at once.
+    static let qoderEvents: [HookSpec] = [
+        HookSpec(HookEvent.sessionStart),
+        HookSpec(HookEvent.sessionEnd),
+        HookSpec(HookEvent.userPromptSubmit),
+        HookSpec(HookEvent.preToolUse),
+        HookSpec(HookEvent.postToolUse),
+        HookSpec("PostToolUseFailure"),
+        HookSpec(HookEvent.permissionRequest),
+        HookSpec(HookEvent.notification),
+        HookSpec(HookEvent.stop),
+        HookSpec(HookEvent.subagentStop),
+        HookSpec(HookEvent.preCompact),
+    ]
+
+    /// Kimi Code (hooks reference): twenty events, every one of which may only
+    /// watch except UserPromptSubmit, PreToolUse and Stop; an unknown event or
+    /// key stops the whole config from loading, so only names from its list.
+    /// No matcher means every tool; timeouts in seconds, 1 to 600.
+    static let kimiEvents: [HookSpec] = [
+        HookEvent.sessionStart, HookEvent.sessionEnd, HookEvent.userPromptSubmit, HookEvent.preToolUse,
+        HookEvent.postToolUse, "PostToolUseFailure", HookEvent.permissionRequest, "PermissionResult",
+        HookEvent.notification, HookEvent.stop, HookEvent.stopFailure, "Interrupt", HookEvent.subagentStop,
+        HookEvent.preCompact, HookEvent.postCompact,
+    ].map { HookSpec($0, matcher: nil) }
+
+    /// MiniMax Code (`mcode`): Claude's events and payloads, loaded from a plugin
+    /// pack only. A timeout must be a whole number of seconds from 1 to 10, or
+    /// the handler is dropped; so its approval hook is only watched.
+    static let minimaxEvents: [HookSpec] = [
+        HookEvent.sessionStart, HookEvent.sessionEnd, HookEvent.userPromptSubmit, HookEvent.preToolUse,
+        HookEvent.permissionRequest, HookEvent.postToolUse, HookEvent.subagentStop, HookEvent.stop,
+        HookEvent.preCompact, HookEvent.postCompact,
+    ].map { HookSpec($0, matcher: nil, timeout: 5) }
+
+    /// Devin (hooks reference): Claude's shape in ~/.config/devin/config.json;
+    /// a missing matcher means every tool; timeouts in seconds. It answers a
+    /// permission request with `{"decision": "approve" | "block"}`.
+    static let devinEvents: [HookSpec] = [
+        HookSpec(HookEvent.sessionStart, matcher: nil),
+        HookSpec(HookEvent.sessionEnd, matcher: nil),
+        HookSpec(HookEvent.userPromptSubmit, matcher: nil),
+        HookSpec(HookEvent.preToolUse, matcher: nil),
+        HookSpec(HookEvent.postToolUse, matcher: nil),
+        HookSpec(HookEvent.stop, matcher: nil),
+        HookSpec("PostCompaction", matcher: nil),
+        HookSpec(HookEvent.permissionRequest, matcher: nil, timeout: HookSpec.approvalTimeout),
+    ]
+
+    /// Copilot CLI (hooks reference): Claude's event names select Claude-shaped
+    /// payloads (`hook_event_name`, `session_id`, `tool_name`, `tool_input`).
+    /// Its tool hook fails closed on a non-zero exit; ours always exits 0.
+    static let copilotEvents: [HookSpec] = [
+        HookEvent.sessionStart, HookEvent.sessionEnd, HookEvent.userPromptSubmit, HookEvent.preToolUse,
+        HookEvent.postToolUse, HookEvent.notification, HookEvent.stop, HookEvent.subagentStop, HookEvent.preCompact,
+    ].map { HookSpec($0, matcher: nil) }
+
+    /// Kiro (hooks reference, CLI V3 and the IDE): global hook files in
+    /// ~/.kiro/hooks run in every workspace; no matcher means always.
+    static let kiroEvents: [HookSpec] = [
+        HookEvent.sessionStart, HookEvent.sessionEnd, HookEvent.userPromptSubmit, HookEvent.preToolUse,
+        HookEvent.postToolUse, HookEvent.stop,
+    ].map { HookSpec($0, matcher: nil) }
+
     private static func shared(_ id: String, _ name: String, dir: String, file: String, binary: String? = nil,
                                events: [HookSpec] = monitorEvents, dialect: HookDialect = .claude,
                                stability: AgentDescriptor.Stability = .experimental, symbol: String,
@@ -236,20 +334,49 @@ public enum AgentRegistry {
                         mechanism: .ownedHookFile(file: ".grok/hooks/niko.json", events: monitorEvents),
                         stability: .beta, symbol: "bolt", processes: ["grok"]),
         AgentDescriptor(id: "copilot", displayName: "Copilot CLI", directory: ".copilot", binary: "copilot",
-                        mechanism: .ownedHookFile(file: ".copilot/hooks/niko.json", events: monitorEvents),
-                        stability: .experimental, symbol: "airplane", processes: ["copilot"]),
+                        mechanism: .ownedHookFile(file: ".copilot/hooks/niko.json", events: copilotEvents, format: .copilot),
+                        stability: .beta, symbol: "airplane", processes: ["copilot"]),
         AgentDescriptor(id: "mimocode", displayName: "MiMoCode", directory: ".config/mimocode", binary: "mimocode",
                         mechanism: .jsPlugin(file: ".config/mimocode/plugins/niko.js"),
                         stability: .experimental, symbol: "terminal", processes: ["mimocode"]),
         shared("qwenwork", "QwenWork", dir: ".qwenwork", file: ".qwenwork/settings.json", symbol: "q.circle"),
-        shared("kiro", "Kiro", dir: ".kiro", file: ".kiro/settings/cli.json", symbol: "k.circle"),
-        planned("kimi", "Kimi Code", dir: ".kimi-code"),
-        planned("devin", "Devin", dir: ".config/devin"),
+        with(shared("qoder", "Qoder", dir: ".qoder", file: ".qoder/settings.json", binary: "qodercli", events: qoderEvents,
+                    stability: .beta, symbol: "chevron.left.slash.chevron.right")) {
+            $0.bridgeArguments = ["--observe"]
+        },
+        with(shared("qoder-cn", "Qoder (CN)", dir: ".qoder-cn", file: ".qoder-cn/settings.json", binary: "qodercli",
+                    events: qoderEvents, stability: .beta, symbol: "chevron.left.slash.chevron.right")) {
+            $0.bridgeArguments = ["--observe"]
+        },
+        with(shared("qoderwork", "QoderWork", dir: ".qoderwork", file: ".qoderwork/settings.json", binary: "qoderwork",
+                    events: qoderEvents, symbol: "chevron.left.slash.chevron.right")) {
+            $0.bridgeArguments = ["--observe"]
+        },
+        AgentDescriptor(id: "kiro", displayName: "Kiro", directory: ".kiro", binary: "kiro-cli",
+                        mechanism: .ownedHookFile(file: ".kiro/hooks/niko.json", events: kiroEvents, format: .kiro),
+                        stability: .experimental, symbol: "k.circle", processes: ["kiro-cli", "kiro"],
+                        followUp: "Kiro reads global hook files from version 3 of its CLI on; an older Kiro CLI does not run them.",
+                        legacySettings: [".kiro/settings/cli.json"]),
+        AgentDescriptor(id: "kimi", displayName: "Kimi Code", directory: ".kimi-code", binary: "kimi",
+                        mechanism: .tomlHooks(file: ".kimi-code/config.toml", events: kimiEvents),
+                        stability: .beta, symbol: "moon", bridgeArguments: ["--observe"], processes: ["kimi"],
+                        followUp: "Kimi Code reads its hooks when a session starts: sessions that are already open stay as they are."),
+        AgentDescriptor(id: "minimax", displayName: "MiniMax Code", directory: ".minimax", binary: "mcode",
+                        mechanism: .pluginPack(directory: ".minimax/plugins/niko", events: minimaxEvents),
+                        stability: .experimental, symbol: "m.circle", bridgeArguments: ["--observe"], processes: ["mcode"]),
+        with(shared("devin", "Devin", dir: ".config/devin", file: ".config/devin/config.json", events: devinEvents,
+                    stability: .beta, symbol: "d.circle")) {
+            $0.bridgeArguments = ["--reply", "devin"]
+            $0.approvals = true
+        },
+        AgentDescriptor(id: "amp", displayName: "Amp", directory: ".config/amp", binary: "amp",
+                        mechanism: .jsPlugin(file: ".config/amp/plugins/niko.ts", flavor: .amp),
+                        stability: .experimental, symbol: "bolt.horizontal", processes: ["amp"],
+                        followUp: "Amp's plugin API is experimental and runs in its command-line app only: reload plugins in Amp (or start it again) to load ours."),
         planned("vibe", "Mistral Vibe", dir: ".vibe"),
         planned("deepseek", "DeepSeek CLI", dir: ".deepseek"),
         planned("pi", "Pi / OhMyPi", dir: ".pi"),
         planned("openclaw", "OpenClaw", dir: ".openclaw"),
-        planned("amp", "Amp", dir: ".amp"),
     ]
 
     public static func descriptor(_ id: String) -> AgentDescriptor? { all.first { $0.id == id } }

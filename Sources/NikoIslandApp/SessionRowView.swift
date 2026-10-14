@@ -90,7 +90,7 @@ struct SessionRowView: View {
         }
         .padding(.vertical, look.compact ? 5 : 9)
         .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(hovering ? Theme.hover : Color.clear))
+        .background(RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).fill(hovering ? Theme.hover : Color.clear))
         .padding(.horizontal, -10)
         .onHover { hovering = $0 }
         .contextMenu {

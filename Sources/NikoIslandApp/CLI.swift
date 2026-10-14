@@ -391,6 +391,14 @@ public enum NikoCLI {
                 case .denied: print("sign-in: macOS said no")
                 }
             }
+            if which == "gemini" {
+                switch GeminiLogin.read(home: home) {
+                case .found(let login):
+                    print("sign-in: found, expires in \(login.expiresAt.map { String(Int($0.timeIntervalSinceNow / 60)) } ?? "?") min")
+                case .missing: print("sign-in: none from Gemini CLI on this Mac")
+                case .denied: print("sign-in: macOS said no")
+                }
+            }
             if which == "codex" {
                 switch CodexLogin.read(home: home) {
                 case .found(let login): print("sign-in: found, account id \(login.account == nil ? "absent" : "present")")
@@ -402,7 +410,11 @@ public enum NikoCLI {
             let region = GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
             Task.detached {
                 let client = ProviderLimitsClient(paths: work, secrets: .system(home: home), transport: transport) { _ in }
-                await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex"))
+                let settings = NikoSettings.load(paths: .resolve())
+                await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex",
+                                             kimi: which == "kimi", minimax: which == "minimax",
+                                             minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
+                                             gemini: which == "gemini"))
                 await client.refresh(force: true)
                 for (provider, result) in await client.current() {
                     print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")
@@ -412,6 +424,34 @@ public enum NikoCLI {
                     }
                 }
                 await client.configure(.init())
+                done.signal()
+            }
+            done.wait()
+            return 0
+        case "update":
+            // What the version check sees, and with `--prepare` a full download and check of that
+            // release's package into a temporary folder. Nothing is replaced.
+            let prepare = args.flag("--prepare")
+            let done = DispatchSemaphore(value: 0)
+            Task.detached {
+                let updater = Updater()
+                guard let release = await updater.latest() else {
+                    print("GitHub could not be asked")
+                    done.signal()
+                    return
+                }
+                print("latest \(release.version), running \(NikoVersion.current), newer: \(UpdateCheck.isNewer(release.version, than: NikoVersion.current))")
+                print("package for this Mac: \(release.package()?.lastPathComponent ?? "none"); checksums: \(release.checksums == nil ? "none" : "yes")")
+                if prepare {
+                    let folder = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("niko-update-\(getpid())")
+                    do {
+                        let app = try await updater.prepare(release, in: folder)
+                        print("prepared and checked: \(app.lastPathComponent) \(release.version)")
+                    } catch {
+                        print("not prepared: \(error)")
+                    }
+                    try? FileManager.default.removeItem(at: folder)
+                }
                 done.signal()
             }
             done.wait()
@@ -492,6 +532,11 @@ public enum NikoCLI {
                 for scene in [PreviewRenderer.Scene.working, .attention, .sessions] {
                     let url = root.appendingPathComponent("plain/island-\(scene.rawValue).png")
                     if PreviewRenderer.render(scene, to: url, metrics: .plain) { print("wrote \(url.path)") } else { failed += 1 }
+                }
+                // Each theme, on a display without a camera housing, where it shows the most.
+                for style in NikoSettings.IslandStyle.allCases {
+                    let url = root.appendingPathComponent("themes/island-\(style.rawValue).png")
+                    if PreviewRenderer.render(.sessions, to: url, metrics: .plain, style: style) { print("wrote \(url.path)") } else { failed += 1 }
                 }
                 if PreviewRenderer.renderDemo(to: root.appendingPathComponent("island-demo.gif")) { print("wrote island-demo.gif") } else { failed += 1 }
                 if PreviewRenderer.renderMascots(to: root.appendingPathComponent("mascots")) { print("wrote mascots/") } else { failed += 1 }

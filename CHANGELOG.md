@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.9.0] - 2026-10-14
+
+### Added
+- **More agents, each in its own format.** Qoder, Qoder CN and QoderWork
+  (Claude's format in their own settings), Kimi Code (one marked block of
+  `[[hooks]]` tables at the end of `~/.kimi-code/config.toml`; a config that
+  defines `hooks` some other way is left alone), Devin (approvals from the
+  island, answered as `{"decision": "approve" | "block"}`), MiniMax Code (a
+  plugin pack under `~/.minimax/plugins/niko/`) and Amp (a plugin that only
+  listens). The formats follow each agent's hook reference and, where that is
+  thin, the registrations CodeIsland ships.
+- **A permission prompt that only an agent itself can answer** (Kimi Code,
+  Qoder, MiniMax Code) shows on the island as "needs permission", without
+  holding the agent up.
+- **Plan limits from three more providers**, each off until switched on:
+  Kimi and MiniMax with a key you paste in (kept in your Keychain), and
+  Google for Gemini CLI's daily quotas, with the sign-in Gemini CLI saved and
+  only while it has not run out: it is never renewed here.
+- **Themes for the island:** Classic, Glass (the desktop blurred behind it),
+  Pixel (square corners, monospaced type) and Midnight. On a display with a
+  camera housing the closed island stays black.
+- **"There is a new version", if you want it.** Once a day the app can ask
+  GitHub for the latest release; the header shows a chip, and Settings →
+  About can install it: the package for this Mac is downloaded, checked
+  against the release's `SHA256SUMS`, its bundle id, version and signature,
+  and only then does the old app go to the Trash and the new one start.
+- **Settings → Agents says when each connected agent was last heard from**,
+  so a hook that never fires is noticed.
+
+### Changed
+- **Copilot CLI** gets the file format its hook reference describes, with
+  Claude's event names (which give Claude-shaped payloads); it is beta now.
+- **Kiro** gets a global hook file in `~/.kiro/hooks/` (Kiro CLI 3 and the
+  IDE); the entries earlier versions wrote into `~/.kiro/settings/cli.json`,
+  which Kiro never ran, are taken out again.
+- **Hooks that Devin and Copilot CLI borrow from Claude Code's settings** are
+  shown as theirs, or dropped when their own hooks are connected, so a
+  session is never listed twice or under the wrong agent.
+- **The first count of a large set of transcripts** reads and commits in
+  stretches: on a few gigabytes of real transcripts the counting process peaked
+  at 48 MB instead of 91 MB (125 MB resident instead of 211 MB) and took
+  18 s instead of 30 s.
+
+### Fixed
+- An event the island has no meaning for (a heartbeat, a helper starting, a
+  failed tool) no longer replaces a row's activity with its raw name.
+- The documentation pictures were drawn with the default look whatever the
+  scene's settings said.
+
 ## [0.8.2] - 2026-10-14
 
 After 0.8.0 quit at its first notification, the rest of the app was searched

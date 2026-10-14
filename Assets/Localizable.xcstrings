@@ -21,6 +21,16 @@
         }
       }
     },
+    "%@ is out": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 已发布"
+          }
+        }
+      }
+    },
     "%@ keeps the plan's limits on its own servers.": {
       "localizations": {
         "zh-Hans": {
@@ -441,6 +451,16 @@
         }
       }
     },
+    "A newer version can be installed from Settings → About.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "可以在“设置 → 关于”里安装新版本。"
+          }
+        }
+      }
+    },
     "A percentage where the agent says how large the model's window is (Codex), a size where it does not (Claude Code). Once it is nearly full it shows by itself.": {
       "localizations": {
         "zh-Hans": {
@@ -671,6 +691,16 @@
         }
       }
     },
+    "Amp's plugin API is experimental and runs in its command-line app only: reload plugins in Amp (or start it again) to load ours.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amp 的插件接口还是实验性的，并且只在它的命令行程序里运行：在 Amp 里重新加载插件（或重新启动它）才会载入我们的插件。"
+          }
+        }
+      }
+    },
     "An agent asks a question": {
       "localizations": {
         "zh-Hans": {
@@ -821,6 +851,36 @@
         }
       }
     },
+    "Ask Google for my Gemini CLI quotas": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Google 查询我的 Gemini CLI 配额"
+          }
+        }
+      }
+    },
+    "Ask Kimi for my Kimi Code plan limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Kimi 查询我的 Kimi Code 套餐额度"
+          }
+        }
+      }
+    },
+    "Ask MiniMax for my Coding Plan limits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 MiniMax 查询我的 Coding Plan 额度"
+          }
+        }
+      }
+    },
     "Ask OpenAI for my Codex limits": {
       "localizations": {
         "zh-Hans": {
@@ -831,12 +891,32 @@
         }
       }
     },
+    "Asking GitHub…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在询问 GitHub…"
+          }
+        }
+      }
+    },
     "Asking…": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "正在查询…"
+          }
+        }
+      }
+    },
+    "Asks GitHub once a day which release is the latest. The request says nothing but this app's name and version. Off until you turn it on.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每天向 GitHub 问一次最新的发布版本。请求里只有本应用的名字和版本号。打开之前不会询问。"
           }
         }
       }
@@ -1017,6 +1097,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "可多选"
+          }
+        }
+      }
+    },
+    "Classic": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "经典"
           }
         }
       }
@@ -1491,6 +1581,26 @@
         }
       }
     },
+    "Flash models, daily": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flash 模型，每日"
+          }
+        }
+      }
+    },
+    "Flash-Lite models, daily": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flash-Lite 模型，每日"
+          }
+        }
+      }
+    },
     "Follow the menu bar": {
       "localizations": {
         "zh-Hans": {
@@ -1551,6 +1661,26 @@
         }
       }
     },
+    "Gemini CLI has not signed in with a Google account on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini CLI 还没有在这台 Mac 上用 Google 账号登录，没有可用来查询的凭据。"
+          }
+        }
+      }
+    },
+    "Gemini CLI's sign-in on this Mac has run out. It renews itself the next time Gemini CLI runs.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gemini CLI 在这台 Mac 上的登录已过期。下次运行 Gemini CLI 时它会自己续期。"
+          }
+        }
+      }
+    },
     "General": {
       "localizations": {
         "zh-Hans": {
@@ -1567,6 +1697,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "开始"
+          }
+        }
+      }
+    },
+    "GitHub could not be asked.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法连接 GitHub。"
+          }
+        }
+      }
+    },
+    "Glass": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毛玻璃"
           }
         }
       }
@@ -1681,12 +1831,32 @@
         }
       }
     },
+    "Install and restart": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "安装并重启"
+          }
+        }
+      }
+    },
     "Install one, then connect it from Settings. The island also finds Claude Code, Codex and ZCode sessions by itself.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "先安装一个，再到设置里接入。小岛也会自己发现 Claude Code、Codex 和 ZCode 的会话。"
+          }
+        }
+      }
+    },
+    "Installing…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在安装…"
           }
         }
       }
@@ -1757,6 +1927,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "没有会话时也保持岛屿可见"
+          }
+        }
+      }
+    },
+    "Kimi Code keeps its sign-in to itself, so this needs an API key of your Kimi Code plan. It is stored in your Keychain and sent to api.kimi.com, nowhere else.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kimi Code 不对外提供它的登录凭据，所以这里需要你 Kimi Code 套餐的 API 密钥。密钥存在你的钥匙串里，只会发送到 api.kimi.com。"
+          }
+        }
+      }
+    },
+    "Kimi Code reads its hooks when a session starts: sessions that are already open stay as they are.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kimi Code 在会话开始时读取钩子：已经开着的会话保持原样。"
+          }
+        }
+      }
+    },
+    "Kiro reads global hook files from version 3 of its CLI on; an older Kiro CLI does not run them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kiro 从 CLI 第 3 版起才读取全局钩子文件；更早的 Kiro CLI 不会运行它们。"
           }
         }
       }
@@ -1881,6 +2081,16 @@
         }
       }
     },
+    "Midnight": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "午夜"
+          }
+        }
+      }
+    },
     "Moments": {
       "localizations": {
         "zh-Hans": {
@@ -1907,6 +2117,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "我的文件"
+          }
+        }
+      }
+    },
+    "Needs an API key of your MiniMax Coding Plan. It is stored in your Keychain and sent only to the service chosen below.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "需要你 MiniMax Coding Plan 的 API 密钥。密钥存在你的钥匙串里，只会发送到下面选择的服务。"
           }
         }
       }
@@ -2291,6 +2511,16 @@
         }
       }
     },
+    "Only an installed app can replace itself.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有安装好的应用才能替换自己。"
+          }
+        }
+      }
+    },
     "Only for a request the island is showing: with the island closed, the first press opens it. The keys are left to other apps while nothing is waiting. Questions are never answered this way.": {
       "localizations": {
         "zh-Hans": {
@@ -2441,6 +2671,16 @@
         }
       }
     },
+    "Pixel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "像素"
+          }
+        }
+      }
+    },
     "Pixel creatures": {
       "localizations": {
         "zh-Hans": {
@@ -2497,6 +2737,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "隐私"
+          }
+        }
+      }
+    },
+    "Pro models, daily": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pro 模型，每日"
           }
         }
       }
@@ -2567,6 +2817,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只发送到 api.anthropic.com，不发往别处。每五分钟查询一次。"
+          }
+        }
+      }
+    },
+    "Reads the sign-in Gemini CLI saved on this Mac (in ~/.gemini, or your Keychain: macOS may ask you first) and sends it to cloudcode-pa.googleapis.com, nowhere else, while it is still good. It is never renewed here: Gemini CLI does that the next time it runs. Asked every five minutes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "读取 Gemini CLI 在这台 Mac 上保存的登录凭据（在 ~/.gemini 里，或在钥匙串里：macOS 可能会先询问你），在它没过期时只发送到 cloudcode-pa.googleapis.com。本应用绝不为它续期：下次运行时 Gemini CLI 会自己续期。每五分钟查询一次。"
           }
         }
       }
@@ -3101,6 +3361,16 @@
         }
       }
     },
+    "Tell me when there is a new version": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有新版本时告诉我"
+          }
+        }
+      }
+    },
     "Text size": {
       "localizations": {
         "zh-Hans": {
@@ -3111,12 +3381,52 @@
         }
       }
     },
+    "The app could not be replaced: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "无法替换应用：%@"
+          }
+        }
+      }
+    },
     "The cue plays again, up to three times, and a line goes to your phone if that is switched on. Not while the screen is locked.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "提示音会再响一次，最多三次；如果开了手机推送，也会发一条。屏幕锁定时不提醒。"
+          }
+        }
+      }
+    },
+    "The download did not finish.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载没有完成。"
+          }
+        }
+      }
+    },
+    "The download did not match the release's checksum, so it was not used.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载的文件与发布附带的校验和不符，没有使用。"
+          }
+        }
+      }
+    },
+    "The download is not this app, so it was not used.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载的不是本应用，没有使用。"
           }
         }
       }
@@ -3221,6 +3531,16 @@
         }
       }
     },
+    "Theme": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主题"
+          }
+        }
+      }
+    },
     "There is no key yet, or the server address cannot be used.": {
       "localizations": {
         "zh-Hans": {
@@ -3241,12 +3561,32 @@
         }
       }
     },
+    "This is the latest version.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已是最新版本。"
+          }
+        }
+      }
+    },
     "This is what a line from your Mac looks like.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "来自你 Mac 的一行消息就是这个样子。"
+          }
+        }
+      }
+    },
+    "This release has no package for this Mac.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这个版本没有适合这台 Mac 的安装包。"
           }
         }
       }
@@ -3381,6 +3721,16 @@
         }
       }
     },
+    "Version %@ is out. Installing puts the old app in the Trash.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 版已发布。安装时旧应用会被移到废纸篓。"
+          }
+        }
+      }
+    },
     "Version %@ · no telemetry, no account, MIT licensed": {
       "localizations": {
         "zh-Hans": {
@@ -3481,6 +3831,16 @@
         }
       }
     },
+    "What the island is drawn on. On a display with a camera housing the closed island stays black, to match it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "灵动岛的底色与质感。在有摄像头刘海的屏幕上，收起的灵动岛保持黑色，与刘海融为一体。"
+          }
+        }
+      }
+    },
     "When an agent finishes": {
       "localizations": {
         "zh-Hans": {
@@ -3517,6 +3877,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "也就是没有菜单栏的地方。"
+          }
+        }
+      }
+    },
+    "Where your MiniMax account is: minimaxi.com in mainland China, minimax.io elsewhere.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你的 MiniMax 账号所在：中国大陆为 minimaxi.com，其他地区为 minimax.io。"
           }
         }
       }
@@ -3801,6 +4171,16 @@
         }
       }
     },
+    "last event %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近一次事件：%@"
+          }
+        }
+      }
+    },
     "macOS": {
       "localizations": {
         "zh-Hans": {
@@ -3837,6 +4217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "需要许可"
+          }
+        }
+      }
+    },
+    "no event since Niko Island started": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Niko Island 启动以来还没收到事件"
           }
         }
       }

@@ -162,9 +162,13 @@ public struct Installer: Sendable {
             case .install: skip = planInstall(agent, scanned: scanned, into: &plan)
             case .uninstall: skip = planUninstall(agent, scanned: scanned, into: &plan)
             }
-            // Whatever an earlier version left behind goes either way (only files that carry our marker).
+            // Whatever an earlier version left behind goes either way (only files that carry our marker,
+            // and only our entries out of files that are the user's).
             if skip == nil, !agent.legacyFiles.isEmpty {
                 skip = planOwnedRemoval(agent, files: agent.legacyFiles, scanned: scanned, into: &plan)
+            }
+            if skip == nil, !agent.legacySettings.isEmpty {
+                skip = planLegacySettings(agent, scanned: scanned, into: &plan)
             }
             if let skip {
                 plan.changes.removeSubrange(before...)
@@ -267,23 +271,81 @@ public struct Installer: Sendable {
             }
             return nil
 
-        case .ownedHookFile(let file, let events):
-            return planOwned(agent, file: file, content: PluginTemplates.hookFile(agent: agent, events: events, paths: options.paths),
+        case .ownedHookFile(let file, let events, let format):
+            let content: String
+            switch format {
+            case .claude: content = PluginTemplates.hookFile(agent: agent, events: events, paths: options.paths)
+            case .copilot: content = PluginTemplates.copilotHookFile(agent: agent, events: events, paths: options.paths)
+            case .kiro: content = PluginTemplates.kiroHookFile(agent: agent, events: events, paths: options.paths)
+            }
+            return planOwned(agent, file: file, content: content, scanned: scanned, into: &plan)
+
+        case .pluginPack(let directory, let events):
+            if let skip = planOwned(agent, file: directory + "/" + AgentDescriptor.packManifest,
+                                    content: PluginTemplates.pluginManifest(agent: agent), scanned: scanned, into: &plan) { return skip }
+            return planOwned(agent, file: directory + "/" + AgentDescriptor.packHooks,
+                             content: PluginTemplates.hookFile(agent: agent, events: events, paths: options.paths, note: false),
                              scanned: scanned, into: &plan)
 
-        case .ownedPluginDirectory(let directory, let events):
-            if let skip = planOwned(agent, file: directory + "/plugin.json", content: PluginTemplates.pluginManifest(agent: agent),
-                                    scanned: scanned, into: &plan) { return skip }
-            return planOwned(agent, file: directory + "/hooks.json",
-                             content: PluginTemplates.hookFile(agent: agent, events: events, paths: options.paths),
-                             scanned: scanned, into: &plan)
+        case .tomlHooks(let file, let events):
+            let before: Data?
+            switch scanned.files[file] ?? .unreadable {
+            case .unreadable: return "~/\(file) is not a readable regular file — left untouched"
+            case .tooLarge(let size): return "~/\(file) is \(size) bytes, over the scan limit — left untouched"
+            case .missing: before = nil
+            case .present(let data): before = data
+            }
+            let text = String(decoding: before ?? Data(), as: UTF8.self)
+            guard Data(text.utf8) == (before ?? Data()) else { return "~/\(file) is not valid UTF-8 — left untouched" }
+            let installed: String
+            switch TOMLHooks.install(into: text, specs: events, command: { _ in
+                Shims.hookCommand(paths: options.paths, source: agent.id, extraArguments: agent.bridgeArguments)
+            }) {
+            case .failure(let refusal): return "~/\(file) \(refusal.reason) — left untouched"
+            case .success(let value): installed = value
+            }
+            // Same invariant as for JSON: with our block taken back out, the file is what the user had
+            // (give or take the line break we add at its end).
+            func settled(_ text: String) -> String {
+                String(TOMLHooks.strip(text).text.reversed().drop { $0.isWhitespace }.reversed())
+            }
+            guard settled(installed) == settled(text) else {
+                return "internal check failed for ~/\(file) — left untouched"
+            }
+            let after = Data(installed.utf8)
+            if after != before {
+                plan.changes.append(FileChange(agent: agent.id, relativePath: file, kind: before == nil ? .create : .modify,
+                                               before: before, after: after, summary: "\(events.count) hook entries",
+                                               createMode: 0o600, keepsBackup: true))
+            }
+            return nil
 
-        case .jsPlugin(let file):
-            let skip = planOwned(agent, file: file, content: PluginTemplates.openCodePlugin(agent: agent, paths: options.paths),
-                                 scanned: scanned, into: &plan)
+        case .jsPlugin(let file, let flavor):
+            let content = flavor == .amp
+                ? PluginTemplates.ampPlugin(agent: agent, paths: options.paths)
+                : PluginTemplates.openCodePlugin(agent: agent, paths: options.paths)
+            let skip = planOwned(agent, file: file, content: content, scanned: scanned, into: &plan)
             if skip == nil { plan.enablesHTTPIngress = true }
             return skip
         }
+    }
+
+    /// Takes our entries out of configs where an earlier version put them by mistake.
+    private func planLegacySettings(_ agent: AgentDescriptor, scanned: ScanReport.Agent, into plan: inout InstallPlan) -> String? {
+        for file in agent.legacySettings {
+            guard case .present(let data) = scanned.files[file] ?? .missing else { continue }
+            let parsed: (root: JSONObject, text: String?)
+            switch parseShared(.present(data), file: file) {
+            case .failure: continue                      // not something we could have written into
+            case .success(let value): parsed = value
+            }
+            guard HookMerge.containsOurs(parsed.root) else { continue }
+            let stripped = HookMerge.strip(parsed.root)
+            let after = pristineBackup(for: file, matching: stripped.root, dialect: .claude) ?? serialize(stripped.root, like: parsed.text)
+            plan.changes.append(FileChange(agent: agent.id, relativePath: file, kind: .modify, before: data, after: after,
+                                           summary: "removed \(stripped.removed) hook entries an earlier version left", keepsBackup: true))
+        }
+        return nil
     }
 
     /// A file that is wholly ours: create it, refresh it, or refuse if someone else's file is in the way.
@@ -342,12 +404,22 @@ public struct Installer: Sendable {
             }
             return nil
 
-        case .ownedHookFile(let file, _):
-            return planOwnedRemoval(agent, files: [file], scanned: scanned, into: &plan)
-        case .ownedPluginDirectory(let directory, _):
-            return planOwnedRemoval(agent, files: [directory + "/hooks.json", directory + "/plugin.json"], scanned: scanned, into: &plan)
-        case .jsPlugin(let file):
-            return planOwnedRemoval(agent, files: [file], scanned: scanned, into: &plan)
+        case .ownedHookFile, .pluginPack, .jsPlugin:
+            return planOwnedRemoval(agent, files: agent.activeFiles, scanned: scanned, into: &plan)
+
+        case .tomlHooks(let file, _):
+            let state = scanned.files[file] ?? .unreadable
+            guard case .present(let data) = state else {
+                if case .missing = state { return nil }
+                return "~/\(file) is not readable — if it contains niko-bridge entries, remove them by hand"
+            }
+            let text = String(decoding: data, as: UTF8.self)
+            let stripped = TOMLHooks.strip(text)
+            guard stripped.removed > 0 else { return nil }
+            plan.changes.append(FileChange(agent: agent.id, relativePath: file, kind: .modify, before: data,
+                                           after: Data(stripped.text.utf8), summary: "removed \(stripped.removed) hook entries",
+                                           keepsBackup: true))
+            return nil
         }
     }
 
@@ -526,12 +598,24 @@ public struct Installer: Sendable {
             default:
                 throw InstallError.verificationFailed("~/" + change.relativePath)
             }
-            guard let after = change.after, change.relativePath.hasSuffix(".json") else { continue }
+            guard let after = change.after else { continue }
+            guard change.relativePath.hasSuffix(".json") else {
+                // Anything else of ours (a TOML block, a plugin) carries the marker exactly while installed.
+                let agent = AgentRegistry.descriptor(change.agent)
+                if agent?.activeFiles.contains(change.relativePath) == true,
+                   HookMerge.isOurs(command: String(decoding: after, as: UTF8.self)) != (plan.action == .install) {
+                    throw InstallError.verificationFailed("~/" + change.relativePath)
+                }
+                continue
+            }
             var dialect = HookDialect.claude
             if case .sharedSettings(_, _, _, let own)? = AgentRegistry.descriptor(change.agent)?.mechanism { dialect = own }
+            // A legacy config we only took our entries out of is clean whichever way we went.
+            let expectOurs = plan.action == .install
+                && AgentRegistry.descriptor(change.agent)?.legacySettings.contains(change.relativePath) != true
             guard let object = (try? JSONValue.parse(after))?.objectValue,
-                  HookMerge.containsOurs(object, dialect: dialect) == (plan.action == .install)
-                    || HookMerge.isOurs(command: String(decoding: after, as: UTF8.self)) == (plan.action == .install) else {
+                  HookMerge.containsOurs(object, dialect: dialect) == expectOurs
+                    || HookMerge.isOurs(command: String(decoding: after, as: UTF8.self)) == expectOurs else {
                 throw InstallError.verificationFailed("~/" + change.relativePath)
             }
         }
@@ -572,6 +656,13 @@ public struct Installer: Sendable {
                 _ = try? HTTPIngressServer.loadOrCreateToken(paths: options.paths)
             }
         case .uninstall:
+            // A plugin pack's folders were made for us: once empty, they go too, whatever else stays.
+            for agent in agents(for: .uninstall) where result.touched(agent.id) {
+                guard case .pluginPack(let directory, _) = agent.mechanism else { continue }
+                rmdir(absolute(directory + "/.claude-plugin"))
+                rmdir(absolute(directory + "/hooks"))
+                rmdir(absolute(directory))
+            }
             if options.agentIDs == nil || options.agentIDs?.contains("claude") == true {
                 unlink(options.paths.statuslineOriginal.path)
             }
@@ -579,8 +670,6 @@ public struct Installer: Sendable {
             guard options.agentIDs == nil else { return }
             Shims.remove(paths: options.paths)
             for agent in agents(for: .uninstall) {
-                // Remove plugin directories that were created for us and are now empty.
-                if case .ownedPluginDirectory(let directory, _) = agent.mechanism { rmdir(absolute(directory)) }
                 for file in agent.legacyFiles { rmdir((absolute(file) as NSString).deletingLastPathComponent) }
             }
             guard options.purge else { return }

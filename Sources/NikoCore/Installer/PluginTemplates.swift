@@ -3,27 +3,63 @@ import Foundation
 /// Files we own outright inside agent config directories.
 public enum PluginTemplates {
     /// Hook file for agents that load self-contained hook files. Same JSON
-    /// shape as the shared-settings adapter, plus a note for whoever opens it.
-    public static func hookFile(agent: AgentDescriptor, events: [HookSpec], paths: NikoPaths) -> String {
+    /// shape as the shared-settings adapter, plus (unless the agent is strict
+    /// about keys) a note for whoever opens it.
+    public static func hookFile(agent: AgentDescriptor, events: [HookSpec], paths: NikoPaths, note: Bool = true) -> String {
         var hooks = JSONObject()
         for spec in events {
-            hooks[spec.event] = .array([HookMerge.group(spec: spec, command: Shims.hookCommand(paths: paths, source: agent.id))])
+            hooks[spec.event] = .array([HookMerge.group(spec: spec, command: command(agent, paths))])
         }
+        var root = JSONObject()
+        if note { root["_comment"] = .string("Managed by Niko Island (niko-bridge). `niko-island uninstall` removes this file.") }
+        root["hooks"] = .object(hooks)
+        return JSONValue.object(root).serialized(.pretty)
+    }
+
+    /// Copilot CLI: `{ "version": 1, "hooks": { event: [{ "type", "bash", "timeoutSec" }] } }`.
+    public static func copilotHookFile(agent: AgentDescriptor, events: [HookSpec], paths: NikoPaths) -> String {
+        var hooks = JSONObject()
+        for spec in events {
+            hooks[spec.event] = .array([.object([
+                "type": .string("command"),
+                "bash": .string(command(agent, paths, event: spec.event)),
+                "timeoutSec": .int(spec.timeout ?? HookSpec.quickTimeout),
+            ])])
+        }
+        return JSONValue.object(["version": .int(1), "hooks": .object(hooks)]).serialized(.pretty)
+    }
+
+    /// Kiro: `{ "version": "v1", "hooks": [{ "name", "trigger", "action": { "type", "command" }, "timeout", "enabled" }] }`.
+    public static func kiroHookFile(agent: AgentDescriptor, events: [HookSpec], paths: NikoPaths) -> String {
+        let hooks: [JSONValue] = events.map { spec in
+            var entry = JSONObject()
+            entry["name"] = .string("niko-island-\(spec.event)")
+            entry["trigger"] = .string(spec.event)
+            if let matcher = spec.matcher { entry["matcher"] = .string(matcher) }
+            entry["action"] = .object(["type": .string("command"), "command": .string(command(agent, paths, event: spec.event))])
+            entry["timeout"] = .int(spec.timeout ?? HookSpec.quickTimeout)
+            entry["enabled"] = .bool(true)
+            return .object(entry)
+        }
+        return JSONValue.object(["version": .string("v1"), "hooks": .array(hooks)]).serialized(.pretty)
+    }
+
+    /// The manifest of a plugin pack, as Claude Code plugins have it (MiniMax Code reads the same layout).
+    public static func pluginManifest(agent: AgentDescriptor) -> String {
         let root = JSONObject([
-            "_comment": .string("Managed by Niko Island (niko-bridge). `niko-island uninstall` removes this file."),
-            "hooks": .object(hooks),
+            "name": .string("niko"),
+            "displayName": .string("Niko Island"),
+            "version": .string(NikoVersion.current),
+            "description": .string("Niko Island status bridge (niko-bridge). `niko-island uninstall` removes this plugin."),
+            "hooks": .array([.string(AgentDescriptor.packHooks)]),
         ])
         return JSONValue.object(root).serialized(.pretty)
     }
 
-    public static func pluginManifest(agent: AgentDescriptor) -> String {
-        let root = JSONObject([
-            "name": .string("niko"),
-            "version": .string(NikoVersion.current),
-            "description": .string("Niko Island status bridge (niko-bridge). `niko-island uninstall` removes this directory."),
-            "hooks": .string("hooks.json"),
-        ])
-        return JSONValue.object(root).serialized(.pretty)
+    /// The hook command for one agent; `event` names the event for agents whose payload may not.
+    static func command(_ agent: AgentDescriptor, _ paths: NikoPaths, event: String? = nil) -> String {
+        Shims.hookCommand(paths: paths, source: agent.id,
+                          extraArguments: agent.bridgeArguments + (event.map { ["--event", $0] } ?? []))
     }
 
     /// In-process plugin for OpenCode-family agents (INTEGRATIONS "OpenCode-family JS").
@@ -195,6 +231,123 @@ public enum PluginTemplates {
             },
           };
         };
+
+        """
+    }
+
+    /// Amp's plugin (its plugin API is experimental; Bun runs the file). It
+    /// only listens: it never answers a tool call, so Amp's own permission
+    /// rules stay exactly as they are.
+    public static func ampPlugin(agent: AgentDescriptor, paths: NikoPaths) -> String {
+        let root = paths.isDefaultLocation
+            ? "join(homedir(), \".niko-island\")"
+            : JSONValue.string(paths.root.path).serialized()
+        return """
+        // Niko Island plugin (niko-bridge) for \(agent.displayName) — generated, version \(NikoVersion.current).
+        // It tells the Niko Island menu-bar app on this machine what Amp is doing,
+        // over loopback HTTP. It only listens and never answers a tool call.
+        // Delete this file, or run `niko-island uninstall`, and it is gone.
+        import { readFileSync } from "node:fs";
+        import { homedir } from "node:os";
+        import { join } from "node:path";
+
+        const ROOT = \(root);
+        const SOURCE = \(JSONValue.string(agent.id).serialized());
+
+        function endpoint() {
+          try {
+            const port = readFileSync(join(ROOT, "run", "ingress-port"), "utf8").trim();
+            const token = readFileSync(join(ROOT, "run", "ingress-token"), "utf8").trim();
+            if (!/^\\d+$/.test(port) || !token) return null;
+            return { url: `http://127.0.0.1:${port}/event`, token };
+          } catch {
+            return null; // app not running or not installed
+          }
+        }
+
+        function textOf(value) {
+          if (typeof value === "string") return value;
+          if (Array.isArray(value)) return value.map(textOf).filter(Boolean).join("\\n");
+          if (value && typeof value === "object") return textOf(value.text ?? value.content);
+          return undefined;
+        }
+
+        async function post(directory, event) {
+          const target = endpoint();
+          if (!target) return;
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 1500);
+          try {
+            await fetch(target.url, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${target.token}`,
+                "X-Niko-Directory": encodeURIComponent(directory ?? ""),
+                "X-Niko-Source": SOURCE,
+              },
+              body: JSON.stringify(
+                {
+                  source: SOURCE,
+                  cwd: directory,
+                  ts: Date.now(),
+                  _niko: { pid: process.pid, term_program: process.env.TERM_PROGRAM, iterm_session_id: process.env.ITERM_SESSION_ID,
+                           tmux: process.env.TMUX, tmux_pane: process.env.TMUX_PANE, bundle_id: process.env.__CFBundleIdentifier },
+                  ...event,
+                },
+                (key, value) => (typeof value === "string" && value.length > 4096 ? value.slice(0, 4096) + "…" : value),
+              ),
+              signal: controller.signal,
+            });
+          } catch {
+            // the app is not there: nothing to do
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+
+        export default function (amp) {
+          let directory = process.cwd();
+          try {
+            const root = amp?.system?.workspaceRoot;
+            if (root) directory = amp.helpers?.filePathFromURI?.(root) ?? String(root);
+          } catch {
+            // keep the process directory
+          }
+          const sessionOf = (event) => event?.thread?.id ?? `cwd:${directory}`;
+          const on = (name, handler) => {
+            try {
+              amp.on(name, async (event) => {
+                try {
+                  await handler(event ?? {});
+                } catch {
+                  // never let our failure reach Amp
+                }
+              });
+            } catch {
+              // an Amp without this event
+            }
+          };
+
+          on("session.start", (event) => post(directory, { hook_event_name: "SessionStart", session_id: sessionOf(event) }));
+          on("agent.start", (event) =>
+            post(directory, { hook_event_name: "UserPromptSubmit", session_id: sessionOf(event), prompt: textOf(event.message) }));
+          on("tool.result", (event) =>
+            post(directory, {
+              hook_event_name: "PreToolUse",
+              session_id: sessionOf(event),
+              tool_name: event.tool,
+              tool_input: event.input && typeof event.input === "object" ? event.input : {},
+            }));
+          on("agent.end", (event) => {
+            const replies = Array.isArray(event.messages) ? event.messages.filter((m) => m?.role === "assistant") : [];
+            return post(directory, {
+              hook_event_name: event.status === "error" ? "StopFailure" : "Stop",
+              session_id: sessionOf(event),
+              last_assistant_message: textOf(replies[replies.length - 1]?.content),
+            });
+          });
+        }
 
         """
     }

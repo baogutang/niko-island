@@ -37,7 +37,9 @@ struct IslandBody: View {
         let recap = model.isExpanded ? nil : model.recap
         let card = model.isExpanded || recap != nil ? nil : model.completion
         let showsCard = card != nil || recap != nil
-        let shape = IslandShape(ear: model.isExpanded ? 10 : (showsCard ? 8 : 6), radius: model.isExpanded ? 30 : (showsCard ? 24 : 13))
+        let housing = metrics.hasNotch && !model.isExpanded && !showsCard
+        let corner = (model.isExpanded ? 30 : (showsCard ? 24 : 13)) * (housing ? 1 : look.islandRadiusScale)
+        let shape = IslandShape(ear: model.isExpanded ? 10 : (showsCard ? 8 : 6), radius: corner)
         // Opening has a little bounce; closing is quicker and settles without one,
         // so the island is out of the way the moment it is not wanted.
         let spring = model.isExpanded ? Animation.spring(response: 0.34 * look.motion, dampingFraction: 0.84)
@@ -58,7 +60,7 @@ struct IslandBody: View {
             }
         }
         .frame(width: model.isExpanded ? CGFloat(model.settings.islandWidth.points) : nil)
-        .background(shape.fill(Theme.island))
+        .background(IslandSurface(shape: shape, style: look.style, housing: housing))
         .clipShape(shape)
         .contentShape(shape)
         .shadow(color: .black.opacity(model.isExpanded ? 0.55 : (showsCard ? 0.45 : 0)), radius: 24, y: 14)
@@ -241,6 +243,16 @@ struct ExpandedIsland: View {
             if !metrics.hasNotch {
                 Text(summary).font(look.body(11.5)).foregroundStyle(model.pending.isEmpty ? Theme.tertiary : Theme.amber)
             }
+            if let update = model.availableUpdate {
+                Button {
+                    model.settingsPage = "about"
+                    model.onOpenSettings?()
+                } label: {
+                    Chip(text: L("%@ is out", update.version), tint: look.accent)
+                }
+                .buttonStyle(.plain)
+                .help(L("A newer version can be installed from Settings → About."))
+            }
             Spacer(minLength: 0)
             IconButton(symbol: "chart.bar.fill", active: model.route == .usage, label: L("Usage")) {
                 model.route = model.route == .usage ? .sessions : .usage
@@ -389,7 +401,7 @@ struct SessionsPane: View {
             Spacer(minLength: 0)
         }
         .padding(12)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Theme.amber.opacity(0.12)))
+        .background(RoundedRectangle(cornerRadius: look.radius(12), style: .continuous).fill(Theme.amber.opacity(0.12)))
         .padding(.bottom, 10)
     }
 }

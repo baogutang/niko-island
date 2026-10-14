@@ -34,19 +34,19 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/mascots/starfish.gif" width="40" alt="海星" title="Claude Code">&nbsp;
-  <img src="docs/images/mascots/whale.gif" width="40" alt="鲸鱼" title="Codex">&nbsp;
-  <img src="docs/images/mascots/crab.gif" width="40" alt="螃蟹" title="ZCode">&nbsp;
+  <img src="docs/images/mascots/starfish.gif" width="40" alt="海星" title="Claude Code · MiniMax Code">&nbsp;
+  <img src="docs/images/mascots/whale.gif" width="40" alt="鲸鱼" title="Codex · Kimi Code">&nbsp;
+  <img src="docs/images/mascots/crab.gif" width="40" alt="螃蟹" title="ZCode · Devin">&nbsp;
   <img src="docs/images/mascots/boat.gif" width="40" alt="小船" title="Cursor · Windsurf">&nbsp;
   <img src="docs/images/mascots/gull.gif" width="40" alt="海鸥" title="Copilot CLI · CodeBuddy">&nbsp;
   <img src="docs/images/mascots/jellyfish.gif" width="40" alt="水母" title="Gemini CLI · Qwen Code">&nbsp;
-  <img src="docs/images/mascots/turtle.gif" width="40" alt="海龟" title="OpenCode · MiMoCode">&nbsp;
+  <img src="docs/images/mascots/turtle.gif" width="40" alt="海龟" title="OpenCode · MiMoCode · Qoder">&nbsp;
   <img src="docs/images/mascots/octopus.gif" width="40" alt="章鱼" title="Trae · Kiro">&nbsp;
-  <img src="docs/images/mascots/puffer.gif" width="40" alt="河豚" title="Grok CLI · Factory">&nbsp;
+  <img src="docs/images/mascots/puffer.gif" width="40" alt="河豚" title="Grok CLI · Factory · Amp">&nbsp;
   <img src="docs/images/mascots/island.gif" width="40" alt="小岛" title="其他代理">
 </p>
 <p align="center">
-  <sub>Claude Code · Codex · ZCode · Cursor · Windsurf · Gemini CLI · Trae · Qwen Code · CodeBuddy · Factory · Grok CLI · OpenCode · MiMoCode · Copilot CLI · Kiro</sub>
+  <sub>Claude Code · Codex · ZCode · Cursor · Windsurf · Gemini CLI · Trae · Qwen Code · CodeBuddy · Factory · Grok CLI · OpenCode · MiMoCode · Copilot CLI · Qoder · Kimi Code · Devin · Kiro · MiniMax Code · Amp</sub>
 </p>
 
 <a id="see-it-move"></a>
@@ -146,11 +146,12 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 - **每个代理一只小生物。** Claude Code 是海星，Codex 是鲸鱼，ZCode 是螃蟹：不用读字就能分清会话。想给哪个代理换一只也可以。
 - **帮你定位的小标签。** 每一行都带着时长、代理、它在哪里运行（iTerm2、Terminal、Ghostty、WezTerm、VS Code、Cursor、tmux、桌面端……），以及所在目录的 Git 分支。模型名称可以在设置里打开。
 - **回到正确的窗口。** 点一下会话行或通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位；桌面端的会话会把对应的应用带到前台，Codex 桌面端的会话会直接打开那一段对话。会话行的右键菜单可以拷贝最后一条回复、在访达里显示文件夹，或者拷贝恢复该会话的命令。
-- **按代理分开的用量与额度。** 在全部、Claude Code、Codex、ZCode 之间切换：最近 5 小时、今天、7 天、30 天。套餐的 5 小时和每周额度来自真正知道它的地方：代理自己写下的文件，或者（在你打开开关之后）厂商本身。
-- **按你的习惯来。** 强调色、宽度、文字大小、行距、显示哪些标签、悬停时间、展开收起的速度、放在哪块显示器、语言、每行显示几行回复、全局快捷键（⌃⌥I）。
+- **按代理分开的用量与额度。** 在全部、Claude Code、Codex、ZCode 之间切换：最近 5 小时、今天、7 天、30 天。套餐的 5 小时和每周额度来自真正知道它的地方：代理自己写下的文件，或者（在你打开开关之后）厂商本身：Anthropic、OpenAI、智谱 BigModel / Z.ai、Kimi、MiniMax，以及 Google（Gemini CLI 的每日配额）。
+- **按你的习惯来。** 主题（经典黑、毛玻璃、方角的像素风、深蓝的午夜）、强调色、宽度、文字大小、行距、显示哪些标签、悬停时间、展开收起的速度、放在哪块显示器、语言、每行显示几行回复、全局快捷键（⌃⌥I）。
 - **音效由你决定。** 五个时刻，两套由应用自己生成的内置音效，也可以用 macOS 系统声音、自己的文件或音效包。默认全部关闭。
-- **可以放心的安装器。** 先扫描、再备份、写后校验、失败回滚，卸载时只删除自己加的内容。
-- **从设计上保证隐私。** 无遥测、无账号。只有三件可选的事会用到网络，而且默认都是关闭的。
+- **可以放心的安装器。** 先扫描、再备份、写后校验、失败回滚，卸载时只删除自己加的内容。 设置 → 代理里会显示每个已接入的代理最近一次传来事件的时间，钩子一直没动静也能看出来。
+- **新版本提醒，按需开启。** 每天可以问一次 GitHub 有没有更新的版本；*安装并重启*会下载适合你这台 Mac 的安装包，核对发布附带的校验和与签名后，把旧应用移到废纸篓。
+- **从设计上保证隐私。** 无遥测、无账号。只有四件可选的事会用到网络，而且默认都是关闭的。
 - **English 与简体中文**，可在设置里切换。
 
 <p align="center">
@@ -164,6 +165,14 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 
 <p align="center">
   <img src="docs/images/island-recap.png" width="640" alt="屏幕锁定期间结束的会话，回来时只说一次：每个会话一行">
+</p>
+
+<p align="center">
+  <img src="docs/images/themes/island-classic.png" width="400" alt="经典主题：黑色">
+  <img src="docs/images/themes/island-glass.png" width="400" alt="毛玻璃主题：背后的桌面被模糊">
+  <img src="docs/images/themes/island-pixel.png" width="400" alt="像素主题：方角与等宽字体">
+  <img src="docs/images/themes/island-midnight.png" width="400" alt="午夜主题：深蓝色">
+  <br><sub>经典 · 毛玻璃 · 像素 · 午夜</sub>
 </p>
 
 <a id="supported-agents"></a>
@@ -183,9 +192,15 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 | Factory | 河豚 | 测试版 | 实时状态 | `~/.factory/settings.json` |
 | Grok CLI | 河豚 | 测试版 | 实时状态 | `~/.grok/hooks/niko.json`（独立文件） |
 | OpenCode、MiMoCode | 海龟 | 实验性 | 通过一个小插件提供实时状态；用量为尽力而为 | `~/.config/opencode/plugins/niko.js`、`~/.config/mimocode/plugins/niko.js`（独立文件） |
-| Copilot CLI | 海鸥 | 实验性 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
-| QwenWork、Kiro | 水母、章鱼 | 实验性 | 实时状态 | `~/.qwenwork/settings.json`、`~/.kiro/settings/cli.json` |
-| Kimi Code、Devin、Mistral Vibe、DeepSeek CLI、Pi / OhMyPi、OpenClaw、Amp | — | 计划中 | — | — |
+| Copilot CLI | 海鸥 | 测试版 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
+| Qoder、Qoder CN | 海龟 | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Qoder 里回答 | `~/.qoder/settings.json`、`~/.qoder-cn/settings.json` |
+| Kimi Code | 鲸鱼 | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Kimi Code 里回答 | `~/.kimi-code/config.toml`（文件末尾一段带标记的内容） |
+| Devin | 螃蟹 | 测试版 | 实时状态、审批 | `~/.config/devin/config.json` |
+| QwenWork、QoderWork | 水母、海龟 | 实验性 | 实时状态 | `~/.qwenwork/settings.json`、`~/.qoderwork/settings.json` |
+| Kiro（CLI 3 与 IDE） | 章鱼 | 实验性 | 实时状态 | `~/.kiro/hooks/niko.json`（独立文件） |
+| MiniMax Code | 海星 | 实验性 | 实时状态；权限请求在 MiniMax Code 里回答 | `~/.minimax/plugins/niko/.claude-plugin/plugin.json` 和 `hooks/hooks.json`（独立插件） |
+| Amp | 河豚 | 实验性 | 通过一个只监听的小插件显示实时状态（Amp 的插件接口本身也是实验性的） | `~/.config/amp/plugins/niko.ts`（独立文件） |
+| Mistral Vibe、DeepSeek CLI、Pi / OhMyPi、OpenClaw | — | 计划中 | — | — |
 
 - **稳定** — 端到端打通并有测试覆盖。
 - **测试版** — 适配器写入的是该代理官方钩子文档描述的格式，并与真实安装环境里的配置文件对照过，有测试覆盖。但我们**还没有用真实的代理把它端到端跑通**。
@@ -201,7 +216,7 @@ niko-island install --all                   # 所有检测到的代理，包括�
 niko-island uninstall                       # 始终移除我们写入的全部内容
 ```
 
-可以在岛屿上审批的有 Claude Code，以及测试版的 Codex 和 ZCode；其他代理在岛屿上只显示状态。
+可以在岛屿上审批的有 Claude Code，以及测试版的 Codex、ZCode 和 Devin。Qoder、Kimi Code 和 MiniMax Code 的权限请求会显示为“需要权限”，在它们自己的窗口里回答；其他代理在岛屿上只显示状态。
 
 ### 不靠钩子也能看到会话
 
@@ -308,7 +323,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 
 - **不向任何地方回传数据。** 应用里没有统计、崩溃上报或更新检查的代码。
 - **没有账号、没有许可证密钥、无需激活。**
-- **只有三件可选的事会用到网络，默认都关闭。**（1）下载一份公开的模型价格表，让费用估算保持最新：在“设置 → 用量”里打开，或运行 `niko-island pricing refresh`。不会发送任何与你有关的信息。（2）向厂商查询你的套餐额度，见下文。（3）给你自己的手机发一行消息，见下文。项目里没有别的联网代码，并且有一个测试专门盯着这一点。
+- **只有四件可选的事会用到网络，默认都关闭。**（1）下载一份公开的模型价格表，让费用估算保持最新：在“设置 → 用量”里打开，或运行 `niko-island pricing refresh`。不会发送任何与你有关的信息。（2）向厂商查询你的套餐额度，见下文。（3）给你自己的手机发一行消息，见下文。（4）向 GitHub 询问有没有新版本，见下文。项目里没有别的联网代码，并且有一个测试专门盯着这一点。
 - **你的数据都在 `~/.niko-island/`：**
 
   ```
@@ -325,10 +340,11 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 - **会话日志只读取，不修改、不复制。** 为了列出会话和统计 token，应用会读取 Claude Code 和 Codex 保存在你主目录里的日志，以及 ZCode 的本地数据库（只读）。会话的标题和最后一条回复只在该行显示期间留在内存里。任务清单也是这样读的（Claude Code 的 `~/.claude/tasks/`、Codex 日志里的计划、ZCode 的待办表）；行上的分支来自会话目录里的 `.git/HEAD` 文件，从不运行 git 本身。
 - **运行中的代理在本地识别。** 为了告诉你某个代理正在运行但还没接入，应用会查看正在运行的应用和进程的名称。这份列表不会发往任何地方。
 - **仅限本机、仅限本人。** 代理通过 unix 套接字与应用通信，应用会对每条消息核对调用者的用户 ID。只有当你接入需要插件的代理时，才会打开一个回环 HTTP 端口（127.0.0.1，令牌保存在仅本人可读的文件里）。
-- **只有打开“向厂商查询”时才会读取登录凭据。** 打开**向 Anthropic 查询**后，应用会读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只放在内存里，并发送到 `api.anthropic.com` 查询额度。打开**向智谱 BigModel / Z.ai 查询**后，应用会把你粘贴的密钥（以 Niko Island 自己的名义存在钥匙串里）发送到 `open.bigmodel.cn` 或 `api.z.ai`。打开**向 OpenAI 查询**后，应用会读取 Codex 存在这台 Mac 上的 ChatGPT 登录凭据（`~/.codex/auth.json`；如果 Codex 被设置为使用钥匙串，则从钥匙串读取），并发送到 `chatgpt.com`。每项只发往对应的那一个主机，并且以本应用自己的名义发出；不续期、不改写、不复制任何东西；只保存百分比、恢复时间和存下的重置次数。三个开关都关闭时（出厂状态），任何登录凭据或密钥都不会被读取。ZCode 自己保存的登录信息由 ZCode 加密，我们绝不触碰。
+- **只有打开“向厂商查询”时才会读取登录凭据。** 打开**向 Anthropic 查询**后，应用会读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只放在内存里，并发送到 `api.anthropic.com` 查询额度。打开**向智谱 BigModel / Z.ai 查询**后，应用会把你粘贴的密钥（以 Niko Island 自己的名义存在钥匙串里）发送到 `open.bigmodel.cn` 或 `api.z.ai`。打开**向 OpenAI 查询**后，应用会读取 Codex 存在这台 Mac 上的 ChatGPT 登录凭据（`~/.codex/auth.json`；如果 Codex 被设置为使用钥匙串，则从钥匙串读取），并发送到 `chatgpt.com`。每项只发往对应的那一个主机，并且以本应用自己的名义发出；不续期、不改写、不复制任何东西；只保存百分比、恢复时间和存下的重置次数。打开**向 Kimi 查询**或**向 MiniMax 查询**后，你粘贴的密钥（同样存在钥匙串里）会发送到 `api.kimi.com`，或 `api.minimaxi.com` / `api.minimax.io`。打开**向 Google 查询**后，应用会读取 Gemini CLI 保存的登录凭据（`~/.gemini/oauth_creds.json`，或它的钥匙串条目），并且只在它还没过期时发送到 `cloudcode-pa.googleapis.com`；本应用绝不为它续期。这些开关都关闭时（出厂状态），任何登录凭据或密钥都不会被读取。ZCode 自己保存的登录信息由 ZCode 加密，我们绝不触碰。
 - **发到手机的那一行，只说你允许它说的。** 打开**给我的手机发消息**后，应用会把一个标题和一行短文字发给你选定的推送服务器（Bark 或 ntfy 自己的，或者你自建的；必须是 https，或者是你自己网络里的地址），不发往别处。内容是代理名、项目文件夹名和事情的类别（“需要你来决定”“已完成”）。只有你另外打开*带上具体内容*，才会附上被请求的命令或回复的第一行。设备 Key 或主题保存在你的钥匙串里。默认只在屏幕锁定或休眠时发送。
 - **回复只会输入到你的终端里。** 打开*从灵动岛回复*（实验性，默认关闭）后，你输入的内容会像亲手输入一样，送进代理所在的 tmux 窗格、iTerm2 会话或“终端”标签页。发送之前应用会先确认等在那个提示符前的确实是代理；如果是 shell，就什么都不发。不会往别的任何地方输入内容；应用要控制“终端”或 iTerm2 之前，macOS 会先征求你的同意。
 - **只会替你运行一个程序，而且要你先打开开关。** 打开*让 Claude Code 自己查*后，应用会在自己的一个空文件夹里启动你自己的 `claude` 程序执行 `/usage`，不加载你的设置、钩子和 MCP 服务器，也不保存成会话。Claude Code 接下来对 Anthropic 说什么，是它自己的事，用的是它自己的登录。应用只从 `~/.claude.json` 里读取结果。
+- **新版本提醒，只在你要的时候。** 打开*有新版本时告诉我*（默认关闭）后，应用每天向 `api.github.com` 问一次最新的发布版本；请求里只有本应用的名字和版本号。*安装并重启*会从 GitHub 下载这一版里适合这台 Mac 的安装包，先核对发布附带的 `SHA256SUMS`、包标识、版本和签名，全部对上之后，才把旧应用移到废纸篓、把新的放到原处。
 - **钩子可审计。** 安装器写入的每一条都包含 `niko-bridge` 字样，随时可以在配置里搜索。
 - **诊断信息经过脱敏**，只包含文件状态和计数，不包含文件内容。
 
@@ -368,7 +384,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 
 | 已验证 | 方式 |
 |---|---|
-| 协议、桥接程序、安装器、审批、提问、用量引擎、会话发现、菜单栏定位、厂商额度查询、任务清单、分支、完成卡片、离开小结、键盘决定、推送、回复前的各项检查、音效合成与音效包 | 约 340 个自动化测试，包括使用真实桥接程序的端到端测试、故障注入和 100 会话压测 |
+| 协议、桥接程序、安装器、审批、提问、用量引擎、会话发现、菜单栏定位、厂商额度查询、任务清单、分支、完成卡片、离开小结、键盘决定、推送、回复前的各项检查、音效合成与音效包 | 约 400 个自动化测试，包括使用真实桥接程序的端到端测试、故障注入和 100 会话压测 |
 | 真实桌面上的岛屿 | 在 macOS 15、一台没有摄像头挖孔的外接显示器上试过：悬停、点击、各个设置页和用量视图；欢迎引导按显示器的原始分辨率截图，确认画面是清晰的；滑到全屏应用再滑回来、全屏下菜单栏落下、请求出现在全屏应用之上，这几项都录了屏并逐帧检查。一轮结束后落下的卡片、用 ⌃⌥A 允许一个请求再用 ⌃⌥D 拒绝另一个、带分支和进度条的会话行，都是通过真实的桥接程序驱动、从岛屿自己的窗口截图确认的 |
 | 不靠钩子的会话 | Claude、Codex 和 ZCode 桌面端的会话（包括 Codex 的辅助代理）在没有任何钩子为它们触发的情况下出现在了岛屿上 |
 | 在真实配置上运行安装器 | 在一份真实 `settings.json` 的私有副本上做了往返测试（其中已有其他工具的钩子和状态栏）：外来内容没有任何改动，卸载后与原文件逐字节一致。各代理的格式与 Codex、ZCode、Cursor、Windsurf、Gemini CLI、Trae 真实安装环境里的配置文件对照过 |

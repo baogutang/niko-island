@@ -60,7 +60,11 @@ public final class TranscriptTailer {
     public var pricing: Pricing
     private var parsers: [String: (generation: Int, parser: any UsageParser)] = [:]
 
-    public init(store: UsageStore, pricing: Pricing) {
+    /// How much of a file is read before what was found is written down.
+    let segmentBytes: Int
+
+    public init(store: UsageStore, pricing: Pricing, segmentBytes: Int = 4 << 20) {
+        self.segmentBytes = max(1024, segmentBytes)
         self.store = store
         self.pricing = pricing
     }
@@ -129,14 +133,34 @@ public final class TranscriptTailer {
             }
         }
 
-        let result = TranscriptTailer.scan(fd: fd, path: path, from: start, to: size, provider: provider, parser: &parser)
+        // A large file is read and written down a few megabytes at a time: what is held in memory
+        // is one stretch's records, not the whole file's, and an interrupted first pass resumes
+        // where the last stretch ended.
+        var position = start
+        var read = 0
+        var stretch = segmentBytes
+        while true {
+            let end = min(size, position + stretch)
+            let result = autoreleasepool {
+                TranscriptTailer.scan(fd: fd, path: path, from: position, to: end, provider: provider, parser: &parser)
+            }
+            if result.committed <= position, end < size {
+                // One line is longer than the stretch: read further in one go.
+                stretch *= 4
+                continue
+            }
+            let state = SourceFileState(path: path, provider: provider.rawValue, fileIdentity: identity, generation: generation,
+                                        size: size, mtime: mtime, committedOffset: result.committed,
+                                        tailHash: TranscriptTailer.tailHash(fd: fd, offset: result.committed),
+                                        parserVersion: provider.parserVersion, status: "active")
+            try store.commit(records: result.records, pricing: pricing, file: state)
+            read += result.records.count
+            if end >= size || result.committed <= position { break }
+            position = result.committed
+            stretch = segmentBytes
+        }
         parsers[path] = (generation, parser)
-        let state = SourceFileState(path: path, provider: provider.rawValue, fileIdentity: identity, generation: generation,
-                                    size: size, mtime: mtime, committedOffset: result.committed,
-                                    tailHash: TranscriptTailer.tailHash(fd: fd, offset: result.committed),
-                                    parserVersion: provider.parserVersion, status: "active")
-        try store.commit(records: result.records, pricing: pricing, file: state)
-        return .read(records: result.records.count, restarted: restarted)
+        return .read(records: read, restarted: restarted)
     }
 
     /// Reads complete lines in `[from, to)`. `committed` is the offset just
@@ -145,41 +169,53 @@ public final class TranscriptTailer {
                      parser: inout any UsageParser) -> (records: [UsageRecord], committed: Int) {
         var records: [UsageRecord] = []
         var offset = from
-        var carry = Data()
-        var carryStart = from
+        // The start of a line that runs past the chunk read so far. Only new bytes are appended to
+        // it, so a line of many megabytes is copied once, not once per chunk.
+        var pending = Data()
+        var pendingStart = from
         var skippingOversize = false
         let needles = provider.needles
         let skipped = provider.skippedKeys
         var buffer = [UInt8](repeating: 0, count: chunkSize)
 
+        func consider(_ line: Data, at start: Int) {
+            guard !line.isEmpty, needles.contains(where: { line.range(of: $0) != nil }),
+                  let json = try? JSONValue.parse(line, skipping: skipped) else { return }
+            records.append(contentsOf: parser.parse(line: json, offset: start, file: path))
+        }
+
         while offset < to {
             let want = min(chunkSize, to - offset)
             let n = buffer.withUnsafeMutableBytes { pread(fd, $0.baseAddress, want, off_t(offset)) }
             guard n > 0 else { break }
-            var data = carry
-            data.append(contentsOf: buffer[0..<n])
-            let base = carryStart
-            var lineStart = data.startIndex
-            while let newline = data[lineStart...].firstIndex(of: 0x0A) {
-                let line = data[lineStart..<newline]
-                if skippingOversize {
-                    skippingOversize = false
-                } else if !line.isEmpty, needles.contains(where: { line.range(of: $0) != nil }),
-                          let json = try? JSONValue.parse(Data(line), skipping: skipped) {
-                    records.append(contentsOf: parser.parse(line: json, offset: base + (lineStart - data.startIndex), file: path))
+            buffer.withUnsafeBufferPointer { raw in
+                let chunk = UnsafeBufferPointer(rebasing: raw[0..<n])
+                var lineStart = 0
+                while let newline = chunk[lineStart...].firstIndex(of: 0x0A) {
+                    if skippingOversize {
+                        skippingOversize = false
+                    } else if pending.isEmpty {
+                        consider(Data(chunk[lineStart..<newline]), at: offset + lineStart)
+                    } else {
+                        pending.append(contentsOf: chunk[lineStart..<newline])
+                        consider(pending, at: pendingStart)
+                    }
+                    pending = Data()
+                    lineStart = newline + 1
+                    pendingStart = offset + lineStart
                 }
-                lineStart = data.index(after: newline)
+                if lineStart < n {
+                    if pending.isEmpty { pendingStart = offset + lineStart }
+                    pending.append(contentsOf: chunk[lineStart..<n])
+                }
             }
-            carryStart = base + (lineStart - data.startIndex)
-            carry = Data(data[lineStart...])
-            if carry.count > maxLineBytes {
+            if pending.count > maxLineBytes {
                 // Not a line we could ever use; drop it without holding on to it.
-                carryStart += carry.count
-                carry = Data()
+                pending = Data()
                 skippingOversize = true
             }
             offset += n
         }
-        return (records, skippingOversize ? offset : carryStart)
+        return (records, skippingOversize ? offset : (pending.isEmpty ? offset : pendingStart))
     }
 }

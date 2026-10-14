@@ -529,8 +529,118 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(ProviderLimits(json: stored.json), stored)
     }
 
-    /// SPEC §5: the network is the price list and, when switched on, the providers. Nothing else.
-    func testOnlyThreeFilesCanReachTheNetwork() throws {
+    // MARK: Kimi, MiniMax, Gemini
+
+    func testKimisAnswerIsReadInNumbersOrText() throws {
+        let answer = #"{"usage":{"limit":"100","remaining":"74","resetTime":"2099-01-05T00:00:00Z"},"limits":[{"window":{"duration":300,"timeUnit":"TIME_UNIT_MINUTE"},"detail":{"limit":200,"remaining":80,"resetTime":4070908800}}]}"#
+        let limits = try XCTUnwrap(KimiUsageAPI.parse(Data(answer.utf8)))
+        XCTAssertEqual(limits.windows.map(\.id), ["five_hour", "seven_day"])
+        XCTAssertEqual(limits.windows[0].usedPercent, 60, accuracy: 0.01)
+        XCTAssertEqual(limits.windows[0].minutes, 300)
+        XCTAssertEqual(limits.windows[0].resetsAt, Date(timeIntervalSince1970: 4_070_908_800))
+        XCTAssertEqual(limits.windows[1].usedPercent, 26, accuracy: 0.01)
+        XCTAssertEqual(limits.windows[1].resetsAt, Date(timeIntervalSince1970: 4_070_908_800 + 4 * 86_400))
+        // A window of another length keeps its own name; nothing usable is no answer.
+        let hourly = #"{"limits":[{"window":{"duration":1,"timeUnit":"TIME_UNIT_HOUR"},"detail":{"limit":10,"remaining":10}}]}"#
+        XCTAssertEqual(KimiUsageAPI.parse(Data(hourly.utf8))?.windows.first?.minutes, 60)
+        XCTAssertNil(KimiUsageAPI.parse(Data(#"{"limits":[],"usage":{"limit":0}}"#.utf8)))
+        XCTAssertEqual(KimiUsageAPI.request(key: "k").url?.host, "api.kimi.com")
+    }
+
+    func testMiniMaxsAnswerCountsOnlyTheCodingModelsAndARealWeek() {
+        let answer = #"{"model_remains":[{"model_name":"video","current_interval_remaining_percent":10},{"model_name":"general","current_interval_remaining_percent":72.5,"end_time":4070908800000,"current_weekly_status":1,"current_weekly_remaining_percent":40,"weekly_end_time":4071513600000}],"base_resp":{"status_code":0,"status_msg":"success"}}"#
+        guard case .limits(let limits) = MiniMaxQuotaAPI.parse(Data(answer.utf8)) else { return XCTFail("expected limits") }
+        XCTAssertEqual(limits.windows.map(\.id), ["five_hour", "seven_day"])
+        XCTAssertEqual(limits.windows[0].usedPercent, 27.5, accuracy: 0.01)
+        XCTAssertEqual(limits.windows[1].usedPercent, 60, accuracy: 0.01)
+        XCTAssertEqual(limits.windows[1].resetsAt, Date(timeIntervalSince1970: 4_071_513_600))
+        // Status 3: this plan has no weekly limit, whatever the percentage says.
+        let noWeek = answer.replacingOccurrences(of: #""current_weekly_status":1"#, with: #""current_weekly_status":3"#)
+        guard case .limits(let short) = MiniMaxQuotaAPI.parse(Data(noWeek.utf8)) else { return XCTFail("expected limits") }
+        XCTAssertEqual(short.windows.map(\.id), ["five_hour"])
+        XCTAssertEqual(MiniMaxQuotaAPI.parse(Data(#"{"base_resp":{"status_code":1004,"status_msg":"login fail"}}"#.utf8)), .refused)
+        XCTAssertEqual(MiniMaxQuotaAPI.parse(Data("<html>".utf8)), .unreadable)
+        XCTAssertEqual(MiniMaxQuotaAPI.url(.cn).host, "api.minimaxi.com")
+        XCTAssertEqual(MiniMaxQuotaAPI.url(.global).host, "api.minimax.io")
+    }
+
+    func testGeminiQuotasAreGroupedByModelFamily() throws {
+        let answer = #"{"buckets":[{"modelId":"gemini-2.5-pro","remainingFraction":0.8,"resetTime":"2099-01-02T00:00:00Z"},{"modelId":"gemini-3-pro-preview","remainingFraction":0.25,"resetTime":"2099-01-02T01:00:00Z"},{"modelId":"gemini-2.5-flash","remainingFraction":1},{"modelId":"gemini-2.5-flash-lite","remainingFraction":"0.5"}]}"#
+        let limits = try XCTUnwrap(GeminiQuotaAPI.parse(Data(answer.utf8)))
+        XCTAssertEqual(limits.windows.map(\.id), ["daily_pro", "daily_flash", "daily_flash_lite"])
+        XCTAssertEqual(limits.windows[0].usedPercent, 75, accuracy: 0.01, "the family's tightest bucket")
+        XCTAssertEqual(limits.windows[0].resetsAt, ISOTime.parse("2099-01-02T01:00:00Z").map(Date.init(timeIntervalSince1970:)))
+        XCTAssertEqual(limits.windows[1].usedPercent, 0, accuracy: 0.01)
+        XCTAssertEqual(limits.windows[2].usedPercent, 50, accuracy: 0.01)
+        XCTAssertNil(GeminiQuotaAPI.parse(Data(#"{"buckets":[]}"#.utf8)))
+
+        XCTAssertEqual(GeminiQuotaAPI.project(Data(#"{"cloudaicompanionProject":"proj-1","currentTier":{"name":"Free"}}"#.utf8)).id, "proj-1")
+        XCTAssertEqual(GeminiQuotaAPI.project(Data(#"{"cloudaicompanionProject":{"id":"proj-2"}}"#.utf8)).id, "proj-2")
+        let request = GeminiQuotaAPI.quotaRequest(token: "t", project: "proj-1")
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.httpBody.flatMap { try? JSONValue.parse($0) }, .object(["project": .string("proj-1")]))
+    }
+
+    func testGeminiCLIsSignInIsReadInEitherForm() throws {
+        let file = try XCTUnwrap(GeminiLogin.parse(Data(#"{"access_token":"a1","refresh_token":"r1","expiry_date":4070908800000}"#.utf8)))
+        XCTAssertEqual(file, GeminiLogin.Login(token: "a1", expiresAt: Date(timeIntervalSince1970: 4_070_908_800)))
+        let keychain = try XCTUnwrap(GeminiLogin.parse(Data(#"{"token":{"accessToken":"a2","refreshToken":"r2","expiresAt":4070908800000},"updatedAt":1}"#.utf8)))
+        XCTAssertEqual(keychain.token, "a2")
+        XCTAssertNil(GeminiLogin.parse(Data(#"{"refresh_token":"only"}"#.utf8)), "a refresh token alone is of no use: it is never spent here")
+    }
+
+    func testTheNewPlansAreAskedOnlyTheirOwnWay() async throws {
+        let scratch = Scratch()
+        let wire = Wire()
+        let clock = Clock(Date(timeIntervalSince1970: 4_000_000_000))
+        let gemini = Stored<GeminiLogin.Outcome>(.found(.init(token: "g-token", expiresAt: clock.now - 60)))
+        let client = ProviderLimitsClient(
+            paths: scratch.paths,
+            secrets: .init(claudeLogin: { .missing }, glmKey: { nil }, kimiKey: { nil }, minimaxKey: { "mm-key" },
+                           geminiLogin: { gemini.value }),
+            transport: { try wire.send($0) }, clock: { clock.now }) { _ in }
+
+        // No key, and a sign-in that has run out: nothing goes out.
+        await client.configure(.init(kimi: true, gemini: true))
+        await client.refresh(force: true)
+        await settle(client, ProviderLimitsClient.gemini)
+        var results = await client.current()
+        XCTAssertEqual(results[ProviderLimitsClient.kimi]?.state, .noKey)
+        XCTAssertEqual(results[ProviderLimitsClient.gemini]?.state, .loginExpired)
+        XCTAssertTrue(wire.requests.isEmpty, "an expired token is never sent, and never renewed")
+
+        // A good sign-in: which project, then that project's buckets.
+        gemini.value = .found(.init(token: "g-token", expiresAt: clock.now + 3600))
+        wire.queue(#"{"cloudaicompanionProject":"proj-9","currentTier":{"name":"Free"}}"#)
+        wire.queue(#"{"buckets":[{"modelId":"gemini-2.5-pro","remainingFraction":0.4}]}"#)
+        clock.advance(400)
+        await client.refresh(force: true)
+        results = await client.current()
+        XCTAssertEqual(results[ProviderLimitsClient.gemini]?.state, .ok)
+        XCTAssertEqual(results[ProviderLimitsClient.gemini]?.limits?.plan, "Free")
+        XCTAssertEqual(results[ProviderLimitsClient.gemini]?.limits?.windows.first?.usedPercent ?? 0, 60, accuracy: 0.01)
+        XCTAssertEqual(wire.requests.map { $0.url?.absoluteString ?? "" },
+                       ["https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist",
+                        "https://cloudcode-pa.googleapis.com/v1internal:retrieveUserQuota"])
+        XCTAssertEqual(wire.requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer g-token")
+
+        // MiniMax turns the key down in the body of a 200.
+        await client.configure(.init(minimax: true, minimaxRegion: .global))
+        wire.queue(#"{"base_resp":{"status_code":1004,"status_msg":"login fail"}}"#)
+        clock.advance(400)
+        await client.refresh(force: true)
+        await settle(client, ProviderLimitsClient.minimax)
+        results = await client.current()
+        XCTAssertEqual(results[ProviderLimitsClient.minimax]?.state, .unauthorized)
+        XCTAssertEqual(wire.requests.last?.url?.host, "api.minimax.io")
+        XCTAssertEqual(wire.requests.last?.value(forHTTPHeaderField: "Authorization"), "Bearer mm-key")
+        XCTAssertNil(results[ProviderLimitsClient.gemini], "switched off: forgotten")
+        for request in wire.requests { XCTAssertTrue(ProviderLimitsClient.hosts.contains(request.url?.host ?? ""), "\(request)") }
+        await client.configure(.init())
+    }
+
+    /// SPEC §5: the network is the price list and, when switched on, the providers and the update check. Nothing else.
+    func testOnlyFourFilesCanReachTheNetwork() throws {
         let sources = repositoryRoot.appendingPathComponent("Sources")
         var offenders: [String] = []
         let walker = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
@@ -541,7 +651,12 @@ final class ProviderLimitsTests: XCTestCase {
             }
         }
         // The price list, the provider lookups, and a line to the user's own phone: each off until switched on.
-        XCTAssertEqual(offenders.sorted(), ["Pricing.swift", "ProviderLookups.swift", "Push.swift"])
+        // And, approved by the owner, a daily question to GitHub about a new version.
+        XCTAssertEqual(offenders.sorted(), ["Pricing.swift", "ProviderLookups.swift", "Push.swift", "Updates.swift"])
+        XCTAssertFalse(NikoSettings().updateChecks)
+        XCTAssertFalse(NikoSettings().kimiLimitsLookup)
+        XCTAssertFalse(NikoSettings().minimaxLimitsLookup)
+        XCTAssertFalse(NikoSettings().geminiLimitsLookup)
         XCTAssertFalse(NikoSettings().claudeLimitsLookup)
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
         XCTAssertFalse(NikoSettings().codexLimitsLookup)

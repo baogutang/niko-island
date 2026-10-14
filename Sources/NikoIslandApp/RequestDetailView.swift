@@ -121,8 +121,8 @@ struct PermissionForm: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).strokeBorder(Theme.hairline))
+        .clipShape(RoundedRectangle(cornerRadius: look.radius(10), style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: look.radius(10), style: .continuous).strokeBorder(Theme.hairline))
         .accessibilityElement(children: .combine)
     }
 
@@ -142,8 +142,8 @@ struct PermissionForm: View {
                     .textSelection(.enabled)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(13)
-                    .background(RoundedRectangle(cornerRadius: 14, style: .continuous).fill(Theme.field))
-                    .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).strokeBorder(Theme.hairline))
+                    .background(RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).fill(Theme.field))
+                    .overlay(RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).strokeBorder(Theme.hairline))
             }
             if !request.summary.changes.isEmpty { changes }
             HStack(spacing: 8) {
@@ -259,7 +259,7 @@ struct QuestionForm: View {
 
     private func tile(_ option: AgentQuestion.Option, letter: Int) -> some View {
         let selected = selections[question.id]?.contains(option.label) ?? false
-        let shape = RoundedRectangle(cornerRadius: 14, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: look.radius(14), style: .continuous)
         let badge = letter < 26 ? String(UnicodeScalar(UInt8(65 + letter))) : "•"
         return Button { toggle(option.label) } label: {
             HStack(alignment: .top, spacing: 10) {
@@ -290,7 +290,7 @@ struct QuestionForm: View {
 
     @ViewBuilder
     private var otherField: some View {
-        let shape = RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let shape = RoundedRectangle(cornerRadius: look.radius(12), style: .continuous)
         HStack(spacing: 8) {
             Image(systemName: "pencil").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.tertiary)
             if isStaticPreview {

@@ -278,7 +278,9 @@ public final class UsageEngine: @unchecked Sendable {
             let mtime = Double(st.st_mtimespec.tv_sec) + Double(st.st_mtimespec.tv_nsec) / 1e9
             if provider == .codex, mtime > (newestCodex?.mtime ?? 0) { newestCodex = (path, mtime) }
             if let seen = known[path], seen.size == size, seen.mtime == mtime { continue }
-            sync(path, provider)
+            // Foundation hands back some of what a file's lines are parsed into for later release;
+            // without a pool per file a first pass holds all of it until the very end.
+            autoreleasepool { sync(path, provider) }
             if indexing, Date().timeIntervalSince(lastPublish) > 2 {
                 publish()
                 lastPublish = Date()
