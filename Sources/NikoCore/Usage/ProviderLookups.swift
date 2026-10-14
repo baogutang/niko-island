@@ -87,7 +87,7 @@ public enum ClaudeUsageAPI {
               let root = try? JSONValue.parse(data, skipping: ["projects", "cachedGrowthBookFeatures", "cachedExperimentData", "cachedArtifactRoster"]),
               let cache = root["cachedUsageUtilization"], let answer = cache["utilization"], answer.objectValue != nil,
               let fetched = cache["fetchedAtMs"]?.doubleValue else { return nil }
-        let at = Date(timeIntervalSince1970: fetched > 100_000_000_000 ? fetched / 1000 : fetched)
+        guard let at = ISOTime.date(fetched) else { return nil }
         guard var limits = parse(answer.serializedData(.compact), now: at) else {
             // Nothing in it that can be shown; when it was fetched is still worth knowing.
             return includingReset ? ProviderLimits(windows: [], capturedAt: at, source: .agentCache) : nil
@@ -145,7 +145,7 @@ public enum GLMQuotaAPI {
                 used = spent / total * 100
             }
             guard let used, used.isFinite else { continue }
-            let resets = item["nextResetTime"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
+            let resets = ISOTime.date(item["nextResetTime"]?.doubleValue)
             let id: String
             var minutes: Int?
             if type == "TIME_LIMIT" {
@@ -213,8 +213,10 @@ public enum CodexUsageAPI {
         for (id, key) in [("primary", "primary_window"), ("secondary", "secondary_window")] {
             guard let window = limit[key], window.objectValue != nil,
                   let used = window["used_percent"]?.doubleValue, used.isFinite else { continue }
-            var resets = window["reset_at"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
-            if resets == nil, let after = window["reset_after_seconds"]?.doubleValue { resets = now.addingTimeInterval(after) }
+            var resets = ISOTime.date(window["reset_at"]?.doubleValue)
+            if resets == nil, let after = window["reset_after_seconds"]?.doubleValue, after.isFinite, after >= 0, after < 400 * 86_400 {
+                resets = now.addingTimeInterval(after)
+            }
             windows.append(RateLimitWindow(id: id, usedPercent: min(max(used, 0), 100), resetsAt: resets,
                                            windowMinutes: window["limit_window_seconds"]?.intValue.map { $0 / 60 }))
         }
@@ -262,7 +264,7 @@ public enum ClaudeCodeLogin {
     public static func parse(_ data: Data) -> Login? {
         guard let root = try? JSONValue.parse(data), let oauth = root["claudeAiOauth"] ?? root["claude.ai_oauth"], oauth.objectValue != nil,
               let token = oauth["accessToken"]?.stringValue, !token.isEmpty else { return nil }
-        let expires = oauth["expiresAt"]?.doubleValue.map { Date(timeIntervalSince1970: $0 > 100_000_000_000 ? $0 / 1000 : $0) }
+        let expires = ISOTime.date(oauth["expiresAt"]?.doubleValue)
         return Login(token: token, expiresAt: expires, plan: oauth["subscriptionType"]?.stringValue)
     }
 

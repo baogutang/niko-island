@@ -307,7 +307,7 @@ extension Activity {
 }
 
 func elapsedText(since start: Date, now: Date) -> String {
-    let seconds = max(0, Int(now.timeIntervalSince(start)))
+    let seconds = max(0, now.timeIntervalSince(start).wholeSeconds)
     if seconds < 60 { return "\(seconds)s" }
     if seconds < 3600 { return "\(seconds / 60)m" }
     return "\(seconds / 3600)h \((seconds % 3600) / 60)m"

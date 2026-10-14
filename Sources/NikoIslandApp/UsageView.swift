@@ -110,7 +110,7 @@ struct UsageView: View {
 
     private func sinceText(_ date: Date) -> String {
         let now = isStaticPreview ? PreviewClock.now : Date()
-        let seconds = max(0, Int(now.timeIntervalSince(date)))
+        let seconds = max(0, now.timeIntervalSince(date).wholeSeconds)
         if seconds < 90 { return L("just now") }
         if seconds < 3600 { return L("%lld min ago", seconds / 60) }
         if seconds < 86_400 { return L("%lldh %lldm ago", seconds / 3600, (seconds % 3600) / 60) }
@@ -140,7 +140,7 @@ struct UsageView: View {
     private func resetText(_ date: Date?) -> String {
         guard let date else { return "" }
         let now = isStaticPreview ? PreviewClock.now : Date()
-        let seconds = max(0, Int(date.timeIntervalSince(now)))
+        let seconds = max(0, date.timeIntervalSince(now).wholeSeconds)
         if seconds >= 86_400 { return L("resets in %lldd %lldh", seconds / 86_400, (seconds % 86_400) / 3600) }
         return L("resets in %lldh %lldm", seconds / 3600, (seconds % 3600) / 60)
     }

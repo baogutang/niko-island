@@ -105,6 +105,42 @@ final class DeeperChecksTests: XCTestCase {
         XCTAssertFalse(NikoSettings().showsChip(.context), "shown on request, or by itself when nearly full")
     }
 
+    // MARK: Numbers that are not times
+
+    func testANumberThatIsNoTimeNeverBecomesADate() throws {
+        // What a provider or another program might write, by mistake or not: none of it may stop the app.
+        for bad in ["1e400", "-1e400", "1e30", "-5", "0", "99999999999999999999"] {
+            XCTAssertNil(ISOTime.flexible(try JSONValue.parse(Data(bad.utf8))), bad)
+            XCTAssertNil(ISOTime.date(Double(bad)), bad)
+        }
+        XCTAssertNil(ISOTime.flexible(.string("NaN")))
+        XCTAssertNil(ISOTime.flexible(.string("inf")))
+        XCTAssertEqual(ISOTime.date(1_790_000_000), Date(timeIntervalSince1970: 1_790_000_000))
+        XCTAssertEqual(ISOTime.date(1_790_000_000_000), Date(timeIntervalSince1970: 1_790_000_000), "milliseconds too")
+        XCTAssertEqual(Double.infinity.wholeSeconds, 0)
+        XCTAssertEqual(Double.nan.wholeSeconds, 0)
+        XCTAssertEqual((-Double.infinity).wholeSeconds, 0)
+        XCTAssertEqual(TimeInterval(90.9).wholeSeconds, 90)
+        XCTAssertEqual(TimeInterval(1e300).wholeSeconds, Int(1e15))
+
+        // In the answers themselves: the window is still read, the impossible time is simply not there.
+        let codex = try XCTUnwrap(CodexUsageAPI.parse(Data(#"{"rate_limit":{"primary_window":{"used_percent":30,"limit_window_seconds":604800,"reset_at":1e400,"reset_after_seconds":1e400}}}"#.utf8), now: now))
+        XCTAssertEqual(codex.windows.first?.usedPercent, 30)
+        XCTAssertNil(codex.windows.first?.resetsAt)
+        let glm = try XCTUnwrap(GLMQuotaAPI.parse(Data(#"{"data":{"limits":[{"type":"TOKENS_LIMIT","unit":3,"number":5,"percentage":12,"nextResetTime":-1e400}]}}"#.utf8), now: now))
+        XCTAssertNil(glm.windows.first?.resetsAt)
+        let claude = try XCTUnwrap(ClaudeUsageAPI.parse(Data(#"{"five_hour":{"utilization":10,"resets_at":"1e400"}}"#.utf8), now: now))
+        XCTAssertNil(claude.windows.first?.resetsAt)
+        XCTAssertNil(CodexUsageAPI.parse(Data(#"{"rate_limit":{"primary_window":{"used_percent":1e400}}}"#.utf8), now: now), "a percentage that is not a number is no window")
+        XCTAssertNil(ClaudeCodeLogin.parse(Data(#"{"claudeAiOauth":{"accessToken":"t","expiresAt":1e400}}"#.utf8))?.expiresAt)
+
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        try Data(#"{"cachedUsageUtilization":{"fetchedAtMs":1e400,"utilization":{"five_hour":{"utilization":10}}}}"#.utf8).write(to: home.appendingPathComponent(".claude.json"))
+        XCTAssertNil(ClaudeUsageAPI.cached(home: home), "an answer from no time at all is not shown as if it were fresh")
+    }
+
     // MARK: What a session has used
 
     func testWhatASessionHasUsedIsAddedUpFromTheSameRecordsAsTheUsageView() throws {

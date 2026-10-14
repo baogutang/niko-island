@@ -259,8 +259,10 @@ public final class ZCodeSessions {
         directory.hasPrefix(home.appendingPathComponent(".zcode").path + "/") ? nil : directory
     }
 
+    /// A time ZCode wrote down. One that is not a time at all reads as the start of 1970, which
+    /// makes the session too old to list, rather than a date that cannot be counted from.
     private static func date(_ value: Double) -> Date {
-        Date(timeIntervalSince1970: value > 100_000_000_000 ? value / 1000 : value)
+        ISOTime.date(value) ?? Date(timeIntervalSince1970: 0)
     }
 
     /// ZCode names a session after its first words until it has thought of something better.

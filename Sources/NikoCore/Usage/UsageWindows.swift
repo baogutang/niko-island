@@ -129,14 +129,14 @@ public struct ProviderLimits: Sendable, Equatable {
 
     init?(json: String) {
         guard let root = try? JSONValue.parse(json), root.objectValue != nil else { return nil }
-        capturedAt = root["captured_at"]?.doubleValue.map(Date.init(timeIntervalSince1970:))
+        capturedAt = ISOTime.date(root["captured_at"]?.doubleValue)
         plan = root["plan"]?.stringValue
         source = root["source"]?.stringValue.flatMap(LimitsSource.init(rawValue:))
         resetsLeft = root["resets_left"]?.intValue
         windows = (root["windows"]?.arrayValue ?? []).compactMap { item in
             guard let id = item["id"]?.stringValue, let used = item["used"]?.doubleValue else { return nil }
             return RateLimitWindow(id: id, usedPercent: used,
-                                   resetsAt: item["resets_at"]?.doubleValue.map(Date.init(timeIntervalSince1970:)),
+                                   resetsAt: ISOTime.date(item["resets_at"]?.doubleValue),
                                    windowMinutes: item["minutes"]?.intValue)
         }
     }

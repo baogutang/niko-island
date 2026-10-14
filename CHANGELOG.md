@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.8.2] - 2026-10-14
+
+After 0.8.0 quit at its first notification, the rest of the app was searched
+for other ways it could stop itself.
+
+### Fixed
+- **A time that is not a time can no longer stop the app.** Numbers that
+  other programs and providers write (reset times, sign-in expiry, Claude
+  Code's cache date, ZCode's message times) were turned into dates as they
+  came; a number such as `1e400` would have become a date at infinity, and
+  the app would have stopped the moment it counted the minutes to it. Such
+  numbers are now no date at all, the window is still shown without its reset
+  time, and the views count minutes in a way that cannot trap.
+
+### Checked
+- Every closure the app hands to a system API was looked at for the 0.8.0
+  mistake; only that one had it.
+- Forced operations (`try!`, forced unwraps, `fatalError`) in what the app
+  runs: none outside a deliberate fault injection in the bridge's test build.
+
 ## [0.8.1] - 2026-10-14
 
 ### Fixed

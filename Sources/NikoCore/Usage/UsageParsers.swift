@@ -63,11 +63,26 @@ public enum ISOTime {
     /// Accepts ISO strings, unix seconds, or unix milliseconds.
     public static func flexible(_ value: JSONValue?) -> Double? {
         guard let value else { return nil }
-        if let text = value.stringValue { return parse(text) ?? Double(text).map(normalize) }
-        return value.doubleValue.map(normalize)
+        if let text = value.stringValue { return parse(text) ?? Double(text).flatMap(normalize) }
+        return value.doubleValue.flatMap(normalize)
     }
 
-    private static func normalize(_ number: Double) -> Double { number > 100_000_000_000 ? number / 1000 : number }
+    /// Seconds or milliseconds since 1970, as long as it is a time at all: a number that is not
+    /// finite, or lies outside 1970 to 2200, is no date. (A date at infinity would stop the app
+    /// the moment it was turned into a count of minutes.)
+    public static func normalize(_ number: Double) -> Double? {
+        guard number.isFinite else { return nil }
+        let seconds = number > 100_000_000_000 ? number / 1000 : number
+        return seconds > 0 && seconds < 7_258_118_400 ? seconds : nil
+    }
+
+    /// The same, as a date.
+    public static func date(_ number: Double?) -> Date? { number.flatMap(normalize).map(Date.init(timeIntervalSince1970:)) }
+}
+
+extension TimeInterval {
+    /// Whole seconds for display. Never traps: what is not a finite number counts as nothing.
+    public var wholeSeconds: Int { isFinite ? Int(Swift.max(-1e15, Swift.min(1e15, self))) : 0 }
 }
 
 /// Claude Code: `~/.claude/projects/**/*.jsonl`, one assistant message per line.
