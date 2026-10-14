@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.9.1] - 2026-10-14
+
+### Fixed
+- **A session that has ended leaves the island.** A session that said
+  goodbye came straight back from its transcript as "waiting for you" for
+  up to half an hour; it now stays gone unless the transcript is written
+  again (a resumed session comes back). A session whose agent exits without
+  a word (the terminal closed, the agent killed, a desktop conversation
+  closed) used to stay up to twelve hours; the bridge now tells the app which
+  processes it ran under, and the row goes within seconds of the agent
+  process exiting. A session found on disk that belongs to a desktop app
+  goes when that app is quit.
+- **Kiro was not recognised.** Kiro's desktop app (`dev.kiro.desktop`) now
+  counts as Kiro running; only its command-line tool did before.
+- **Agents connected by an earlier version keep working after an update.**
+  0.9.0 moved Kiro's and Copilot CLI's hooks to new files, but an agent
+  connected by 0.8 kept the old wiring until Connect was pressed again. The
+  installed app now brings agents that carry our entries up to date once
+  after an update (the same scan, backup and rollback; the status line is
+  left alone).
+
+### Added
+- **Kiro sessions are listed without any hook**, from Kiro's own session
+  folders (`~/.kiro/sessions/`, read-only): title, folder, last prompt and
+  reply, and the tool at work. Only real work counts as activity, not the
+  housekeeping Kiro writes when it opens a session.
+
 ## [0.9.0] - 2026-10-14
 
 ### Added

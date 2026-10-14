@@ -38,6 +38,7 @@ public final class TranscriptScout: @unchecked Sendable {
     private var tick = 0
     private var lastEmitted: [TranscriptSnapshot]?
     private lazy var zcode = ZCodeSessions(home: home)
+    private lazy var kiro = KiroSessions(home: home)
 
     public init(home: URL, options: Options = Options(), onChange: @escaping @Sendable ([TranscriptSnapshot]) -> Void) {
         self.home = home
@@ -111,6 +112,8 @@ public final class TranscriptScout: @unchecked Sendable {
         }
         // ZCode keeps its sessions in a database instead of one file each.
         out.append(contentsOf: zcode.snapshots(since: cutoff, now: now))
+        // Kiro keeps a folder per session.
+        out.append(contentsOf: kiro.snapshots(since: cutoff, now: now))
         return out.sorted { $0.updatedAt != $1.updatedAt ? $0.updatedAt > $1.updatedAt : $0.path < $1.path }
     }
 

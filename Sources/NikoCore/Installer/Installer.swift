@@ -137,6 +137,17 @@ public struct Installer: Sendable {
         return apply(plan)
     }
 
+    /// Agents an earlier install connected: one of their files, current or left
+    /// over from an older version, carries our hook marker.
+    public static func connectedAgents(in report: ScanReport) -> [String] {
+        AgentRegistry.installable.filter { agent in
+            guard let scanned = report.agents[agent.id], scanned.directory == .present else { return false }
+            return agent.files.contains { file in
+                scanned.files[file]?.data.map { String(decoding: $0, as: UTF8.self).contains(NikoVersion.hookMarker) } ?? false
+            }
+        }.map(\.id)
+    }
+
     // MARK: Planning (pure apart from reading our own backups/sidecar)
 
     public func plan(_ action: InstallAction, scan: ScanReport) -> InstallPlan {

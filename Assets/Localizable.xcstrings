@@ -1951,12 +1951,12 @@
         }
       }
     },
-    "Kiro reads global hook files from version 3 of its CLI on; an older Kiro CLI does not run them.": {
+    "Kiro runs global hook files in its app and from version 3 of its CLI; an older Kiro CLI does not.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Kiro 从 CLI 第 3 版起才读取全局钩子文件；更早的 Kiro CLI 不会运行它们。"
+            "value": "Kiro 应用和第 3 版起的 Kiro CLI 会运行全局钩子文件；更早的 Kiro CLI 不会。"
           }
         }
       }

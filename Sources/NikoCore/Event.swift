@@ -45,6 +45,9 @@ public struct TerminalContext: Sendable, Equatable {
     public var pid: Int32?
     /// Executable paths of the bridge's ancestors, nearest first (self-reported).
     public var ancestors: [String] = []
+    /// Their process ids, in the same order: how the app tells that the agent has gone
+    /// even when it never said goodbye.
+    public var ancestorPIDs: [Int32] = []
 
     public init() {}
 
@@ -58,6 +61,7 @@ public struct TerminalContext: Sendable, Equatable {
         bundleID = object["bundle_id"]?.stringValue
         pid = object["pid"]?.intValue.flatMap { Int32(exactly: $0) }
         ancestors = (object["ancestors"]?.arrayValue ?? []).compactMap(\.stringValue)
+        ancestorPIDs = (object["ancestor_pids"]?.arrayValue ?? []).compactMap { $0.intValue.flatMap { Int32(exactly: $0) } }
     }
 
     public var json: JSONValue {
@@ -70,6 +74,7 @@ public struct TerminalContext: Sendable, Equatable {
         if let bundleID { object["bundle_id"] = .string(bundleID) }
         if let pid { object["pid"] = .int(Int(pid)) }
         if !ancestors.isEmpty { object["ancestors"] = .array(ancestors.map(JSONValue.string)) }
+        if !ancestorPIDs.isEmpty { object["ancestor_pids"] = .array(ancestorPIDs.map { .int(Int($0)) }) }
         return .object(object)
     }
 
@@ -332,13 +337,15 @@ public struct Activity: Sendable, Equatable {
     public static func verb(forTool tool: String?) -> String {
         guard let tool, !tool.isEmpty else { return "working" }
         switch tool.lowercased() {
-        case "bash", "shell", "exec", "exec_command", "run_terminal_cmd", "run_shell_command", "local_shell":
+        case "bash", "shell", "exec", "exec_command", "run_terminal_cmd", "run_shell_command", "local_shell", "executebash", "execute_bash":
             return "running"
-        case "read", "read_file", "view", "notebookread":
+        case "read", "read_file", "view", "notebookread", "readfile", "readmultiplefiles", "fs_read":
             return "reading"
-        case "write", "edit", "multiedit", "notebookedit", "write_file", "edit_file", "apply_patch", "str_replace", "replace", "patch":
+        case "write", "edit", "multiedit", "notebookedit", "write_file", "edit_file", "apply_patch", "str_replace", "replace", "patch",
+             "fswrite", "fsappend", "strreplace", "fs_write", "deletefile":
             return "editing"
-        case "grep", "glob", "search", "find", "ls", "list", "search_file_content", "codebase_search", "toolsearch", "websearch", "web_search":
+        case "grep", "glob", "search", "find", "ls", "list", "search_file_content", "codebase_search", "toolsearch", "websearch", "web_search",
+             "grepsearch", "filesearch", "listdirectory":
             return "finding"
         case "taskcreate", "taskupdate", "tasklist", "taskget", "todowrite", "todo_write", "update_plan":
             // Keeping its own list of steps (Claude Code's task tools, and the older single list).

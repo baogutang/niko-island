@@ -1603,3 +1603,71 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertFalse(PreviewRenderer.demoModel(.attention).isExpanded)
     }
 }
+
+// MARK: - Sessions that are over
+
+extension AppModelTests {
+    func testASessionThatEndedDoesNotComeBackFromItsTranscript() async throws {
+        let transcript = ",\"transcript_path\":\"/tmp/demo-project/s1.jsonl\""
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\"" + transcript))
+        _ = await bridge(event("Stop", extra: transcript))
+        _ = await bridge(event("SessionEnd", extra: transcript))
+        let gone = await eventually { self.model.sessions.isEmpty }
+        XCTAssertTrue(gone)
+        // The transcript is still recent, and still says what it said before the end.
+        let written = Date().addingTimeInterval(-5)
+        let snapshot = TranscriptSnapshot(key: key, path: "/tmp/demo-project/s1.jsonl", cwd: "/tmp/demo-project", lastReply: "Shipped.",
+                                          phase: .waiting, activity: .waiting, updatedAt: written)
+        model.mergeTranscripts([snapshot])
+        XCTAssertTrue(model.sessions.isEmpty, "an ended session stays ended")
+        // Resumed: its transcript is written again, and it is back.
+        var resumed = snapshot
+        resumed.updatedAt = Date().addingTimeInterval(5)
+        model.mergeTranscripts([resumed])
+        XCTAssertEqual(model.sessions.map(\.key), [key])
+    }
+
+    func testASessionWhoseAgentHasExitedLeavesTheList() async throws {
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"ship the fix\""))
+        _ = await bridge(event("UserPromptSubmit", session: "s2", extra: ",\"prompt\":\"write the docs\""))
+        let both = await eventually { self.model.sessions.count == 2 }
+        XCTAssertTrue(both)
+        // The bridge said which processes it ran under, with their ids.
+        let agent = try XCTUnwrap(Session.agentProcess(in: try XCTUnwrap(model.sessions.first { $0.key == key }).ancestors))
+        XCTAssertGreaterThan(agent.pid, 1)
+        XCTAssertEqual(agent.pid, getpid(), "the test runner stands in for the agent here")
+
+        // Still running: nothing happens.
+        model.endGoneSessions(runningApps: [])
+        XCTAssertEqual(model.sessions.count, 2)
+        // It exits without a word.
+        model.endGoneSessions(isAlive: { _ in false }, runningApps: [])
+        XCTAssertTrue(model.sessions.isEmpty)
+        XCTAssertTrue(notifier.cleared.contains(key))
+        // Its transcript does not bring it back either.
+        model.mergeTranscripts([TranscriptSnapshot(key: key, path: "/tmp/s1.jsonl", phase: .waiting, activity: .waiting,
+                                                   updatedAt: Date().addingTimeInterval(-1))])
+        XCTAssertTrue(model.sessions.isEmpty)
+    }
+
+    func testASessionFoundOnDiskGoesWhenItsAppIsQuit() {
+        let desk = SessionKey(source: "codex", sessionID: "desk")
+        var inApp = TranscriptSnapshot(key: desk, path: "/tmp/desk.jsonl", phase: .waiting, activity: .waiting, updatedAt: Date())
+        inApp.host = .codexDesktop
+        let terminal = TranscriptSnapshot(key: SessionKey(source: "claude", sessionID: "term"), path: "/tmp/term.jsonl",
+                                          phase: .waiting, activity: .waiting, updatedAt: Date())
+        model.mergeTranscripts([inApp, terminal])
+        XCTAssertEqual(model.sessions.count, 2)
+        model.endGoneSessions(runningApps: ["com.openai.codex"])
+        XCTAssertEqual(model.sessions.count, 2, "the app is open")
+        model.endGoneSessions(runningApps: [])
+        XCTAssertEqual(model.sessions.map(\.key.sessionID), ["term"], "a terminal session found on disk is left to its window")
+    }
+
+    func testOnlyTheInstalledAppBringsConnectedAgentsUpToDate() async throws {
+        // A test (or a development build on its own runtime folder) never rewrites anything.
+        model.refreshWiringAfterUpdate(isBundled: true)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertNil(model.settings.lastWiredVersion)
+    }
+}

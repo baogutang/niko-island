@@ -62,6 +62,43 @@ extension AppModel {
         }
     }
 
+    /// After an update, the agents an earlier version connected get this version's wiring:
+    /// an adapter whose format changed (Kiro and Copilot CLI in 0.9.0) would otherwise keep
+    /// the old one until the user thought of pressing Connect again. Only agents whose
+    /// configs already carry our marker are touched, with the usual scan, backup and
+    /// rollback; the status line is left as it is. Only the installed app does this: a
+    /// build running on another runtime folder must never point real configs at it.
+    func refreshWiringAfterUpdate(isBundled: Bool) {
+        guard isBundled, paths.isDefaultLocation, settings.lastWiredVersion != NikoVersion.current, !maintenance.busy else { return }
+        let home = self.home, paths = self.paths
+        let bridge = Shims.locateBridgeBinary(), executable = Bundle.main.executablePath
+        Task.detached(priority: .utility) {
+            var options = InstallOptions(home: home, paths: paths)
+            guard let report = try? Installer(options: options).scan(.uninstall) else { return }
+            let ids = Installer.connectedAgents(in: report)
+            var result: InstallResult?
+            if !ids.isEmpty {
+                options.agentIDs = ids
+                options.includeStatusLine = false
+                options.bridgeBinary = bridge
+                options.appExecutable = executable
+                result = Installer(options: options).run(.install)
+            }
+            let rows = AppModel.scanRows(home: home)
+            await MainActor.run {
+                if result?.succeeded ?? true { self.settings.lastWiredVersion = NikoVersion.current }
+                if let result {
+                    if result.applied {
+                        self.log.info("brought connected agents up to date: \(result.plan.changes.map(\.agent).joined(separator: ", "))")
+                    } else if let error = result.error {
+                        self.log.error("bringing connected agents up to date failed: \(error)")
+                    }
+                }
+                self.maintenance.agents = rows
+            }
+        }
+    }
+
     /// Runs the installer off the main thread. Only ever called from an explicit click.
     public func runInstaller(_ action: InstallAction, agents: [String]? = nil) {
         guard !maintenance.busy else { return }

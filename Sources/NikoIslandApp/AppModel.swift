@@ -197,6 +197,7 @@ public final class AppModel: ObservableObject {
     private var unixServer: UnixIngressServer?
     private var httpServer: HTTPIngressServer?
     private var pruneTimer: Timer?
+    private var goneTimer: Timer?
     private var presenceTimer: Timer?
     private var toastTask: Task<Void, Never>?
     private var lastPlayed: [SoundEvent: Date] = [:]
@@ -269,6 +270,12 @@ public final class AppModel: ObservableObject {
         }
         RunLoop.main.add(timer, forMode: .common)
         pruneTimer = timer
+        let goneTimer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            MainActor.assumeIsolated { self.endGoneSessions() }
+        }
+        RunLoop.main.add(goneTimer, forMode: .common)
+        self.goneTimer = goneTimer
 
         if scout ?? usage { startPresence() }
         if usage { startUsageEngine() }
@@ -462,6 +469,7 @@ public final class AppModel: ObservableObject {
 
     public func stop() {
         pruneTimer?.invalidate()
+        goneTimer?.invalidate()
         pruneTimer = nil
         presenceTimer?.invalidate()
         presenceTimer = nil
@@ -586,6 +594,8 @@ public final class AppModel: ObservableObject {
         case .ended(let key):
             grants.revoke(key)
             notifier?.clear(session: key)
+            // Its transcript is still recent: without this it would come straight back as "waiting".
+            dismissedAt[key] = Date()
         case .becameIdle(let key):
             if let session = store[key] {
                 announce(.idle, session: session, body: "")
@@ -983,6 +993,30 @@ public final class AppModel: ObservableObject {
             branchFolders = folders
             refreshBranches()
         }
+    }
+
+    /// Sessions that are over without having said so leave the list: a hook session
+    /// whose agent process has exited, and a session found on disk whose desktop app
+    /// has been quit. Like a dismissed row, it comes back only if it is written to again.
+    func endGoneSessions(now: Date = Date(),
+                         isAlive: (ProcessNode) -> Bool = { ProcessInspector.path(of: $0.pid) == $0.path },
+                         runningApps: Set<String>? = nil) {
+        let waiting = Set(pending.map(\.sessionKey))
+        var ended = store.endGone(isAlive: isAlive, keeping: waiting)
+        let apps = runningApps ?? Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
+        for session in store.sessions.values where session.origin == .transcript && !waiting.contains(session.key) {
+            guard let app = session.host?.bundleID, !apps.contains(app) else { continue }
+            store.remove(session.key)
+            ended.append(session.key)
+        }
+        guard !ended.isEmpty else { return }
+        for key in ended {
+            dismissedAt[key] = now
+            grants.revoke(key)
+            hub.forget(session: key)
+            notifier?.clear(session: key)
+        }
+        publish()
     }
 
     private func pruneStaleSessions() {

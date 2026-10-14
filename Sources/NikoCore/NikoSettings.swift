@@ -182,6 +182,12 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["updateChecks"] = .bool(newValue) }
     }
 
+    /// The version that last brought connected agents' wiring up to date.
+    public var lastWiredVersion: String? {
+        get { raw["lastWiredVersion"]?.stringValue }
+        set { raw["lastWiredVersion"] = newValue.map(JSONValue.string) }
+    }
+
     /// When GitHub was last asked (seconds since 1970).
     public var lastUpdateCheck: Double {
         get { raw["lastUpdateCheck"]?.doubleValue ?? 0 }

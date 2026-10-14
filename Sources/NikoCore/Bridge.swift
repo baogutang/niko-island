@@ -307,7 +307,9 @@ public enum BridgeRunner {
         context.bundleID = value("__CFBundleIdentifier")
         context.tty = ProcessInspector.controllingTTY(of: getpid())
         context.pid = getppid()
-        context.ancestors = (chain ?? ancestry()).map(\.path)
+        let chain = chain ?? ancestry()
+        context.ancestors = chain.map(\.path)
+        context.ancestorPIDs = chain.map(\.pid)
         return context
     }
 

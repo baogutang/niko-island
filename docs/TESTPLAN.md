@@ -445,6 +445,11 @@ is also a listening test: note anything harsh, too long or too quiet.
   island at once. Glass shows the desktop blurred behind it; Pixel has square
   corners, square chips and monospaced type. On a display with a camera
   housing the closed island stays black in every theme.
+- ☑ A session whose agent exits without a word leaves the list: a stand-in
+  agent (a python process running the bridge as a hook would) was killed with
+  `kill -9`; its row was gone within 20 s (0.9.1, development build,
+  notifications on). A session found on disk for a desktop app that is not
+  running (Kiro) went the same way.
 - ☐ Agents: a connected agent says "last event …" once its hooks have fired,
   and "no event since Niko Island started" before that.
 - ☐ About → "Tell me when there is a new version": with an older build, the

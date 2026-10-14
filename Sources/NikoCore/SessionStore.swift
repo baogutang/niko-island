@@ -213,6 +213,19 @@ public struct SessionStore: Sendable {
 
     public mutating func remove(_ key: SessionKey) { sessions[key] = nil }
 
+    /// Hook sessions whose agent process has exited: the terminal was closed, the
+    /// agent was killed, a desktop conversation was closed. Most of these never send
+    /// SessionEnd, and would otherwise stay listed until `idleExpiry`.
+    public mutating func endGone(isAlive: (ProcessNode) -> Bool, keeping exempt: Set<SessionKey> = []) -> [SessionKey] {
+        let gone = sessions.values.filter { session in
+            guard session.origin == .hooks, !exempt.contains(session.key),
+                  let agent = Session.agentProcess(in: session.ancestors) else { return false }
+            return !isAlive(agent)
+        }.map(\.key)
+        gone.forEach { sessions[$0] = nil }
+        return gone
+    }
+
     /// Folds what the transcripts on disk say into the session list.
     ///
     /// A session that hooks are reporting keeps its own state and only gains
@@ -310,6 +323,19 @@ public struct SessionStore: Sendable {
             changes.append(.ended(key))
         }
         return changes
+    }
+}
+
+extension Session {
+    /// What runs between an agent and our bridge without being the agent.
+    static let launchers: Set<String> = ["sh", "bash", "zsh", "dash", "fish", "ksh", "tcsh", "csh", "env", "nohup", "nice",
+                                         "timeout", "xargs", "niko-bridge"]
+
+    /// The process an agent's hook ran under: the nearest ancestor that is not a shell
+    /// or a launcher. Unknown (nil) when the chain carries no process ids.
+    public static func agentProcess(in ancestors: [ProcessNode]) -> ProcessNode? {
+        guard let node = ancestors.first(where: { !launchers.contains($0.executableName) }), node.pid > 1 else { return nil }
+        return node
     }
 }
 

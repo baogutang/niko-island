@@ -90,6 +90,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
             NSApp.terminate(nil)
         }
         model.checkForUpdates()
+        model.refreshWiringAfterUpdate(isBundled: Bundle.main.bundleURL.pathExtension == "app")
         watchScreen()
         model.$wantsOnboarding
             .receive(on: DispatchQueue.main)

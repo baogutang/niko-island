@@ -287,8 +287,10 @@ public final class IngressHub: @unchecked Sendable {
         if ancestors.count < 2, !event.terminal.ancestors.isEmpty {
             // Hook processes are short-lived: by now the peer has often exited.
             // Fall back to what the bridge said about its own lineage.
-            ancestors = event.terminal.ancestors.prefix(16).map {
-                ProcessNode(pid: 0, path: $0, bundleID: BundleIDCache.shared.bundleID(forExecutable: $0))
+            let pids = event.terminal.ancestorPIDs
+            ancestors = event.terminal.ancestors.prefix(16).enumerated().map { index, path in
+                ProcessNode(pid: pids.count == event.terminal.ancestors.count ? pids[index] : 0, path: path,
+                            bundleID: BundleIDCache.shared.bundleID(forExecutable: path))
             }
             selfReported = true
         }
