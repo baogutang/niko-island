@@ -10,7 +10,7 @@
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
 | 本轮版本 | **v0.9.0 — 更多代理、更多厂商额度、主题、新版本提醒、首次统计省内存**（2026-10-14） |
 | 发布产物 | 每种架构一份：`Niko-Island-0.9.0-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.9.0-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
-| 发布核对 | 见下方“0.9.0 发布记录” |
+| 发布核对 | `ci.yml` 与 `release.yml`（v0.9.0）全部绿色。五个发布文件重新下载后校验和、挂载、单架构、ad-hoc 签名、版本 0.9.0 都核对过；直接运行下载的 apple-silicon 应用（开着通知、毛玻璃主题）经过三轮完成的回合和一个“只能看”的权限请求，没有退出，没有崩溃报告；它的版本检查认出自己是最新版，并找到了这台 Mac 的安装包 |
 | 你机器上装的 | 我没有替你覆盖 `/Applications` 里的应用，请下载 `apple-silicon` 的 dmg 自己装 |
 | 旧版本 | v0.8.2、v0.8.1、v0.8.0（第一条通知时会退出，请勿使用）、v0.7.0 及更早 |
 | 官网 | https://baogutang.github.io/niko-island/ |
