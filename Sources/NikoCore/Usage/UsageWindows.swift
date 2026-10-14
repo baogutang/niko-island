@@ -32,6 +32,21 @@ extension UsageStore {
         return out
     }
 
+    /// Tokens and estimated cost per session since `timestamp`, keyed "agent/session id".
+    public func sessionTotals(since timestamp: Double, limit: Int = 300) throws -> [String: UsageSnapshot.SessionUse] {
+        let rows = try db.query("""
+            SELECT agent, session, SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens), SUM(estimated_cost), MAX(ts)
+            FROM events WHERE ts >= ? AND session IS NOT NULL AND session != ''
+            GROUP BY agent, session ORDER BY MAX(ts) DESC LIMIT ?
+            """, [.real(timestamp), .integer(Int64(limit))])
+        var out: [String: UsageSnapshot.SessionUse] = [:]
+        for row in rows {
+            guard let agent = row[0].stringValue, let session = row[1].stringValue else { continue }
+            out[agent + "/" + session] = UsageSnapshot.SessionUse(tokens: row[2].intValue, cost: row[3].doubleValue)
+        }
+        return out
+    }
+
     /// Small things worth remembering between runs (a cursor, the last limits seen).
     public func meta(_ key: String) throws -> String? {
         try db.query("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first?.stringValue

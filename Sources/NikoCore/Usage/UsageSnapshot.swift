@@ -106,6 +106,29 @@ public struct UsageSnapshot: Sendable, Equatable {
         public init(id: String) { self.id = id }
     }
 
+    /// What one session has used: tokens, and an estimate of their cost at list prices.
+    public struct SessionUse: Sendable, Equatable {
+        public var tokens: Int
+        public var cost: Double
+
+        public init(tokens: Int, cost: Double) {
+            self.tokens = tokens
+            self.cost = cost
+        }
+
+        /// "$1.24", or the tokens where the model has no list price.
+        public var label: String {
+            if cost >= 0.005 { return cost >= 100 ? String(format: "$%.0f", cost) : String(format: "$%.2f", cost) }
+            if tokens >= 1_000_000 { return String(format: "%.1fM", Double(tokens) / 1_000_000) }
+            return tokens >= 1000 ? "\(tokens / 1000)k" : "\(tokens)"
+        }
+    }
+
+    /// Sessions of the last two days, keyed "agent/session id".
+    public var sessions: [String: SessionUse] = [:]
+
+    public func use(of key: SessionKey) -> SessionUse? { sessions[key.source + "/" + key.sessionID] }
+
     /// "all" first, then every agent with usage or limits, busiest first.
     public var agents: [AgentUsage] = []
 

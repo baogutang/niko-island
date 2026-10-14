@@ -89,21 +89,32 @@ to what turned up when somebody did.
 | How full the context is | Built and covered by tests; Codex's record was checked against a real file |
 | A real approval from the island | Done once: interactive Claude Code 2.1.295 in a terminal of its own, answered with ⌃⌥A |
 
+## Released: 0.8.0
+
+| Area | State |
+|---|---|
+| A notice when a used-up limit resets | Built and covered by tests with a stand-in clock; a real window was not waited out |
+| What a session has used, on its row | Built and covered by tests against the usage store |
+| A line through the real ntfy service | Done once, on a random throwaway topic, read back from the service |
+| ZCode limits without a key | Looked into: not possible with what ZCode offers today (no usage command in its CLI, nothing on disk) |
+
 ## Next
 
-1. **Run the reply against real terminals** (tmux, iTerm2, Terminal) and take
-   the "experimental" off, or take the feature out.
-2. **A line through the real Bark and ntfy services**, with the owner's key.
+Everything below needs something only the owner of a Mac can give, or hardware
+that was not there.
+
+1. **Run the reply against real terminals** (tmux, iTerm2, Terminal): it needs
+   tmux installed, or the owner's consent for the app to control a terminal.
+   Then take the "experimental" off, or take the feature out.
+2. **A line arriving on a real phone** through Bark (the owner's device key).
 3. **Click the banner's buttons**, and approve a request with Terminal.app,
    iTerm2 and the Claude desktop app in front.
-4. **A live answer for the BigModel / Z.ai lookup**; and whether ZCode can be
-   asked to look for itself the way Claude Code can.
+4. **A live answer for the BigModel / Z.ai lookup** (the owner's key).
 5. **Drive the beta adapters against their live agents.** `TESTPLAN.md`
    section 10.
 6. **Try the island on a MacBook's own display** and with two displays.
 7. **Listen to the built-in sounds** and tune them by ear.
-8. **What a session has cost so far**, on its row.
-9. **Notarized builds** if the project gets a signing identity.
+8. **Notarized builds** if the project gets a signing identity.
 
 ## Planned, not started
 

@@ -431,6 +431,9 @@ struct SettingsPageView: View {
                 toggleRow(L("Show which terminal or app"), isOn: chipBinding(.host))
                 toggleRow(L("Show the git branch"), L("Next to the project's name."), isOn: chipBinding(.branch))
                 toggleRow(L("Show the model"), isOn: chipBinding(.model))
+                toggleRow(L("Show what the session has used"),
+                          L("An estimate at list prices, from the same records as the usage view; tokens where the model has no list price."),
+                          isOn: chipBinding(.cost))
                 toggleRow(L("Show how full the context is"),
                           L("A percentage where the agent says how large the model's window is (Codex), a size where it does not (Claude Code). Once it is nearly full it shows by itself."),
                           isOn: chipBinding(.context))

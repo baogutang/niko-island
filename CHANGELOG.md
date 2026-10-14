@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.8.0] - 2026-10-14
+
+### Added
+- **Told when a limit resets.** A window that is used up is remembered with
+  the time it opens again. When it does, the island says so once ("Claude
+  Code's limit has reset"), with the "finished" cue, and with a line to your
+  phone if that is switched on. If you were away, it is said when you are
+  back. With two windows used up, it waits for both.
+- **What a session has used**, as a chip on its row (off by default): an
+  estimate at list prices from the same records as the usage view, or the
+  tokens where the model has no list price.
+
+### Checked against the real thing
+- **A line through the real ntfy service**: one fixed test line on a random
+  throwaway topic, sent by the app's own code and read back from the service.
+
+### Looked into, and not possible today
+- **ZCode's limits without a key.** Claude Code can be asked to look up its
+  own usage; ZCode cannot: its command-line program has no usage command, and
+  its app fetches the figures itself without keeping them on disk. The lookup
+  with a key you paste stays the only way.
+- **Codex's plan from a real session**: none of the recent sessions on the
+  machine the app is built on has written one, so `update_plan` is still read
+  from its documented shape.
+
 ## [0.7.0] - 2026-10-14
 
 Claude's limits for people who only use the desktop app, and the oldest

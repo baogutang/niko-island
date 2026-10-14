@@ -88,7 +88,7 @@ struct IslandGlance: Equatable {
         if let toast = model.toast {
             source = toast.key.source
             text = toast.title
-            tone = toast.kind == .completed ? .done : .failed
+            tone = toast.kind == .failed ? .failed : .done
             count = 0
         } else if let request = model.pending.first {
             let session = model.sessions.first { $0.key == request.sessionKey }

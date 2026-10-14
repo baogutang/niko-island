@@ -448,6 +448,7 @@ public final class UsageEngine: @unchecked Sendable {
             let fiveHours = try store.totals(since: now.timeIntervalSince1970 - 5 * 3600)
             let month = try store.totals(since: now.timeIntervalSince1970 - 30 * 86_400)
             let perDay = try store.dailyTotalsByAgent(fromDay: first, toDay: today)
+            snapshot.sessions = try store.sessionTotals(since: now.timeIntervalSince1970 - 2 * 86_400)
 
             func usage(_ id: String) -> UsageSnapshot.AgentUsage {
                 func pick(_ rows: [UsageTotals]) -> [UsageTotals] { id == "all" ? rows : rows.filter { $0.agent == id } }

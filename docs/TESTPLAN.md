@@ -7,7 +7,7 @@ screen and ears: the island window, full-screen apps, sounds, notifications,
 and real agents. Nothing here touches your real agent configuration until
 section 10.
 
-Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 to 0.7.0, on one
+Legend: ☐ = check by hand. ☑ = checked by hand for 0.3.0 to 0.8.0, on one
 setup: macOS 15 with an external display that has no camera housing. A ☑ says nothing about
 a MacBook's own display or two displays at once. Items marked **(not
 automated)** have no test at all behind them.
@@ -268,6 +268,9 @@ Back at the screen, the phone, quiet hours, the list (0.6.0):
   against a server of your own on this Mac: one POST to `/push` with
   `device_key`, `title`, `body` as JSON. `… push ntfy …`: one POST to `/` with
   `topic`, `title`, `message`. `… push bark http://example.org`: refused.
+- ☑ `NIKO_PUSH_KEY=<a long random topic> niko-island internal push ntfy ""`,
+  then `curl -s "https://ntfy.sh/<that topic>/json?poll=1"`: the line that was
+  sent comes back from the real service.
 - ☐ Settings → General → *A line to your phone*: paste a real Bark key or ntfy
   topic, *Send a test*: the phone shows "Niko Island" and one line; the note
   says the server accepted it. A wrong key says the server said no.
@@ -298,6 +301,17 @@ echo '{"hook_event_name":"PermissionRequest","session_id":"t1","cwd":"'$PWD'","t
 - ☐ Settings → Island → *Show how full the context is*: Codex rows show a
   percentage, Claude Code rows a size; a Codex session above 85 % shows the
   chip in amber without the switch.
+
+A limit that resets, what a session has used (0.8.0):
+
+- ☐ With a Claude Code window at 100 % (the usage view shows it in red with a
+  reset time), wait for that time: within a few seconds the closed island says
+  "Claude Code's limit has reset" for a moment, the "finished" cue plays if
+  sounds are on, and nothing more is said about it. **(tested with a stand-in
+  clock; a real window was not waited out)**
+- ☐ Settings → Island → *Show what the session has used*: rows of sessions
+  that have used anything in the last two days show "$1.24", or tokens for a
+  model without a list price.
 
 ## 6. Usage and limits
 

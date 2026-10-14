@@ -105,6 +105,47 @@ final class DeeperChecksTests: XCTestCase {
         XCTAssertFalse(NikoSettings().showsChip(.context), "shown on request, or by itself when nearly full")
     }
 
+    // MARK: What a session has used
+
+    func testWhatASessionHasUsedIsAddedUpFromTheSameRecordsAsTheUsageView() throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        let home = scratch.file("home")
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+        let pricing = Pricing(rates: ["priced-model": .init(input: 1e-6, output: 2e-6, cacheRead: 0, cacheWrite: 0)], source: "test")
+        let engine = UsageEngine(paths: paths, home: home, pricing: pricing) { _ in }
+        _ = engine.scanNow()
+        engine.stop()
+        let store = try UsageStore(path: paths.usageDB.path)
+        let t = Date().timeIntervalSince1970
+        func record(_ id: String, agent: String, session: String?, model: String, at: Double, input: Int, output: Int) -> UsageRecord {
+            UsageRecord(identityKey: id, timestamp: at, agent: agent, model: model, session: session, project: nil, input: input, output: output)
+        }
+        try store.commit(records: [
+            record("1", agent: "claude", session: "s1", model: "priced-model", at: t - 600, input: 1_000_000, output: 100_000),
+            record("2", agent: "claude", session: "s1", model: "priced-model", at: t - 60, input: 500_000, output: 0),
+            record("3", agent: "codex", session: "s1", model: "unpriced", at: t - 60, input: 2_000_000, output: 500_000),
+            record("4", agent: "claude", session: "old", model: "priced-model", at: t - 5 * 86_400, input: 9, output: 9),
+            record("5", agent: "claude", session: nil, model: "priced-model", at: t - 60, input: 7, output: 7),
+        ], pricing: pricing, file: nil)
+        let totals = try store.sessionTotals(since: t - 2 * 86_400)
+        store.close()
+        XCTAssertEqual(Set(totals.keys), ["claude/s1", "codex/s1"], "the same id under two agents is two sessions; old ones and nameless ones are left out")
+        XCTAssertEqual(totals["claude/s1"]?.tokens, 1_600_000)
+        XCTAssertEqual(totals["claude/s1"]?.cost ?? 0, 1.7, accuracy: 0.0001)
+        XCTAssertEqual(totals["claude/s1"]?.label, "$1.70")
+        XCTAssertEqual(totals["codex/s1"]?.label, "2.5M", "no list price: the tokens are the figure")
+
+        var snapshot = UsageSnapshot()
+        snapshot.sessions = totals
+        XCTAssertEqual(snapshot.use(of: SessionKey(source: "claude", sessionID: "s1"))?.tokens, 1_600_000)
+        XCTAssertNil(snapshot.use(of: SessionKey(source: "claude", sessionID: "nobody")))
+        XCTAssertEqual(UsageSnapshot.SessionUse(tokens: 800, cost: 0).label, "800")
+        XCTAssertEqual(UsageSnapshot.SessionUse(tokens: 42_000, cost: 0.001).label, "42k")
+        XCTAssertEqual(UsageSnapshot.SessionUse(tokens: 1, cost: 123.4).label, "$123")
+        XCTAssertFalse(NikoSettings().showsChip(.cost), "a price on every row is for those who ask for it")
+    }
+
     // MARK: Claude Code looks for itself
 
     /// A stand-in `claude`: a script that does what the test tells it to.

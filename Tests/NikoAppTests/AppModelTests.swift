@@ -965,6 +965,79 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         _ = await waiting
     }
 
+    // MARK: A limit that opens again
+
+    func testALimitThatWasUsedUpIsAnnouncedOnceWhenItResets() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        let now = Date()
+        func usage(fiveHour: Double, weekly: Double, fiveHourResets: TimeInterval = 600, weeklyResets: TimeInterval = 86_400) -> UsageSnapshot {
+            var snapshot = UsageSnapshot()
+            var claude = UsageSnapshot.AgentUsage(id: "claude")
+            claude.limits = [RateLimitWindow(id: "five_hour", usedPercent: fiveHour, resetsAt: now.addingTimeInterval(fiveHourResets)),
+                             RateLimitWindow(id: "seven_day", usedPercent: weekly, resetsAt: now.addingTimeInterval(weeklyResets))]
+            snapshot.agents = [UsageSnapshot.AgentUsage(id: "all"), claude]
+            return snapshot
+        }
+        // Not full: nothing to wait for, nothing announced later.
+        model.usage = usage(fiveHour: 80, weekly: 18)
+        model.noteLimitResets(now: now.addingTimeInterval(700))
+        XCTAssertNil(model.toast)
+
+        // Used up. Before the reset: silence. At the reset: once.
+        model.usage = usage(fiveHour: 100, weekly: 18)
+        model.noteLimitResets(now: now.addingTimeInterval(300))
+        XCTAssertNil(model.toast)
+        sounds.played = []
+        model.noteLimitResets(now: now.addingTimeInterval(601))
+        XCTAssertEqual(model.toast?.kind, .limitReset)
+        XCTAssertEqual(model.toast?.title, "Claude Code's limit has reset")
+        XCTAssertEqual(model.toast?.key.source, "claude")
+        XCTAssertEqual(IslandGlance(model: model).tone, .done)
+        XCTAssertEqual(sounds.played, [.completed])
+        model.dismissToast()
+        model.noteLimitResets(now: now.addingTimeInterval(700))
+        XCTAssertNil(model.toast, "said once")
+
+        // Two windows used up: the agent can only work again when both have opened.
+        model.usage = usage(fiveHour: 100, weekly: 100, fiveHourResets: 900, weeklyResets: 1800)
+        model.noteLimitResets(now: now.addingTimeInterval(901))
+        XCTAssertNil(model.toast, "the week is still full")
+        model.noteLimitResets(now: now.addingTimeInterval(1801))
+        XCTAssertEqual(model.toast?.kind, .limitReset)
+        model.dismissToast()
+
+        // Nobody at the screen: it is said when somebody is back.
+        model.usage = usage(fiveHour: 100, weekly: 18, fiveHourResets: 2400)
+        model.isAway = true
+        sounds.played = []
+        model.noteLimitResets(now: now.addingTimeInterval(2401))
+        XCTAssertNil(model.toast)
+        XCTAssertTrue(sounds.played.isEmpty)
+        model.isAway = false
+        XCTAssertEqual(model.toast?.kind, .limitReset)
+        model.dismissToast()
+
+        // A reset that passed while the Mac slept for hours is not news any more.
+        model.usage = usage(fiveHour: 100, weekly: 18, fiveHourResets: 3000)
+        model.noteLimitResets(now: now.addingTimeInterval(3000 + 7200))
+        XCTAssertNil(model.toast)
+
+        // And to the phone, where that is wanted.
+        let outbox = Outbox()
+        model.makePushClient = { PushClient(transport: { request in outbox.take(request); return (Data(), 200) }, key: { "device-key" }) }
+        model.settings.pushEnabled = true
+        model.settings.pushOnlyWhenAway = false
+        model.hasPushKey = true
+        model.usage = usage(fiveHour: 100, weekly: 18, fiveHourResets: 4000)
+        model.noteLimitResets(now: now.addingTimeInterval(4001))
+        let sent = await eventually { outbox.sent.count == 1 }
+        XCTAssertTrue(sent)
+        XCTAssertEqual(outbox.sent[0]["title"]?.stringValue, "Claude Code")
+        XCTAssertEqual(outbox.sent[0]["body"]?.stringValue, "Its limit has reset. It can work again.")
+    }
+
     // MARK: Answering from the island
 
     func testAFollowUpGoesToTheTerminalOnlyWhenThereIsAWayIn() async throws {

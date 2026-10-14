@@ -141,6 +141,16 @@
         }
       }
     },
+    "%@'s limit has reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的额度已重置"
+          }
+        }
+      }
+    },
     "%lld agents on this Mac are not connected": {
       "localizations": {
         "zh-Hans": {
@@ -707,6 +717,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理接到了你的指令并开始工作。"
+          }
+        }
+      }
+    },
+    "An estimate at list prices, from the same records as the usage view; tokens where the model has no list price.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按公开标价估算，数据与用量页同源；没有标价的模型显示 token 数。"
           }
         }
       }
@@ -1707,6 +1727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "它不会抢走你正在输入的键盘焦点。"
+          }
+        }
+      }
+    },
+    "Its limit has reset. It can work again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "额度已重置，可以继续了。"
           }
         }
       }
@@ -2907,6 +2937,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "显示额度…"
+          }
+        }
+      }
+    },
+    "Show what the session has used": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "显示这个会话用了多少"
           }
         }
       }

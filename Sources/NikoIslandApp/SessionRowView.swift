@@ -165,6 +165,7 @@ struct SessionRowView: View {
                 }
                 if look.chips.contains(.host), let host = session.hostLabel { Chip(text: host) }
                 if look.chips.contains(.model), let model = session.modelLabel { Chip(text: model) }
+                if look.chips.contains(.cost), let use = model.usage.use(of: session.key) { Chip(text: use.label) }
                 if let context = session.context, look.chips.contains(.context) || context.isNearlyFull {
                     // Shown on request, and by itself once the context is nearly full: that is when it is news.
                     Chip(text: L("context %@", context.label), tint: context.isNearlyFull ? Theme.amber : nil)

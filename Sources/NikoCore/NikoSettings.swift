@@ -381,11 +381,12 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     public enum RowChip: String, Sendable, CaseIterable {
-        case elapsed, agent, host, branch, model, context
+        case elapsed, agent, host, branch, model, context, cost
 
-        /// The model's name is long and rarely changes, and how full the context is matters
-        /// only near the end (when it is shown anyway): both only on request.
-        public var shownByDefault: Bool { self != .model && self != .context }
+        /// The model's name is long and rarely changes, how full the context is matters only
+        /// near the end (when it is shown anyway), and not everybody wants a price on every row:
+        /// these only on request.
+        public var shownByDefault: Bool { self != .model && self != .context && self != .cost }
     }
 
     /// Whether a kind of chip is shown on session rows.

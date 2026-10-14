@@ -63,7 +63,7 @@ public final class AppModel: ObservableObject {
 
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
-        public enum Kind: Sendable { case completed, failed }
+        public enum Kind: Sendable { case completed, failed, limitReset }
         public var key: SessionKey
         public var title: String
         public var kind: Kind
@@ -349,6 +349,7 @@ public final class AppModel: ObservableObject {
         refreshBranches()
         remindAboutWaiting()
         askClaudeCode()
+        noteLimitResets()
         let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         Task.detached(priority: .utility) {
             let running = AgentPresence.running(apps: apps, processes: AgentPresence.runningProcessNames())
@@ -620,6 +621,55 @@ public final class AppModel: ObservableObject {
         let before = previous.rateLimits.map(\.usedPercent).max() ?? 0
         let after = usage.rateLimits.map(\.usedPercent).max() ?? 0
         if after >= threshold, before < threshold { play(.limit) }
+        // A window that is used up is remembered with the time it opens again.
+        for agent in usage.agents where agent.id != "all" {
+            for window in agent.limits where window.usedPercent >= 99.5 {
+                // Only a reset that is still to come: one that has passed was said already.
+                guard let resets = window.resetsAt, resets > Date() else { continue }
+                fullWindows[agent.id + "/" + window.id] = (agent.id, resets)
+            }
+        }
+    }
+
+    /// Windows that were used up, with the agent and the time they open again.
+    private var fullWindows: [String: (agent: String, resets: Date)] = [:]
+    /// Limits that opened again while nobody was at the screen.
+    private var resetsWhileAway: [String] = []
+
+    /// A limit that stopped an agent has reset: that is the moment its user was waiting for,
+    /// so it is said once, on the island, with the "finished" cue, and to the phone if that is on.
+    func noteLimitResets(now: Date = Date()) {
+        let due = fullWindows.filter { $0.value.resets <= now }
+        guard !due.isEmpty else { return }
+        for key in due.keys { fullWindows[key] = nil }
+        // A reset that passed long ago (the Mac was asleep) is not news any more.
+        let agents = Set(due.values.filter { now.timeIntervalSince($0.resets) < 3600 }.map(\.agent)).sorted()
+        for agent in agents {
+            // Another window of the same agent is still full: it cannot work yet.
+            if fullWindows.values.contains(where: { $0.agent == agent }) { continue }
+            let name = AgentRegistry.displayName(for: agent)
+            if settings.pushEnabled, hasPushKey, !settings.isQuiet(at: now), !settings.pushOnlyWhenAway || isAway {
+                send(PushMessage(title: name, body: L("Its limit has reset. It can work again.")), subject: "reset/" + agent)
+            }
+            if isAway && settings.quietWhenAway {
+                resetsWhileAway.append(agent)
+            } else {
+                announceReset(of: agent)
+            }
+        }
+    }
+
+    private func announceReset(of agent: String) {
+        play(.completed)
+        guard !isExpanded else { return }
+        dismissCompletion()
+        toast = Toast(key: SessionKey(source: agent, sessionID: ""), title: L("%@'s limit has reset", AgentRegistry.displayName(for: agent)), kind: .limitReset)
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 12 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
     }
 
     // MARK: Island state
@@ -722,6 +772,10 @@ public final class AppModel: ObservableObject {
     private func welcomeBack() {
         let items = missed.filter { item in store[item.key]?.phase == .waiting }
         missed = []
+        // A limit that opened again in the meantime is said now.
+        let reset = resetsWhileAway
+        resetsWhileAway = []
+        defer { if recap == nil, let agent = reset.first { announceReset(of: agent) } }
         guard settings.completionStyle != .off, !items.isEmpty, !isExpanded, islandIsVisible() else { return }
         toast = nil
         dismissCompletion()
