@@ -21,6 +21,15 @@ scripts/smoke-launch.sh          # launches against a throwaway directory
 scripts/make-release.sh          # both release packages, built and verified
 ```
 
+Before every release, run the app once **with notifications on** (no
+`-NikoNotificationsDisabled`) and let it show a banner or two: 0.8.0 quit at
+its first notification, a path every scripted run had switched off.
+
+- ☑ 0.8.1: a development build with notifications on, three rounds of
+  sessions, permission requests that time out, questions, failures, ⌃⌥J and
+  ⌃⌥I, a stand-in lock and Claude Code looking for itself: still running, no
+  crash report.
+
 ## 1. The island window
 
 Launch with a throwaway runtime directory so nothing of yours is used:

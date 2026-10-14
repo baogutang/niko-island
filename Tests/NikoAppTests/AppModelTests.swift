@@ -821,6 +821,27 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(outbox.sent[4]["title"]?.stringValue, "Niko Island")
     }
 
+    // MARK: Notifications must not stop the app
+
+    func testTheNotificationPermissionAnswerCanArriveOnAnyThread() async throws {
+        // 0.8.0 quit at its first notification: macOS answered the permission question on a queue of its
+        // own, and the closure that took the answer belonged to the main actor. Called here the way macOS
+        // calls it; with "not granted" nothing is posted, so this runs without a notification centre.
+        let handler = SystemNotifier.afterAuthorization(post: SystemNotifier.Payload(identifier: "i", title: "t", subtitle: "s", body: "b",
+                                                                                      source: "claude", session: "s1", category: ""))
+        let done = await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                handler(false, nil)
+                continuation.resume(returning: true)
+            }
+        }
+        XCTAssertTrue(done)
+        // And nobody writes that callback inline again, inside the main-actor class.
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/NikoIslandApp/TerminalJumper.swift"), encoding: .utf8)
+        XCTAssertFalse(source.contains("requestAuthorization(options: [.alert]) {"), "the answer must come through afterAuthorization(post:)")
+    }
+
     // MARK: Claude Code looks for itself
 
     func testClaudeCodeIsAskedToLookOnlyWhenSwitchedOnAndNotTooOften() async throws {

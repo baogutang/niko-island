@@ -148,13 +148,21 @@ final class SystemNotifier: NSObject, AttentionNotifying, UNUserNotificationCent
             SystemNotifier.post(payload)
         } else {
             askedForPermission = true
-            center.requestAuthorization(options: [.alert]) { granted, _ in
-                if granted { SystemNotifier.post(payload) }
-            }
+            center.requestAuthorization(options: [.alert], completionHandler: SystemNotifier.afterAuthorization(post: payload))
         }
     }
 
-    private struct Payload: Sendable {
+    /// What runs once macOS has answered the permission question. macOS calls it on a queue of
+    /// its own, so it must not belong to the main actor: a closure written inside this
+    /// main-actor class would, and Swift stops the app when such a closure runs off the main
+    /// thread (that was 0.8.0 quitting at the first notification). Made here, outside any actor.
+    nonisolated static func afterAuthorization(post payload: Payload) -> @Sendable (Bool, (any Error)?) -> Void {
+        { granted, _ in
+            if granted { post(payload) }
+        }
+    }
+
+    struct Payload: Sendable {
         let identifier, title, subtitle, body, source, session, category: String
     }
 

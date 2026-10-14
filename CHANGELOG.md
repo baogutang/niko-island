@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.8.1] - 2026-10-14
+
+### Fixed
+- **The app quit by itself at the first notification of a run.** macOS
+  answers the "may this app show notifications" question on a queue of its
+  own; the code that took the answer had been written inside a part of the
+  app that may only run on the main thread, and Swift stops an app when such
+  code runs anywhere else. Every launch therefore ended at the first banner
+  (a permission request, a question, or a finished turn). The answer is now
+  taken by code that may run on any thread, a test calls it the way macOS
+  does, and a development build with notifications switched on was run
+  through three rounds of sessions, requests, failures, shortcuts and a
+  stand-in lock without stopping.
+
+### How it was missed
+- Every hands-on run of a development build had notifications switched off,
+  so the one path that crashed was never taken outside the shipped app. The
+  test plan now asks for one run with notifications on before a release.
+
 ## [0.8.0] - 2026-10-14
 
 ### Added
