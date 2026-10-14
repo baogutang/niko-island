@@ -10,7 +10,7 @@
 | 仓库 | https://github.com/baogutang/niko-island（公开，`main`） |
 | 本轮版本 | **v0.8.1 — 修复：应用在第一条通知时自己退出**（2026-10-14） |
 | 发布产物 | 每种架构一份：`Niko-Island-0.8.1-apple-silicon.dmg` / `.zip`（arm64）、`Niko-Island-0.8.1-intel.dmg` / `.zip`（x86_64）、`SHA256SUMS` |
-| 发布核对 | 见 `PROGRESS.md` 里的 R10 发布记录 |
+| 发布核对 | `ci.yml` 与 `release.yml`（v0.8.1）全部绿色。五个发布文件重新下载后校验和、挂载、单架构、ad-hoc 签名、版本 0.8.1 都核对过；并且直接运行下载下来的发布版，开着通知连发四条横幅，应用照常运行、没有崩溃报告。`releases/latest` → v0.8.1 |
 | 你机器上装的 | 我没有替你覆盖 `/Applications` 里的应用，请下载 `apple-silicon` 的 dmg 自己装 |
 | 旧版本 | v0.8.0（第一条通知时会退出，请勿使用）、v0.7.0、v0.6.0、v0.5.0、v0.4.0、v0.3.0、v0.2.0（universal）、v0.1.0（面板界面，只有 zip） |
 | 官网 | https://baogutang.github.io/niko-island/ |
