@@ -80,7 +80,7 @@
    | Intel | `Niko-Island-<版本>-intel.dmg` |
 
    不确定是哪种？打开苹果菜单 → **关于本机**：写着“芯片：Apple M…”就是 Apple 芯片，写着“处理器：…Intel…”就是 Intel。每种构建也都提供 `.zip`。不再提供通用（universal）包。
-2. 清除下载隔离标记。应用采用 ad-hoc 签名（项目没有 Apple 开发者账号），所以 macOS 不会直接打开下载来的副本：
+2. 清除下载隔离标记。应用使用项目自己的 NIKO 证书签名，但未经 Apple 公证（项目没有 Apple 开发者账号），所以 macOS 不会直接打开下载来的副本：
 
    ```bash
    xattr -cr "/Applications/Niko Island.app"
@@ -88,6 +88,8 @@
    ```
 
    不想用终端？在 macOS 14 上，右键点击应用 → **打开** → **打开**。在 macOS 15 及更新版本上，先尝试打开一次，再到**系统设置 → 隐私与安全性**里点击**仍要打开**。`xattr` 命令是最稳妥的办法，因为它同时清除了代理钩子要运行的那个小助手程序上的标记；如果标记还在，**设置 → 代理**页会提示你。
+
+   从 0.12.0 起，每个版本都用同一张证书签名，你给过的权限（跳回终端标签页用的“自动化”、通知）升级后会保留。从 0.11.0 或更早版本升级时，系统会再问一次。
 
 3. 打开它。首次启动会出现一个全屏的欢迎引导：它会找出这台 Mac 上已有的代理，标出哪些正在运行，并接入你勾选的那些。
 
@@ -115,7 +117,7 @@
 git clone https://github.com/baogutang/niko-island.git
 cd niko-island
 scripts/check.sh              # 全部测试
-scripts/make-app.sh           # → dist/Niko Island.app（本机架构），ad-hoc 签名
+scripts/make-app.sh           # → dist/Niko Island.app（本机架构），ad-hoc 签名（设置 NIKO_SIGN_IDENTITY 则用证书签名）
 scripts/smoke-launch.sh       # 在一个临时目录上启动它
 open "dist/Niko Island.app"
 scripts/make-release.sh       # 发布用的全部产物：apple-silicon 与 intel，各有 .dmg 和 .zip
@@ -129,6 +131,8 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 
 <a id="features"></a>
 ## 功能
+
+**0.12.0：升级不再重新授权，搜索支持拼音。** 每个版本都用同一张证书签名，升级后 macOS 不会再为已经允许过的权限重新询问。快捷搜索可以用拼音找中文项目和提示词，全拼或首字母都行：输入 `fanyi` 或 `fy` 都能找到“翻译”。
 
 **0.11.0：更安静，也更快找到会话。** ⌃⌥S 打开快捷搜索，输入项目、提示词或代理名称，用 ↑↓ 和回车回到会话；遇到待审批请求则打开对应卡片。中文输入法的候选确认键由输入法处理。
 
@@ -377,7 +381,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 | 许可证密钥 / 激活 | 无 | 通常需要 |
 | 追踪 | 没有，并且你可以自己验证 | 只能相信对方的说法 |
 | 发展方向 | Issue 与 Pull Request | 厂商的路线图 |
-| 代码签名 | ad-hoc：首次启动多一步 | 通常已公证 |
+| 代码签名 | 项目自己的证书，未公证：首次启动多一步 | 通常已公证 |
 | 目前的代理覆盖 | 一个稳定集成，其余为测试版或实验性 | 往往更广 |
 
 ## 工作原理
@@ -443,7 +447,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 ## 常见问题
 
 **macOS 提示应用“无法打开”或“已损坏”。**
-因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名，Gatekeeper 不认识它。运行一次 `xattr -cr "/Applications/Niko Island.app"` 即可。不用终端的话：在 macOS 14 上，右键点击应用 → **打开** → **打开**；在 macOS 15 及更新版本上，先尝试打开，再到**系统设置 → 隐私与安全性 → 仍要打开**。发布页提供 SHA-256 校验和，可以先核对下载文件。
+因为项目没有 Apple 开发者账号，应用使用项目自己的证书签名、未经 Apple 公证，Gatekeeper 不认识它。运行一次 `xattr -cr "/Applications/Niko Island.app"` 即可。不用终端的话：在 macOS 14 上，右键点击应用 → **打开** → **打开**；在 macOS 15 及更新版本上，先尝试打开，再到**系统设置 → 隐私与安全性 → 仍要打开**。发布页提供 SHA-256 校验和，可以先核对下载文件。
 
 **我该下载哪一个？**
 M 系列芯片的 Mac 下载 `apple-silicon`，Intel 处理器的 Mac 下载 `intel`（苹果菜单 → 关于本机可以看到）。下错了要么打不开，要么在 Rosetta 下跑得更慢。

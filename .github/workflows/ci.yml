@@ -40,9 +40,21 @@ jobs:
           exit "$status"
       - name: Rosetta (to start the Intel build on this arm64 runner)
         run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license >/dev/null 2>&1 || true
+      - name: Signing identity (the pinned NIKO certificate keeps macOS grants across updates)
+        env:
+          NIKO_SIGNING_P12_BASE64: ${{ secrets.NIKO_SIGNING_P12_BASE64 }}
+          NIKO_SIGNING_P12_PASSWORD: ${{ secrets.NIKO_SIGNING_P12_PASSWORD }}
+        run: scripts/import-signing.sh
       - name: Build and verify the release packages (Apple silicon and Intel)
         run: scripts/make-release.sh
       - name: Launch smoke test (Apple silicon build)
         run: scripts/smoke-launch.sh "dist/apple-silicon/Niko Island.app"
       - name: Launch smoke test (Intel build, under Rosetta)
         run: scripts/smoke-launch.sh "dist/intel/Niko Island.app"
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          if [ -n "${NIKO_SIGN_KEYCHAIN:-}" ] && [ -f "$NIKO_SIGN_KEYCHAIN" ]; then
+            security delete-keychain "$NIKO_SIGN_KEYCHAIN"
+            rm -rf "$(dirname "$NIKO_SIGN_KEYCHAIN")"
+          fi

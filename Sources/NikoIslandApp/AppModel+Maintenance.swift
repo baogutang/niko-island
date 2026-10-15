@@ -91,7 +91,10 @@ extension AppModel {
                 if result?.succeeded ?? true { self.settings.lastWiredVersion = NikoVersion.current }
                 if let result {
                     if result.applied {
-                        self.log.info("brought connected agents up to date: \(result.plan.changes.map(\.agent).joined(separator: ", "))")
+                        // An agent with two config files has two changes; name it once.
+                        var named: [String] = []
+                        for agent in result.plan.changes.map(\.agent) where !named.contains(agent) { named.append(agent) }
+                        self.log.info("brought connected agents up to date: \(named.joined(separator: ", "))")
                     } else if let error = result.error {
                         self.log.error("bringing connected agents up to date failed: \(error)")
                     }

@@ -73,11 +73,19 @@ check_bundle() {
     codesign --verify --deep --strict "$app"
     # Read the whole description first: a pipe into `grep -q` would close early.
     local signature
-    signature="$(codesign -dv "$app" 2>&1)"
-    case "$signature" in
-        *"Signature=adhoc"*) ;;
-        *) echo "make-release.sh: $app is not ad-hoc signed" >&2; return 1 ;;
-    esac
+    signature="$(codesign -dvv "$app" 2>&1)"
+    if [ -n "${NIKO_SIGN_IDENTITY:-}" ]; then
+        # Tagged releases must keep the pinned identity, or every user's grants reset.
+        case "$signature" in
+            *"Authority=NIKO Code Signing"*) ;;
+            *) echo "make-release.sh: $app is not signed with the NIKO identity" >&2; return 1 ;;
+        esac
+    else
+        case "$signature" in
+            *"Signature=adhoc"*) ;;
+            *) echo "make-release.sh: $app is not ad-hoc signed" >&2; return 1 ;;
+        esac
+    fi
 }
 
 MOUNT=""

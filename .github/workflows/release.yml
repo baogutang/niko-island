@@ -1,6 +1,6 @@
 name: release
 
-# Tag push (vX.Y.Z)  → GitHub Release with one ad-hoc signed app per architecture
+# Tag push (vX.Y.Z)  → GitHub Release with one NIKO-signed app per architecture
 #                      (Apple silicon and Intel, each as .dmg and .zip; no universal build).
 # Manual dispatch    → refreshes the rolling "nightly" pre-release from the chosen ref.
 on:
@@ -45,12 +45,22 @@ jobs:
           fi
       - name: Rosetta (to start the Intel build on this arm64 runner)
         run: /usr/sbin/softwareupdate --install-rosetta --agree-to-license >/dev/null 2>&1 || true
-      - name: Build and verify one package per architecture, ad-hoc signed
+      - name: Signing identity (the pinned NIKO certificate keeps macOS grants across updates)
+        env:
+          NIKO_SIGNING_P12_BASE64: ${{ secrets.NIKO_SIGNING_P12_BASE64 }}
+          NIKO_SIGNING_P12_PASSWORD: ${{ secrets.NIKO_SIGNING_P12_PASSWORD }}
+        run: scripts/import-signing.sh
+      - name: Build and verify one package per architecture, signed with the NIKO identity
         env:
           NIKO_VERSION: ${{ steps.version.outputs.version }}
         # arm64 and x86_64 apps, each as .dmg and .zip; checks architectures,
         # signatures, that the zips unpack and the images mount, and SHA256SUMS.
-        run: scripts/make-release.sh
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ -z "${NIKO_SIGN_IDENTITY:-}" ]; then
+            echo "::error::releases must be signed with the NIKO identity (secret NIKO_SIGNING_P12_BASE64)"
+            exit 1
+          fi
+          scripts/make-release.sh
       - name: Both builds must have been started
         run: |
           "dist/apple-silicon/Niko Island.app/Contents/MacOS/niko-island" --version
@@ -79,7 +89,7 @@ jobs:
             echo
             echo "Pick the download for your Mac (Apple menu → About This Mac): **apple-silicon** for an M-series chip, **intel** for an Intel processor."
             echo "Open the \`.dmg\` and drag **Niko Island** onto **Applications** (the \`.zip\` holds the same app)."
-            echo "The app is ad-hoc signed (no Apple Developer account), so clear the quarantine flag once:"
+            echo "The app is signed with the project's own NIKO certificate but not notarized by Apple (no Apple Developer account), so clear the quarantine flag once:"
             echo "\`xattr -cr \"/Applications/Niko Island.app\"\`."
             echo "Without a terminal: on macOS 14 right-click the app → **Open**; on macOS 15+ open it once, then System Settings → Privacy & Security → **Open Anyway**."
             echo
@@ -114,3 +124,10 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Niko Island nightly (${{ steps.version.outputs.version }})" \
             --notes-file "$RUNNER_TEMP/notes.md"
+      - name: Remove the signing keychain
+        if: always()
+        run: |
+          if [ -n "${NIKO_SIGN_KEYCHAIN:-}" ] && [ -f "$NIKO_SIGN_KEYCHAIN" ]; then
+            security delete-keychain "$NIKO_SIGN_KEYCHAIN"
+            rm -rf "$(dirname "$NIKO_SIGN_KEYCHAIN")"
+          fi

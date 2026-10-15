@@ -1,5 +1,6 @@
 #!/bin/bash
-# Assemble "Niko Island.app" from SwiftPM build products and ad-hoc sign it.
+# Assemble "Niko Island.app" from SwiftPM build products and sign it
+# (the pinned NIKO identity when NIKO_SIGN_IDENTITY is set, else ad hoc).
 #
 #   scripts/make-app.sh                 release build for the host architecture
 #   scripts/make-app.sh --arch arm64    build for one architecture (arm64 or x86_64);
@@ -12,10 +13,11 @@
 #   scripts/make-app.sh --out <dir>     output directory (default: dist)
 #   scripts/make-app.sh --skip-build    reuse existing .build products
 #
-# No Apple Developer account is involved: the bundle is signed ad hoc
-# (`codesign -s -`), which is enough for it to run once the user has cleared
-# the download quarantine (`xattr -cr`; right-click → Open on macOS 14;
-# System Settings → Privacy & Security → Open Anyway on macOS 15+).
+# No Apple Developer account is involved. Local builds are signed ad hoc
+# (`codesign -s -`); releases set NIKO_SIGN_IDENTITY to the pinned self-signed
+# certificate so macOS keeps granted permissions across updates. Either runs
+# once the user has cleared the download quarantine (`xattr -cr`; right-click →
+# Open on macOS 14; System Settings → Privacy & Security → Open Anyway on 15+).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -165,10 +167,22 @@ $ICON_KEY
 PLIST
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
-echo "==> ad-hoc signing"
-codesign --force --sign - --timestamp=none --identifier "$BUNDLE_ID.bridge" "$APP/Contents/Helpers/niko-bridge"
-codesign --force --sign - --timestamp=none --identifier "$BUNDLE_ID" "$APP"
+# With NIKO_SIGN_IDENTITY (the pinned self-signed certificate, see scripts/import-signing.sh)
+# macOS keeps Automation grants across updates; ad hoc signing ties them to each build's
+# hash, so every update would ask again.
+SIGN_IDENTITY="${NIKO_SIGN_IDENTITY:--}"
+if [ "$SIGN_IDENTITY" = "-" ]; then echo "==> ad-hoc signing"; else echo "==> signing with the NIKO identity"; fi
+codesign --force --sign "$SIGN_IDENTITY" --timestamp=none --identifier "$BUNDLE_ID.bridge" "$APP/Contents/Helpers/niko-bridge"
+codesign --force --sign "$SIGN_IDENTITY" --timestamp=none --identifier "$BUNDLE_ID" "$APP"
 codesign --verify --deep --strict "$APP"
+if [ "$SIGN_IDENTITY" != "-" ]; then
+    PINNED="$(tr -d ' \n' < "$ROOT/scripts/signing-identity.sha1" | tr '[:upper:]' '[:lower:]')"
+    REQUIREMENT="$(codesign --display --requirements - "$APP" 2>&1)"
+    case "$REQUIREMENT" in
+        *"identifier \"$BUNDLE_ID\""*"H\"$PINNED\""*) ;;
+        *) echo "make-app.sh: the designated requirement does not pin the NIKO certificate: $REQUIREMENT" >&2; exit 1 ;;
+    esac
+fi
 
 echo "==> $APP ($VERSION build $BUILD_NUMBER, $ARCH_LABEL)"
 lipo -archs "$APP/Contents/MacOS/niko-island"
@@ -185,7 +199,7 @@ fi
 
 if [ "$MAKE_DMG" -eq 1 ]; then
     # A plain disk image: the app, a shortcut to /Applications to drag it onto,
-    # and a note about the one step an ad-hoc signed app needs.
+    # and a note about the one step an app without Apple notarization needs.
     DMG_NAME="Niko-Island-$VERSION-$ARCH_LABEL.dmg"
     DMG_ROOT="$STAGE/dmg"
     mkdir -p "$DMG_ROOT"
@@ -195,9 +209,10 @@ if [ "$MAKE_DMG" -eq 1 ]; then
 Niko Island
 
 1. Drag "Niko Island" onto "Applications".
-2. The app is ad-hoc signed (this project has no Apple Developer account),
-   so macOS will not open a downloaded copy straight away. Clear the
-   download flag once, in Terminal:
+2. The app is signed with the project's own NIKO certificate, not notarized
+   by Apple (this project has no Apple Developer account), so macOS will not
+   open a downloaded copy straight away. Clear the download flag once, in
+   Terminal:
 
        xattr -cr "/Applications/Niko Island.app"
 
@@ -209,8 +224,8 @@ Niko Island
 ------------------------------------------------------------
 
 1. 把 "Niko Island" 拖到 "Applications"（应用程序）上。
-2. 应用采用 ad-hoc 签名（本项目没有 Apple 开发者账号），所以 macOS
-   不会直接打开下载来的副本。在“终端”里执行一次：
+2. 应用使用项目自己的 NIKO 证书签名，未经 Apple 公证（本项目没有 Apple
+   开发者账号），所以 macOS 不会直接打开下载来的副本。在“终端”里执行一次：
 
        xattr -cr "/Applications/Niko Island.app"
 

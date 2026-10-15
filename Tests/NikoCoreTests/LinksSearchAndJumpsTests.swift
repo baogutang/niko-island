@@ -57,6 +57,16 @@ final class LinksSearchAndJumpsTests: XCTestCase {
         XCTAssertGreaterThan(QuickFind.score("web", fields: ["web", "x"]) ?? 0, QuickFind.score("web", fields: ["x", "web"]) ?? 0)
     }
 
+    func testChineseMatchesByPinyinWholeAndByInitials() {
+        XCTAssertNotNil(QuickFind.score("fanyi", fields: ["修复翻译设置"]), "whole pinyin, tones ignored")
+        XCTAssertNotNil(QuickFind.score("FY", fields: ["翻译"]), "initials")
+        XCTAssertNotNil(QuickFind.score("denglu api", fields: ["登录接口", "api-server"]), "pinyin and Latin words together")
+        XCTAssertNil(QuickFind.score("zhifu", fields: ["修复登录页的样式"]))
+        // The characters themselves still rank above their spelling.
+        XCTAssertGreaterThan(QuickFind.score("翻译", fields: ["翻译"]) ?? 0, QuickFind.score("fanyi", fields: ["翻译"]) ?? 0)
+        XCTAssertNil(QuickFind.pinyin("niko-island"), "Latin text is not transliterated")
+    }
+
     // MARK: Jumps
 
     func testWezTermAndKittyAreAddressedExactly() {

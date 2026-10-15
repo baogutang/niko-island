@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.12.0] - 2026-10-15
+
+### Changed
+- **Permissions survive updates.** Releases are signed with one fixed, self-signed certificate (`NIKO Code Signing`) instead of ad hoc. macOS records Automation and notification grants against the designated requirement, which now names that certificate rather than each build's hash, so an update no longer asks again. The first update from 0.11.0 or earlier asks once. Still not notarized: the project has no Apple Developer account.
+- The release workflow refuses to publish a tag that is not signed with the pinned certificate (`scripts/signing-identity.sha1`), and checks the designated requirement of both architectures.
+
+### Added
+- **Quick search in pinyin.** Chinese project names, titles and prompts match by pinyin, whole or by initials (`fanyi` and `fy` both find 翻译), ranked just below a match on the characters themselves.
+
+### Fixed
+- The log names an agent with two config files once when bringing connected agents up to date (it said "kiro, kiro").
+
+### Verification
+- 423 local automated tests, 5 environment-dependent skips, no failures.
+
 ## [0.11.0] - 2026-10-15
 
 ### Added

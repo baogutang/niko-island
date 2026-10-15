@@ -119,6 +119,13 @@ to what turned up when somebody did.
 | The last 24 hours, four weeks by weekday and hour, cache hits | Built; seen with real transcripts in a development build |
 | Copilot's allowances | Built and covered by tests with a recorded shape; the endpoint was checked through `gh` (field names only), the app's own lookup was not run (it would read gh's Keychain item) |
 
+## Released: 0.12.0
+
+| Area | State |
+|---|---|
+| One signing certificate for every release, so macOS keeps granted permissions across updates | Built; the release workflow checks the designated requirement of both architectures against the pinned certificate. A real update on a Mac that had granted Automation has not been watched yet |
+| Pinyin in quick search (whole and initials) | Built and covered by tests |
+
 ## Released: 0.11.0
 
 | Area | State |

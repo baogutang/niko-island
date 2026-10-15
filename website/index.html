@@ -345,7 +345,7 @@
 <main id="top">
   <div class="hero">
     <div class="wrap">
-      <div class="kicker" data-i18n="hero.kicker">0.11.0 · Free · Open source · No telemetry</div>
+      <div class="kicker" data-i18n="hero.kicker">0.12.0 · Free · Open source · No telemetry</div>
       <h1 data-i18n="hero.title">Your agents work. <em>The island keeps watch.</em></h1>
       <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent on your Mac is doing, moves with the menu bar, opens when one needs you, and lets you approve or answer on the spot.</p>
       <div class="cta">
@@ -605,7 +605,7 @@
   <section id="install">
     <div class="wrap">
       <h2 data-i18n="install.title">Up and running in about a minute</h2>
-      <p class="sub" data-i18n="install.sub">The app is ad-hoc signed because the project has no Apple Developer account, so macOS will not open a downloaded copy until you clear its quarantine flag once. After that it opens like any other app.</p>
+      <p class="sub" data-i18n="install.sub">The app is signed with the project's own certificate but not notarized, because the project has no Apple Developer account, so macOS will not open a downloaded copy until you clear its quarantine flag once. After that it opens like any other app, and since 0.12.0 updates keep the permissions you granted.</p>
       <div class="steps">
         <div class="step"><div>
           <h3 data-i18n="s1.t">Download the build for your Mac</h3>
@@ -653,7 +653,7 @@ open "dist/Niko Island.app"</pre>
             <tr><td data-i18n="c.r3">License key</td><td data-i18n="c.r3a">None</td><td data-i18n="c.r3b">Usually required</td></tr>
             <tr><td data-i18n="c.r4">Tracking</td><td data-i18n="c.r4a">None, and you can verify it</td><td data-i18n="c.r4b">You take their word for it</td></tr>
             <tr><td data-i18n="c.r5">Direction</td><td data-i18n="c.r5a">Issues and pull requests</td><td data-i18n="c.r5b">The vendor's roadmap</td></tr>
-            <tr><td data-i18n="c.r6">Code signing</td><td data-i18n="c.r6a">Ad-hoc: one extra step at first launch</td><td data-i18n="c.r6b">Usually notarized</td></tr>
+            <tr><td data-i18n="c.r6">Code signing</td><td data-i18n="c.r6a">Own certificate, not notarized: one extra step at first launch</td><td data-i18n="c.r6b">Usually notarized</td></tr>
             <tr><td data-i18n="c.r7">Agent coverage today</td><td data-i18n="c.r7a">One stable integration, the rest in beta or experimental</td><td data-i18n="c.r7b">Often broader</td></tr>
           </tbody>
         </table>
@@ -677,7 +677,7 @@ open "dist/Niko Island.app"</pre>
     "search.t": "敲几个字，就能回去",
     "search.d": "⌃⌥S 打开搜索，输入项目、提示词或代理，方向键和回车选择。支持重音字符和中文，输入法候选确认不会误触跳转。遇到待审批请求，会打开对应卡片。",
     "nav.features": "功能", "nav.agents": "代理", "nav.sounds": "音效", "nav.privacy": "隐私", "nav.install": "安装",
-    "hero.kicker": "0.11.0 · 免费 · 开源 · 无遥测",
+    "hero.kicker": "0.12.0 · 免费 · 开源 · 无遥测",
     "hero.title": "代理干活，<em>小岛放哨。</em>",
     "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示这台 Mac 上每个 AI 编程代理正在做什么，跟着菜单栏一起走，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
@@ -745,7 +745,7 @@ open "dist/Niko Island.app"</pre>
     "tree.bin": "桥接与状态栏启动脚本", "tree.run": "本地套接字，仅本人可访问", "tree.cache": "速率限制、可选的价格表",
     "tree.data": "SQLite 里的 token 计数", "tree.sounds": "你自己添加的声音（如果有）", "tree.logs": "已脱敏的诊断日志",
     "install.title": "大约一分钟即可用上",
-    "install.sub": "因为项目没有 Apple 开发者账号，应用采用 ad-hoc 签名，所以在你清除一次隔离标记之前，macOS 不会打开下载来的副本。之后它就和其他应用一样打开。",
+    "install.sub": "因为项目没有 Apple 开发者账号，应用使用项目自己的证书签名、未经公证，所以在你清除一次隔离标记之前，macOS 不会打开下载来的副本。之后它就和其他应用一样打开；从 0.12.0 起，升级后已给过的权限都会保留。",
     "s1.t": "下载适合你这台 Mac 的版本", "s1.d": "从 GitHub 获取 .dmg", "s1.e": "：M 系列芯片的 Mac 选 <b>apple-silicon</b>，Intel 处理器的 Mac 选 <b>intel</b>。苹果菜单 → 关于本机可以看到是哪一种。两种也都提供 .zip。",
     "s2.t": "拖到“应用程序”并打开", "s2.d": "打开磁盘映像，把 Niko Island 拖到“应用程序”上，再用下面的命令清除隔离标记。不用终端的话：在 macOS 14 上右键点击应用并选择“打开”；在 macOS 15 及更新版本上，先尝试打开一次，再到“系统设置 → 隐私与安全性”里点击“仍要打开”。",
     "s3.t": "让欢迎引导替你接入代理", "s3.d": "首次启动会找出这台 Mac 上的代理，并接入你勾选的那些；之后在“设置”的“代理”页里也能做同样的事。更喜欢终端？先看计划：在第二条命令之前不会改动任何东西。",
@@ -760,7 +760,7 @@ open "dist/Niko Island.app"</pre>
     "c.r3": "许可证密钥", "c.r3a": "无", "c.r3b": "通常需要",
     "c.r4": "追踪", "c.r4a": "没有，并且可以自己验证", "c.r4b": "只能相信对方的说法",
     "c.r5": "发展方向", "c.r5a": "Issue 与 Pull Request", "c.r5b": "厂商的路线图",
-    "c.r6": "代码签名", "c.r6a": "ad-hoc：首次启动多一步", "c.r6b": "通常已公证",
+    "c.r6": "代码签名", "c.r6a": "自有证书、未公证：首次启动多一步", "c.r6b": "通常已公证",
     "c.r7": "目前的代理覆盖", "c.r7a": "一个稳定集成，其余为测试版或实验性", "c.r7b": "往往更广",
     "foot.license": "基于 MIT 许可发布。", "foot.roadmap": "路线图", "foot.issues": "问题反馈",
     "foot.disclaimer": "Niko Island 是独立项目，与任何 AI 厂商均无隶属、认可或赞助关系。产品名称仅用于说明本应用可以配合哪些工具使用。",

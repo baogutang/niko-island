@@ -80,7 +80,7 @@ On a display without a camera housing the island is a small tab on the menu bar 
    | Intel | `Niko-Island-<version>-intel.dmg` |
 
    Not sure which? Apple menu → **About This Mac**: "Chip: Apple M…" is Apple silicon, "Processor: … Intel …" is Intel. Each build is also there as a `.zip`. There is no universal build.
-2. Clear the download quarantine. The app is ad-hoc signed (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
+2. Clear the download quarantine. The app is signed with the project's own NIKO certificate but not notarized by Apple (the project has no Apple Developer account), so macOS will not open a downloaded copy straight away:
 
    ```bash
    xattr -cr "/Applications/Niko Island.app"
@@ -88,6 +88,8 @@ On a display without a camera housing the island is a small tab on the menu bar 
    ```
 
    No terminal at hand? On macOS 14, right-click the app → **Open** → **Open**. On macOS 15 or later, try to open it once, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The `xattr` command is the reliable route because it also clears the flag on the small helper that agent hooks run; if that flag is still set, **Settings → Agents** says so.
+
+   Since 0.12.0 every release carries the same certificate, so macOS keeps the permissions you granted (Automation for jumping back to a terminal tab, notifications) across updates. Coming from 0.11.0 or earlier, it asks once more.
 
 3. Open it. The first launch greets you with a full-screen welcome that finds the agents on your Mac, shows which ones are running, and connects the ones you tick.
 
@@ -115,7 +117,7 @@ Requires macOS 14+ and Xcode 16 or later (Swift 6).
 git clone https://github.com/baogutang/niko-island.git
 cd niko-island
 scripts/check.sh              # the whole test suite
-scripts/make-app.sh           # → dist/Niko Island.app for this Mac, ad-hoc signed
+scripts/make-app.sh           # → dist/Niko Island.app for this Mac, ad-hoc signed (NIKO_SIGN_IDENTITY signs it for real)
 scripts/smoke-launch.sh       # launches it against a throwaway directory
 open "dist/Niko Island.app"
 scripts/make-release.sh       # what a release ships: apple-silicon and intel, .dmg and .zip
@@ -129,6 +131,8 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 
 <a id="features"></a>
 ## Features
+
+**0.12.0: permissions that survive updates, search in pinyin.** Releases are signed with one fixed certificate, so an update no longer makes macOS ask again for what you already allowed. The quick switcher finds Chinese projects and prompts by pinyin, whole or by initials: `fanyi` or `fy` both find 翻译.
 
 **0.11.0: quieter, with a faster way back.** Press ⌃⌥S, type a project, prompt or agent, move with ↑↓ and press Return. A session with a pending request opens that card instead. Input-method candidate selection keeps its own Return key.
 
@@ -377,7 +381,7 @@ There are polished closed-source apps in this space. If you would rather read th
 | License key / activation | None | Usually required |
 | Tracking | None, and you can verify that | You have to take their word |
 | Direction | Issues and pull requests | The vendor's roadmap |
-| Code signing | Ad-hoc: one extra step at first launch | Usually notarized |
+| Code signing | The project's own certificate, not notarized: one extra step at first launch | Usually notarized |
 | Agent coverage today | One stable integration, the rest in beta or experimental | Often broader |
 
 ## How it works
@@ -443,7 +447,7 @@ If something in the second table bites you, please open an issue.
 ## FAQ
 
 **macOS says the app "cannot be opened" or "is damaged".**
-The app is ad-hoc signed because the project has no Apple Developer account, so Gatekeeper does not recognise it. Run `xattr -cr "/Applications/Niko Island.app"` once. Without a terminal: on macOS 14, right-click the app → **Open** → **Open**; on macOS 15 or later, try to open it, then use **System Settings → Privacy & Security → Open Anyway**. The release page lists SHA-256 checksums if you want to verify the download first.
+The app is signed with the project's own certificate, not notarized by Apple, because the project has no Apple Developer account, so Gatekeeper does not recognise it. Run `xattr -cr "/Applications/Niko Island.app"` once. Without a terminal: on macOS 14, right-click the app → **Open** → **Open**; on macOS 15 or later, try to open it, then use **System Settings → Privacy & Security → Open Anyway**. The release page lists SHA-256 checksums if you want to verify the download first.
 
 **Which download do I need?**
 `apple-silicon` for a Mac with an M-series chip, `intel` for a Mac with an Intel processor (Apple menu → About This Mac tells you). The wrong one either does not start or runs slower under Rosetta.
