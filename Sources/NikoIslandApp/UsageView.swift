@@ -38,6 +38,12 @@ struct UsageView: View {
                     if current.days.contains(where: { $0.tokens > 0 }) { chart.frame(width: 200) }
                     if !current.models.isEmpty { breakdown }
                 }
+                if current.quarters.contains(where: { $0 > 0 }) || current.weekHours.joined().contains(where: { $0 > 0 }) {
+                    HStack(alignment: .top, spacing: 22) {
+                        quarterStrip
+                        heatmap
+                    }
+                }
             }
             footnote
         }
@@ -119,27 +125,6 @@ struct UsageView: View {
 
     // MARK: Limits
 
-    private func windowName(_ window: RateLimitWindow) -> String {
-        switch window.id {
-        case "tools_month": return L("Tool calls, monthly")
-        case "extra_usage": return L("Extra usage")
-        case "daily_pro": return L("Pro models, daily")
-        case "daily_flash": return L("Flash models, daily")
-        case "daily_flash_lite": return L("Flash-Lite models, daily")
-        case let id where id.hasPrefix("seven_day_"):
-            // One model's share of the week, or a share this version has no name for.
-            return L("Weekly, %@", id.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized)
-        default: break
-        }
-        switch window.minutes {
-        case 300?: return L("5-hour limit")
-        case 10080?: return L("Weekly limit")
-        case let minutes? where minutes % 1440 == 0: return L("%lld-day limit", minutes / 1440)
-        case let minutes? where minutes % 60 == 0: return L("%lld-hour limit", minutes / 60)
-        default: return window.id.replacingOccurrences(of: "_", with: " ")
-        }
-    }
-
     private func resetText(_ date: Date?) -> String {
         guard let date else { return "" }
         let now = isStaticPreview ? PreviewClock.now : Date()
@@ -148,24 +133,39 @@ struct UsageView: View {
         return L("resets in %lldh %lldm", seconds / 3600, (seconds % 3600) / 60)
     }
 
-    private func limitRow(_ window: RateLimitWindow, agent: String?) -> some View {
-        let hot = window.usedPercent >= 85
-        return HStack(spacing: 10) {
-            if let agent { MascotView(source: agent, size: 15) }
-            Text(windowName(window)).font(look.body(12)).foregroundStyle(Theme.primary).lineLimit(1)
-                .frame(width: 112, alignment: .leading)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.10))
-                    Capsule().fill(hot ? Theme.coral : look.accent)
-                        .frame(width: max(4, proxy.size.width * CGFloat(window.usedPercent / 100)))
+    /// `mascot`: the agent's creature is drawn (in the list of every agent's limits).
+    private func limitRow(_ window: RateLimitWindow, agent: String, mascot: Bool) -> some View {
+        let level = QuotaLevel(used: window.usedPercent)
+        let tint = LimitWords.color(level, accent: look.accent)
+        let outlook = isStaticPreview ? nil : model.outlook(agent: agent, window: window)
+        return VStack(alignment: .leading, spacing: 3) {
+            HStack(spacing: 10) {
+                if mascot { MascotView(source: agent, size: 15) }
+                Text(LimitWords.name(window)).font(look.body(12)).foregroundStyle(Theme.primary).lineLimit(1)
+                    .frame(width: 112, alignment: .leading)
+                GeometryReader { proxy in
+                    ZStack(alignment: .leading) {
+                        Capsule().fill(Color.white.opacity(0.10))
+                        if let projected = outlook?.usedAtReset, projected > window.usedPercent + 1 {
+                            // Where the pace of late leads by the reset, faintly.
+                            Capsule().fill((outlook?.runsOutBeforeReset == true ? Theme.coral : tint).opacity(0.22))
+                                .frame(width: max(4, proxy.size.width * CGFloat(projected / 100)))
+                        }
+                        Capsule().fill(tint)
+                            .frame(width: max(4, proxy.size.width * CGFloat(window.usedPercent / 100)))
+                    }
                 }
+                .frame(height: 5)
+                Text(String(format: "%.0f%%", window.usedPercent)).font(look.mono(12, .medium))
+                    .foregroundStyle(level == .ok ? Theme.primary : tint).frame(width: 40, alignment: .trailing)
+                Text(resetText(window.resetsAt)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                    .frame(width: 112, alignment: .trailing)
             }
-            .frame(height: 5)
-            Text(String(format: "%.0f%%", window.usedPercent)).font(look.mono(12, .medium))
-                .foregroundStyle(hot ? Theme.coral : Theme.primary).frame(width: 40, alignment: .trailing)
-            Text(resetText(window.resetsAt)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
-                .frame(width: 112, alignment: .trailing)
+            if let outlook, let text = LimitWords.outlook(outlook, window: window) {
+                Text(text).font(look.body(10.5))
+                    .foregroundStyle(outlook.runsOutBeforeReset && outlook.runsOutAt != nil ? Theme.amber : Theme.tertiary)
+                    .padding(.leading, (mascot ? 25 : 0) + 122)
+            }
         }
     }
 
@@ -229,7 +229,7 @@ struct UsageView: View {
                             .help(L("A reset is spent in %@ itself. This only brings it to the front.", name))
                     }
                 }
-                ForEach(agent.limits) { limitRow($0, agent: nil) }
+                ForEach(agent.limits) { limitRow($0, agent: agent.id, mascot: false) }
                 if let asking {
                     if !asking.enabled {
                         // Nothing local knows the plan's windows: say where they are and how to see them.
@@ -267,7 +267,7 @@ struct UsageView: View {
             VStack(alignment: .leading, spacing: 7) {
                 Text(L("Limits").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
                 ForEach(withLimits) { agent in
-                    ForEach(agent.limits) { limitRow($0, agent: agent.id) }
+                    ForEach(agent.limits) { limitRow($0, agent: agent.id, mascot: true) }
                 }
             }
         }
@@ -294,9 +294,63 @@ struct UsageView: View {
         .accessibilityLabel(L("Tokens per day, last 7 days"))
     }
 
+    /// The last 24 hours in quarter hours: when the work happened today.
+    private var quarterStrip: some View {
+        let quarters = current.quarters
+        let peak = max(quarters.max() ?? 1, 1)
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(L("Last 24 hours").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+            HStack(alignment: .bottom, spacing: 1) {
+                ForEach(Array(quarters.enumerated()), id: \.offset) { index, tokens in
+                    Rectangle()
+                        .fill(index == quarters.count - 1 ? look.accent : look.accent.opacity(tokens > 0 ? 0.55 : 0.12))
+                        .frame(width: 2, height: tokens > 0 ? max(2, 40 * CGFloat(tokens) / CGFloat(peak)) : 1)
+                }
+            }
+            .frame(height: 40, alignment: .bottom)
+            HStack {
+                Text(L("24h ago")).font(look.mono(9, .regular)).foregroundStyle(Theme.tertiary)
+                Spacer()
+                Text(L("now")).font(look.mono(9, .regular)).foregroundStyle(Theme.tertiary)
+            }
+            .frame(width: 287)
+        }
+        .accessibilityLabel(L("Tokens per quarter hour, last 24 hours"))
+    }
+
+    /// Four weeks by weekday and hour: the rhythm of the work.
+    private var heatmap: some View {
+        let grid = current.weekHours.count == 7 ? current.weekHours : Array(repeating: Array(repeating: 0, count: 24), count: 7)
+        let peak = max(grid.joined().max() ?? 1, 1)
+        let days = [L("Mon"), L("Tue"), L("Wed"), L("Thu"), L("Fri"), L("Sat"), L("Sun")]
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(L("When, last 4 weeks").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+            VStack(alignment: .leading, spacing: 2) {
+                ForEach(0..<7, id: \.self) { row in
+                    HStack(spacing: 2) {
+                        Text(days[row]).font(look.mono(8.5, .regular)).foregroundStyle(Theme.tertiary).frame(width: 22, alignment: .leading)
+                        ForEach(0..<24, id: \.self) { hour in
+                            let tokens = grid[row][hour]
+                            RoundedRectangle(cornerRadius: look.radius(1.5), style: .continuous)
+                                .fill(tokens > 0 ? look.accent.opacity(0.18 + 0.82 * sqrt(Double(tokens) / Double(peak))) : Color.white.opacity(0.06))
+                                .frame(width: 7, height: 7)
+                        }
+                    }
+                }
+            }
+        }
+        .accessibilityLabel(L("Tokens by weekday and hour, last 4 weeks"))
+    }
+
     private var breakdown: some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(L("By model, last 7 days").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+            HStack(spacing: 8) {
+                Text(L("By model, last 7 days").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+                if let rate = current.cacheHitRate {
+                    Text(L("cache hits %lld%%", Int((rate * 100).rounded()))).font(look.mono(10.5, .regular)).foregroundStyle(Theme.tertiary)
+                        .help(L("Prompt tokens read from the cache, out of every prompt token, in these seven days."))
+                }
+            }
             ForEach(Array(current.models.prefix(4).enumerated()), id: \.offset) { _, row in
                 HStack(spacing: 8) {
                     MascotView(source: row.agent, size: 16)
@@ -337,6 +391,7 @@ enum ProviderLookupText {
         case ProviderLimitsClient.kimi: return "Kimi"
         case ProviderLimitsClient.minimax: return "MiniMax"
         case ProviderLimitsClient.gemini: return "Google"
+        case ProviderLimitsClient.copilot: return "GitHub"
         default: return nil
         }
     }
@@ -357,14 +412,17 @@ enum ProviderLookupText {
 
     static func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
         let codex = agent == ProviderLimitsClient.codex, gemini = agent == ProviderLimitsClient.gemini
+        let copilot = agent == ProviderLimitsClient.copilot
         switch state {
         case .ok: return nil
         case .noLogin:
             if gemini { return L("Gemini CLI has not signed in with a Google account on this Mac, so there is nothing to ask with.") }
+            if copilot { return L("The GitHub CLI (gh) has not signed in on this Mac, so there is nothing to ask with.") }
             return codex ? L("Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.")
                 : L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
         case .loginExpired:
             if gemini { return L("Gemini CLI's sign-in on this Mac has run out. It renews itself the next time Gemini CLI runs.") }
+            if copilot { return L("GitHub did not accept the GitHub CLI's sign-in. Run gh auth login to renew it.") }
             return codex ? L("Codex's sign-in on this Mac has run out. It renews itself the next time Codex runs.")
                 : L("Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.")
         case .denied: return L("macOS was told not to share %@'s sign-in.", AgentRegistry.displayName(for: agent))
@@ -375,5 +433,62 @@ enum ProviderLookupText {
         case .unreachable: return L("The provider could not be reached.")
         case .unreadable: return L("The provider answered in a form this version does not read.")
         }
+    }
+}
+
+/// Limits in words and colours, the same in the usage view and in notices.
+enum LimitWords {
+    static func name(_ window: RateLimitWindow) -> String {
+        switch window.id {
+        case "tools_month": return L("Tool calls, monthly")
+        case "extra_usage": return L("Extra usage")
+        case "copilot_premium": return L("Premium requests, monthly")
+        case "copilot_chat": return L("Chat, monthly")
+        case "copilot_completions": return L("Completions, monthly")
+        case "daily_pro": return L("Pro models, daily")
+        case "daily_flash": return L("Flash models, daily")
+        case "daily_flash_lite": return L("Flash-Lite models, daily")
+        case let id where id.hasPrefix("seven_day_"):
+            // One model's share of the week, or a share this version has no name for.
+            return L("Weekly, %@", id.dropFirst("seven_day_".count).replacingOccurrences(of: "_", with: " ").capitalized)
+        default: break
+        }
+        switch window.minutes {
+        case 300?: return L("5-hour limit")
+        case 10080?: return L("Weekly limit")
+        case let minutes? where minutes % 1440 == 0: return L("%lld-day limit", minutes / 1440)
+        case let minutes? where minutes % 60 == 0: return L("%lld-hour limit", minutes / 60)
+        default: return window.id.replacingOccurrences(of: "_", with: " ")
+        }
+    }
+
+
+    static func color(_ level: QuotaLevel, accent: Color) -> Color {
+        switch level {
+        case .ok: return accent
+        case .warning: return Theme.amber
+        case .critical: return Theme.coral
+        }
+    }
+
+    /// "1h 20m", "3d 4h": how long until a moment.
+    static func span(_ seconds: Int) -> String {
+        if seconds >= 86_400 { return L("%lldd %lldh", seconds / 86_400, (seconds % 86_400) / 3600) }
+        if seconds >= 3600 { return L("%lldh %lldm", seconds / 3600, (seconds % 3600) / 60) }
+        return L("%lld min", max(1, seconds / 60))
+    }
+
+    /// The pace of late, and where it leads, in a few words.
+    static func outlook(_ outlook: QuotaOutlook, window: RateLimitWindow, now: Date = Date()) -> String? {
+        let pace = outlook.pacePerHour
+        guard pace > 0.05 else { return L("hardly used lately") }
+        let rate = pace >= 10 ? String(format: "%.0f", pace) : String(format: "%.1f", pace)
+        if outlook.runsOutBeforeReset, let at = outlook.runsOutAt {
+            return L("%@%% an hour: runs out in about %@, before the reset", rate, span(max(0, at.timeIntervalSince(now).wholeSeconds)))
+        }
+        if let projected = outlook.usedAtReset {
+            return L("%@%% an hour: about %lld%% by the reset", rate, Int(projected.rounded()))
+        }
+        return L("%@%% an hour", rate)
     }
 }

@@ -414,7 +414,7 @@ public enum NikoCLI {
                 await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex",
                                              kimi: which == "kimi", minimax: which == "minimax",
                                              minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
-                                             gemini: which == "gemini"))
+                                             gemini: which == "gemini", copilot: which == "copilot"))
                 await client.refresh(force: true)
                 for (provider, result) in await client.current() {
                     print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")

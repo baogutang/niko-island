@@ -151,12 +151,62 @@
         }
       }
     },
+    "%@%% an hour": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每小时 %@%%"
+          }
+        }
+      }
+    },
+    "%@%% an hour: about %lld%% by the reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每小时 %@%%：到重置时约用掉 %lld%%"
+          }
+        }
+      }
+    },
+    "%@%% an hour: runs out in about %@, before the reset": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每小时 %@%%：约 %@ 后用完，早于重置"
+          }
+        }
+      }
+    },
     "%@'s limit has reset": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@ 的额度已重置"
+          }
+        }
+      }
+    },
+    "%@: %@ %lld%% used": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：%@已用 %lld%%"
+          }
+        }
+      }
+    },
+    "%@: %@ runs out in about %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：%@约 %@ 后用完"
           }
         }
       }
@@ -197,6 +247,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 个子代理"
+          }
+        }
+      }
+    },
+    "%lld min": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分钟"
           }
         }
       }
@@ -301,6 +361,26 @@
         }
       }
     },
+    "%lldd %lldh": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 天 %lld 小时"
+          }
+        }
+      }
+    },
+    "%lldh %lldm": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时 %lld 分"
+          }
+        }
+      }
+    },
     "%lldh %lldm ago": {
       "localizations": {
         "zh-Hans": {
@@ -337,6 +417,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "2 小时"
+          }
+        }
+      }
+    },
+    "24h ago": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "24 小时前"
           }
         }
       }
@@ -567,6 +657,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 分钟后"
+          }
+        }
+      }
+    },
+    "After this long, a request still on the island goes back to the agent's own prompt, answered by nobody, so an agent is never stuck on a card you did not see.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "超过这个时间还没回答的请求，会交还给代理自己的提示，不替你做任何决定，这样代理不会卡在一张你没看到的卡片上。"
           }
         }
       }
@@ -851,6 +951,16 @@
         }
       }
     },
+    "Ask GitHub for my Copilot allowances": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 GitHub 查询我的 Copilot 额度"
+          }
+        }
+      }
+    },
     "Ask Google for my Gemini CLI quotas": {
       "localizations": {
         "zh-Hans": {
@@ -1081,6 +1191,16 @@
         }
       }
     },
+    "Chat, monthly": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "聊天，每月"
+          }
+        }
+      }
+    },
     "Check now": {
       "localizations": {
         "zh-Hans": {
@@ -1267,6 +1387,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "紧凑"
+          }
+        }
+      }
+    },
+    "Completions, monthly": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代码补全，每月"
           }
         }
       }
@@ -1631,6 +1761,16 @@
         }
       }
     },
+    "Fri": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "五"
+          }
+        }
+      }
+    },
     "From": {
       "localizations": {
         "zh-Hans": {
@@ -1707,6 +1847,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "无法连接 GitHub。"
+          }
+        }
+      }
+    },
+    "GitHub did not accept the GitHub CLI's sign-in. Run gh auth login to renew it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub 没有接受 GitHub CLI 的登录。运行 gh auth login 重新登录即可。"
+          }
+        }
+      }
+    },
+    "Give an unanswered request back to the agent": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "把没回答的请求交还给代理"
           }
         }
       }
@@ -1991,6 +2151,16 @@
         }
       }
     },
+    "Last 24 hours": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 24 小时"
+          }
+        }
+      }
+    },
     "Let Claude Code look up my Claude limits": {
       "localizations": {
         "zh-Hans": {
@@ -2097,6 +2267,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "时刻"
+          }
+        }
+      }
+    },
+    "Mon": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一"
           }
         }
       }
@@ -2721,6 +2901,26 @@
         }
       }
     },
+    "Premium requests, chat and completions for the month. Reads the sign-in the GitHub CLI (gh) keeps on this Mac (in ~/.config/gh, or your Keychain: macOS may ask you first) and sends it to api.github.com, nowhere else. Asked every ten minutes.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本月的高级请求、聊天和代码补全额度。读取 GitHub CLI（gh）在这台 Mac 上保存的登录凭据（在 ~/.config/gh 里，或在钥匙串里：macOS 可能会先询问你），只发送到 api.github.com。每十分钟查询一次。"
+          }
+        }
+      }
+    },
+    "Premium requests, monthly": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "高级请求，每月"
+          }
+        }
+      }
+    },
     "Price list": {
       "localizations": {
         "zh-Hans": {
@@ -2747,6 +2947,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "Pro 模型，每日"
+          }
+        }
+      }
+    },
+    "Prompt tokens read from the cache, out of every prompt token, in these seven days.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这七天里，所有提示 token 中从缓存读取的比例。"
           }
         }
       }
@@ -2967,6 +3177,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "跟随 macOS"
+          }
+        }
+      }
+    },
+    "Sat": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "六"
           }
         }
       }
@@ -3361,6 +3581,16 @@
         }
       }
     },
+    "Sun": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日"
+          }
+        }
+      }
+    },
     "Tell me when there is a new version": {
       "localizations": {
         "zh-Hans": {
@@ -3377,6 +3607,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "文字大小"
+          }
+        }
+      }
+    },
+    "The GitHub CLI (gh) has not signed in on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "GitHub CLI（gh）还没有在这台 Mac 上登录，没有可用来查询的凭据。"
           }
         }
       }
@@ -3601,6 +3841,16 @@
         }
       }
     },
+    "Thu": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "四"
+          }
+        }
+      }
+    },
     "Tight": {
       "localizations": {
         "zh-Hans": {
@@ -3621,12 +3871,32 @@
         }
       }
     },
+    "Tokens by weekday and hour, last 4 weeks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 4 周按星期和小时统计的 token"
+          }
+        }
+      }
+    },
     "Tokens per day, last 7 days": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "最近 7 天每日 token 数"
+          }
+        }
+      }
+    },
+    "Tokens per quarter hour, last 24 hours": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 24 小时每 15 分钟的 token"
           }
         }
       }
@@ -3647,6 +3917,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "工具调用（每月）"
+          }
+        }
+      }
+    },
+    "Tue": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "二"
           }
         }
       }
@@ -3791,6 +4071,16 @@
         }
       }
     },
+    "Wed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "三"
+          }
+        }
+      }
+    },
     "Weekly limit": {
       "localizations": {
         "zh-Hans": {
@@ -3857,6 +4147,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理想执行命令时，小岛会展开并显示这条命令。允许、拒绝，或者交回终端处理。"
+          }
+        }
+      }
+    },
+    "When, last 4 weeks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "什么时候用，最近 4 周"
           }
         }
       }
@@ -4041,6 +4341,16 @@
         }
       }
     },
+    "cache hits %lld%%": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "缓存命中 %lld%%"
+          }
+        }
+      }
+    },
     "compacting": {
       "localizations": {
         "zh-Hans": {
@@ -4127,6 +4437,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "来自 %@ 的状态栏"
+          }
+        }
+      }
+    },
+    "hardly used lately": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近几乎没用"
           }
         }
       }
@@ -4237,6 +4557,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "未接入"
+          }
+        }
+      }
+    },
+    "now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "现在"
           }
         }
       }

@@ -258,3 +258,26 @@ public struct RequestSummary: Sendable, Equatable {
         text.count > limit ? String(text.prefix(limit - 1)) + "…" : text
     }
 }
+
+extension AgentEvent {
+    /// Whether `other` reports the very call this request asked about: the same tool with the
+    /// same input, as far as a status event carries it (the bridge shortens long strings there).
+    public func isSameCall(as other: AgentEvent) -> Bool {
+        guard let tool = toolName, tool == other.toolName else { return false }
+        func shortened(_ input: JSONObject?) -> JSONValue {
+            BridgeRunner.truncateStrings(in: .object(input ?? JSONObject()), limit: BridgeRunner.slimStringLimit)
+        }
+        return shortened(toolInput) == shortened(other.toolInput)
+    }
+
+    /// An event that shows a waiting request of the same session was settled somewhere else:
+    /// the call it asked about has run (or failed), or the turn is over.
+    public func settles(_ request: AgentEvent) -> Bool {
+        guard key == request.key, !isBlocking else { return false }
+        switch name {
+        case HookEvent.stop, HookEvent.stopFailure, HookEvent.userPromptSubmit, HookEvent.sessionEnd: return true
+        case HookEvent.postToolUse: return request.isSameCall(as: self)
+        default: return false
+        }
+    }
+}

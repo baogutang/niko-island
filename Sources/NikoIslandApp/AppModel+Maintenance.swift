@@ -162,7 +162,7 @@ extension AppModel {
                                            codex: settings.codexLimitsLookup, kimi: settings.kimiLimitsLookup,
                                            minimax: settings.minimaxLimitsLookup,
                                            minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
-                                           gemini: settings.geminiLimitsLookup)
+                                           gemini: settings.geminiLimitsLookup, copilot: settings.copilotLimitsLookup)
     }
 
     /// Starts, stops or re-aims the lookups after a setting changed. Nothing is

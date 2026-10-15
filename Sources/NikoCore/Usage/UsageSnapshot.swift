@@ -102,6 +102,10 @@ public struct UsageSnapshot: Sendable, Equatable {
         public var plan: String?
         /// Quota resets the account can still spend, when the provider says.
         public var resetsLeft: Int?
+        /// The last 24 hours in quarter hours, oldest first, ending with the current one.
+        public var quarters: [Int] = []
+        /// The last four weeks by weekday (Monday first) and hour of the day.
+        public var weekHours: [[Int]] = []
 
         public init(id: String) { self.id = id }
     }
@@ -226,5 +230,15 @@ public struct UsageSnapshot: Sendable, Equatable {
         snapshot.updatedAt = now
         snapshot.pricingSource = "bundled"
         return snapshot
+    }
+}
+
+extension UsageSnapshot.AgentUsage {
+    /// Cache reads against every prompt token over the last seven days (nil without any).
+    public var cacheHitRate: Double? {
+        let read = models.reduce(0) { $0 + $1.cacheRead }
+        let prompt = models.reduce(0) { $0 + $1.input + $1.cacheWrite + $1.cacheRead }
+        guard prompt > 0, read > 0 else { return nil }
+        return Double(read) / Double(prompt)
     }
 }

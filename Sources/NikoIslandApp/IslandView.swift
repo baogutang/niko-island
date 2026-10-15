@@ -79,7 +79,7 @@ struct IslandBody: View {
 
 /// What the collapsed island says at a glance.
 struct IslandGlance: Equatable {
-    enum Tone { case idle, working, waiting, attention, done, failed }
+    enum Tone { case idle, working, waiting, attention, done, failed, warning }
     var source: String?
     var text: String
     var tone: Tone
@@ -90,7 +90,7 @@ struct IslandGlance: Equatable {
         if let toast = model.toast {
             source = toast.key.source
             text = toast.title
-            tone = toast.kind == .failed ? .failed : .done
+            tone = toast.kind == .failed ? .failed : toast.kind == .limitWarning ? .warning : .done
             count = 0
         } else if let request = model.pending.first {
             let session = model.sessions.first { $0.key == request.sessionKey }
@@ -126,6 +126,7 @@ struct IslandGlance: Equatable {
         case .attention: return Theme.amber
         case .done: return accent
         case .failed: return Theme.coral
+        case .warning: return Theme.amber
         }
     }
 }
@@ -199,6 +200,8 @@ struct CollapsedIsland: View {
             Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(look.accent)
         case .failed:
             Image(systemName: "exclamationmark").font(.system(size: 10, weight: .heavy)).foregroundStyle(Theme.coral)
+        case .warning:
+            Image(systemName: "gauge.with.dots.needle.67percent").font(.system(size: 10, weight: .bold)).foregroundStyle(Theme.amber)
         case .idle:
             Circle().fill(Theme.quaternary).frame(width: 5, height: 5)
         }

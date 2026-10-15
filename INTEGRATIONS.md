@@ -113,6 +113,8 @@ and, only when the user switches it on, the provider:
 | MiniMax (Coding Plan, 0.9.0) | `GET https://api.minimaxi.com/v1/api/openplatform/coding_plan/remains` (or `api.minimax.io`), `Bearer` | a key the user pastes, in the Keychain | `base_resp.status_code` 0, then `model_remains[]` where `model_name` is `general`: `current_interval_remaining_percent` + `end_time`, and the week only when `current_weekly_status` is 1 |
 | Google (Gemini CLI, 0.9.0) | `POST https://cloudcode-pa.googleapis.com/v1internal:loadCodeAssist`, then `…:retrieveUserQuota` with the project | Gemini CLI's own sign-in from `~/.gemini/oauth_creds.json` or the Keychain item `gemini-cli-oauth`, used only while unexpired and never renewed | `cloudaicompanionProject` (text or `{id}`), `currentTier.name`; `buckets[]` with `modelId`, `remainingFraction`, `resetTime`, grouped into Pro / Flash / Flash-Lite by the bucket with least left |
 
+| GitHub (Copilot, 0.10.0) | `GET https://api.github.com/copilot_internal/user`, `Authorization: token …` | the GitHub CLI's sign-in: `GH_TOKEN` / `GITHUB_TOKEN`, `oauth_token` for github.com in `~/.config/gh/hosts.yml`, else the Keychain item `gh:github.com` (`go-keyring-base64:` unwrapped) | `quota_snapshots` (`premium_interactions`, `chat`, `completions`) with `percent_remaining` (else `entitlement` and `remaining`), `quota_reset_at`; `unlimited` and `has_quota: false` counters are left out; `copilot_plan` |
+
 None of these endpoints is documented by its provider; the shapes are the ones several open-source tools read, and the OpenAI one was answered live once. See
 `Sources/NikoCore/Usage/ProviderLookups.swift`. ZCode's own stored sign-in is
 encrypted by ZCode and is not read.

@@ -286,6 +286,10 @@ struct SettingsPageView: View {
                           isOn: settingsBinding(\.jumpHotkey))
                 toggleRow(L("Stay quiet while the screen is locked or asleep"),
                           L("No sounds and no cards while nobody is there to notice. Requests still wait for you."), isOn: settingsBinding(\.quietWhenAway))
+                choiceRow(L("Give an unanswered request back to the agent"),
+                          L("After this long, a request still on the island goes back to the agent's own prompt, answered by nobody, so an agent is never stuck on a card you did not see."),
+                          options: NikoSettings.approvalWaitChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
+                          selection: settingsBinding(\.approvalWaitMinutes))
                 choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times, and a line goes to your phone if that is switched on. Not while the screen is locked."),
                           options: NikoSettings.reminderChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
                           selection: settingsBinding(\.reminderMinutes))
@@ -780,8 +784,12 @@ struct SettingsPageView: View {
                 if let note = lookupNote(ProviderLimitsClient.minimax) { lookupStatus(note, divider: true) }
                 toggleRow(L("Ask Google for my Gemini CLI quotas"),
                           L("Reads the sign-in Gemini CLI saved on this Mac (in ~/.gemini, or your Keychain: macOS may ask you first) and sends it to cloudcode-pa.googleapis.com, nowhere else, while it is still good. It is never renewed here: Gemini CLI does that the next time it runs. Asked every five minutes."),
-                          divider: lookupNote(ProviderLimitsClient.gemini) != nil, isOn: settingsBinding(\.geminiLimitsLookup))
-                if let note = lookupNote(ProviderLimitsClient.gemini) { lookupStatus(note, divider: false) }
+                          divider: true, isOn: settingsBinding(\.geminiLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.gemini) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask GitHub for my Copilot allowances"),
+                          L("Premium requests, chat and completions for the month. Reads the sign-in the GitHub CLI (gh) keeps on this Mac (in ~/.config/gh, or your Keychain: macOS may ask you first) and sends it to api.github.com, nowhere else. Asked every ten minutes."),
+                          divider: lookupNote(ProviderLimitsClient.copilot) != nil, isOn: settingsBinding(\.copilotLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.copilot) { lookupStatus(note, divider: false) }
             }
             card(L("Price list")) {
                 toggleRow(L("Refresh the model price list from the network (weekly)"),

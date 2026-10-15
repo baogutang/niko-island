@@ -235,3 +235,105 @@ public enum GeminiLogin {
         return .missing
     }
 }
+
+/// Copilot's monthly allowances, as GitHub tells its own editors: premium requests,
+/// chat messages, code completions. A counter that is unlimited, or not part of the
+/// plan, is left out.
+public enum CopilotQuotaAPI {
+    public static let url = URL(string: "https://api.github.com/copilot_internal/user")!
+
+    public static func request(token: String) -> URLRequest {
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 12)
+        request.setValue("token \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("2022-11-28", forHTTPHeaderField: "X-GitHub-Api-Version")
+        request.setValue("niko-island/\(NikoVersion.current)", forHTTPHeaderField: "User-Agent")
+        return request
+    }
+
+    static let order = ["premium_interactions", "chat", "completions"]
+
+    public static func parse(_ data: Data, now: Date = Date()) -> ProviderLimits? {
+        guard let root = try? JSONValue.parse(data), let snapshots = root["quota_snapshots"]?.objectValue else { return nil }
+        let fallbackReset = moment(root["quota_reset_date_utc"] ?? root["quota_reset_date"])
+        var windows: [RateLimitWindow] = []
+        let keys = snapshots.members.map(\.key).sorted { (order.firstIndex(of: $0) ?? 9, $0) < (order.firstIndex(of: $1) ?? 9, $1) }
+        for key in keys {
+            guard let item = snapshots[key], item["unlimited"]?.boolValue != true, item["has_quota"]?.boolValue != false else { continue }
+            var used: Double?
+            if let left = number(item["percent_remaining"]) {
+                used = 100 - left
+            } else if let total = number(item["entitlement"]), total > 0, let left = number(item["remaining"] ?? item["quota_remaining"]) {
+                used = (total - left) / total * 100
+            }
+            guard let used else { continue }
+            let name = key == "premium_interactions" ? "premium" : key
+            windows.append(RateLimitWindow(id: "copilot_" + name, usedPercent: percent(used),
+                                           resetsAt: moment(item["quota_reset_at"]) ?? fallbackReset))
+        }
+        guard !windows.isEmpty else { return nil }
+        return ProviderLimits(windows: windows, capturedAt: now, plan: root["copilot_plan"]?.stringValue, source: .provider)
+    }
+}
+
+/// The sign-in the GitHub CLI (`gh`) keeps: `oauth_token` for github.com in its
+/// `hosts.yml`, or its Keychain item (`gh:github.com`). Read only while the user's
+/// switch is on; used in memory and never written anywhere.
+public enum GitHubLogin {
+    public enum Outcome: Sendable, Equatable {
+        case found(String)
+        case missing
+        case denied
+    }
+
+    static let keychainService = "gh:github.com"
+
+    /// The `oauth_token` under the `github.com:` block of a `hosts.yml`.
+    public static func token(inHosts text: String) -> String? {
+        var inGitHub = false
+        for raw in text.components(separatedBy: "\n") {
+            let indented = raw.hasPrefix(" ") || raw.hasPrefix("\t")
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if !indented { inGitHub = line == "github.com:" || line == "\"github.com\":"; continue }
+            guard inGitHub, line.hasPrefix("oauth_token:") else { continue }
+            let value = line.dropFirst("oauth_token:".count).trimmingCharacters(in: .whitespaces)
+                .trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
+            if !value.isEmpty { return value }
+        }
+        return nil
+    }
+
+    /// The Keychain keeps it as written by gh's keyring library, sometimes base64-wrapped.
+    public static func unwrap(_ stored: String) -> String? {
+        let prefix = "go-keyring-base64:"
+        guard stored.hasPrefix(prefix) else { return stored.isEmpty ? nil : stored }
+        return Data(base64Encoded: String(stored.dropFirst(prefix.count))).flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    public static func read(home: URL, environment: [String: String] = ProcessInfo.processInfo.environment) -> Outcome {
+        for name in ["GH_TOKEN", "GITHUB_TOKEN"] {
+            if let token = environment[name], !token.isEmpty { return .found(token) }
+        }
+        let folder = environment["GH_CONFIG_DIR"].map(URL.init(fileURLWithPath:))
+            ?? environment["XDG_CONFIG_HOME"].map { URL(fileURLWithPath: $0).appendingPathComponent("gh") }
+            ?? home.appendingPathComponent(".config/gh")
+        if let text = try? String(contentsOf: folder.appendingPathComponent("hosts.yml"), encoding: .utf8),
+           let token = token(inHosts: text) {
+            return .found(token)
+        }
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: keychainService,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        var item: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &item)
+        if status == errSecSuccess, let data = item as? Data, let stored = String(data: data, encoding: .utf8),
+           let token = unwrap(stored) {
+            return .found(token)
+        }
+        if status == errSecUserCanceled || status == errSecAuthFailed || status == errSecInteractionNotAllowed { return .denied }
+        return .missing
+    }
+}

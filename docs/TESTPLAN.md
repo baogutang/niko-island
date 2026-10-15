@@ -450,6 +450,15 @@ is also a listening test: note anything harsh, too long or too quiet.
   `kill -9`; its row was gone within 20 s (0.9.1, development build,
   notifications on). A session found on disk for a desktop app that is not
   running (Kiro) went the same way.
+- ☐ General → "Give an unanswered request back to the agent": with 1 minute,
+  a permission request left alone leaves the island after a minute and the
+  agent asks in its own window; nothing was decided.
+- ☐ A request answered in Claude Code's own dialog leaves the island as soon
+  as the command has run.
+- ☐ Usage: after an hour of readings, a limit shows its pace ("… an hour") and
+  where it leads; a window crossing 90 % shows an amber notice once.
+- ☑ Usage: the last 24 hours and four weeks by weekday and hour draw from real
+  transcripts, with the cache hit rate beside the models (0.10.0, development build).
 - ☐ Agents: a connected agent says "last event …" once its hooks have fired,
   and "no event since Niko Island started" before that.
 - ☐ About → "Tell me when there is a new version": with an older build, the

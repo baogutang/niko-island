@@ -287,6 +287,18 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["jumpHotkey"] = .bool(newValue) }
     }
 
+    /// Minutes a permission request or question waits on the island before it goes back to the
+    /// agent's own prompt, answered by nobody. 0: it waits for as long as the agent does.
+    public static let approvalWaitChoices = [1, 3, 5, 10, 30, 60, 0]
+
+    public var approvalWaitMinutes: Int {
+        get {
+            let stored = raw["approvalWaitMinutes"]?.intValue ?? 10
+            return NikoSettings.approvalWaitChoices.contains(stored) ? stored : 10
+        }
+        set { raw["approvalWaitMinutes"] = .int(newValue) }
+    }
+
     /// Minutes a request may wait unanswered before the app speaks up again. 0: never.
     public static let reminderChoices = [0, 2, 5, 10]
 
@@ -329,6 +341,7 @@ public struct NikoSettings: Sendable, Equatable {
         case "kimi": return kimiLimitsLookup
         case "minimax": return minimaxLimitsLookup
         case "gemini": return geminiLimitsLookup
+        case "copilot": return copilotLimitsLookup
         default: return false
         }
     }
@@ -352,6 +365,12 @@ public struct NikoSettings: Sendable, Equatable {
             return ["cn", "global"].contains(value) ? value : "cn"
         }
         set { raw["minimaxRegion"] = .string(newValue) }
+    }
+
+    /// Ask GitHub about Copilot's monthly allowances, with the sign-in the GitHub CLI keeps.
+    public var copilotLimitsLookup: Bool {
+        get { bool("copilotLimitsLookup", default: false) }
+        set { raw["copilotLimitsLookup"] = .bool(newValue) }
     }
 
     /// Ask Google about Gemini CLI's daily quotas, with the sign-in Gemini CLI saved, while it is still good.

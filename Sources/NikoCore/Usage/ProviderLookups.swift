@@ -395,9 +395,11 @@ public actor ProviderLimitsClient {
         public var minimax = false
         public var minimaxRegion = MiniMaxQuotaAPI.Region.cn
         public var gemini = false
+        public var copilot = false
 
         public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false,
-                    kimi: Bool = false, minimax: Bool = false, minimaxRegion: MiniMaxQuotaAPI.Region = .cn, gemini: Bool = false) {
+                    kimi: Bool = false, minimax: Bool = false, minimaxRegion: MiniMaxQuotaAPI.Region = .cn, gemini: Bool = false,
+                    copilot: Bool = false) {
             self.claude = claude
             self.glm = glm
             self.glmRegion = glmRegion
@@ -406,6 +408,7 @@ public actor ProviderLimitsClient {
             self.minimax = minimax
             self.minimaxRegion = minimaxRegion
             self.gemini = gemini
+            self.copilot = copilot
         }
 
         public func asks(_ provider: String) -> Bool {
@@ -416,6 +419,7 @@ public actor ProviderLimitsClient {
             case ProviderLimitsClient.kimi: return kimi
             case ProviderLimitsClient.minimax: return minimax
             case ProviderLimitsClient.gemini: return gemini
+            case ProviderLimitsClient.copilot: return copilot
             default: return false
             }
         }
@@ -459,17 +463,20 @@ public actor ProviderLimitsClient {
         public var kimiKey: @Sendable () -> String?
         public var minimaxKey: @Sendable () -> String?
         public var geminiLogin: @Sendable () -> GeminiLogin.Outcome
+        public var githubLogin: @Sendable () -> GitHubLogin.Outcome
 
         public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?,
                     codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing },
                     kimiKey: @escaping @Sendable () -> String? = { nil }, minimaxKey: @escaping @Sendable () -> String? = { nil },
-                    geminiLogin: @escaping @Sendable () -> GeminiLogin.Outcome = { .missing }) {
+                    geminiLogin: @escaping @Sendable () -> GeminiLogin.Outcome = { .missing },
+                    githubLogin: @escaping @Sendable () -> GitHubLogin.Outcome = { .missing }) {
             self.claudeLogin = claudeLogin
             self.glmKey = glmKey
             self.codexLogin = codexLogin
             self.kimiKey = kimiKey
             self.minimaxKey = minimaxKey
             self.geminiLogin = geminiLogin
+            self.githubLogin = githubLogin
         }
 
         public static func system(home: URL) -> Secrets {
@@ -477,7 +484,8 @@ public actor ProviderLimitsClient {
                     codexLogin: { CodexLogin.read(home: home) },
                     kimiKey: { ProviderKeychain.read(ProviderLimitsClient.kimiAccount) },
                     minimaxKey: { ProviderKeychain.read(ProviderLimitsClient.minimaxAccount) },
-                    geminiLogin: { GeminiLogin.read(home: home) })
+                    geminiLogin: { GeminiLogin.read(home: home) },
+                    githubLogin: { GitHubLogin.read(home: home) })
         }
     }
 
@@ -494,12 +502,13 @@ public actor ProviderLimitsClient {
     public static let minimax = "minimax"
     public static let minimaxAccount = "minimax-coding-plan"
     public static let gemini = "gemini"
-    public static let providers = [claude, glm, codex, kimi, minimax, gemini]
+    public static let copilot = "copilot"
+    public static let providers = [claude, glm, codex, kimi, minimax, gemini, copilot]
     /// The only hosts a request may go to.
     public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
-                                            "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host]
+                                            "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host, "api.github.com"]
 
-    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300]
+    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300, copilot: 600]
     static let forcedInterval: TimeInterval = 30
 
     private let cacheFile: URL
@@ -573,6 +582,7 @@ public actor ProviderLimitsClient {
             case Self.kimi: result = await askKimi(now: now)
             case Self.minimax: result = await askMiniMax(now: now)
             case Self.gemini: result = await askGemini(now: now)
+            case Self.copilot: result = await askCopilot(now: now)
             default: result = await askCodex(now: now)
             }
             asking.remove(provider)
@@ -700,6 +710,23 @@ public actor ProviderLimitsClient {
             state = .loginExpired
         }
         if limits != nil, let plan = project.plan, plan.count <= 24 { limits?.plan = plan }
+        return Result(limits: limits, state: state, checkedAt: now)
+    }
+
+    private func askCopilot(now: Date) async -> Result {
+        let token: String
+        switch secrets.githubLogin() {
+        case .found(let found): token = found
+        case .missing: return Result(state: .noLogin, checkedAt: now)
+        case .denied: return Result(state: .denied, checkedAt: now)
+        }
+        // A sign-in GitHub turned down is not offered again until gh replaces it.
+        if refused[Self.copilot] == token { return Result(state: .loginExpired, checkedAt: now) }
+        var (state, limits) = await ask(CopilotQuotaAPI.request(token: token)) { CopilotQuotaAPI.parse($0, now: now) }
+        if state == .unauthorized {
+            refused[Self.copilot] = token
+            state = .loginExpired
+        }
         return Result(limits: limits, state: state, checkedAt: now)
     }
 

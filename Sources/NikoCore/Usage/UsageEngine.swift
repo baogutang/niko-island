@@ -450,6 +450,10 @@ public final class UsageEngine: @unchecked Sendable {
             let fiveHours = try store.totals(since: now.timeIntervalSince1970 - 5 * 3600)
             let month = try store.totals(since: now.timeIntervalSince1970 - 30 * 86_400)
             let perDay = try store.dailyTotalsByAgent(fromDay: first, toDay: today)
+            // The last day in quarter hours, and four weeks by weekday and hour, for the charts.
+            let quarterNow = Int(now.timeIntervalSince1970 / 900)
+            let quarterRows = try store.stretches(since: Double((quarterNow - 95) * 900), seconds: 900)
+            let hourRows = try store.stretches(since: now.timeIntervalSince1970 - 28 * 86_400, seconds: 3600)
             snapshot.sessions = try store.sessionTotals(since: now.timeIntervalSince1970 - 2 * 86_400)
 
             func usage(_ id: String) -> UsageSnapshot.AgentUsage {
@@ -468,6 +472,18 @@ public final class UsageEngine: @unchecked Sendable {
                 agent.limitsSource = limits[id]?.source
                 agent.plan = limits[id]?.plan
                 agent.resetsLeft = limits[id]?.resetsLeft
+                func tokens(_ row: [String: Int]?) -> Int {
+                    guard let row else { return 0 }
+                    return id == "all" ? row.values.reduce(0, +) : row[id] ?? 0
+                }
+                agent.quarters = (quarterNow - 95...quarterNow).map { tokens(quarterRows[$0]) }
+                var grid = Array(repeating: Array(repeating: 0, count: 24), count: 7)
+                for (hour, row) in hourRows {
+                    let date = Date(timeIntervalSince1970: TimeInterval(hour * 3600))
+                    let weekday = (calendar.component(.weekday, from: date) + 5) % 7   // Monday is 0
+                    grid[weekday][calendar.component(.hour, from: date)] += tokens(row)
+                }
+                agent.weekHours = grid
                 return agent
             }
             var ids = Set(snapshot.week.map(\.agent)).union(fiveHours.map(\.agent)).union(limits.keys)

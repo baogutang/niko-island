@@ -404,14 +404,20 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertNil(model.completion)
 
         // One warning when a window crosses 90 %, none while it stays there.
+        model.dismissToast()
         var usage = UsageSnapshot()
-        usage.rateLimits = [RateLimitWindow(id: "five_hour", usedPercent: 60, resetsAt: nil)]
+        var claude = UsageSnapshot.AgentUsage(id: "claude")
+        claude.limits = [RateLimitWindow(id: "five_hour", usedPercent: 60, resetsAt: Date().addingTimeInterval(3 * 3600))]
+        usage.agents = [UsageSnapshot.AgentUsage(id: "all"), claude]
         model.usage = usage
-        usage.rateLimits[0].usedPercent = 93
+        usage.agents[1].limits[0].usedPercent = 93
         model.usage = usage
-        usage.rateLimits[0].usedPercent = 96
+        usage.agents[1].limits[0].usedPercent = 96
         model.usage = usage
         XCTAssertEqual(sounds.played.filter { $0 == .limit }.count, 1)
+        XCTAssertEqual(model.toast?.kind, .limitWarning)
+        XCTAssertEqual(model.toast?.title, "Claude Code: 5-hour limit 93% used")
+        XCTAssertEqual(IslandGlance(model: model).tone, .warning)
     }
 
     func testRepeatedCuesAreThrottled() {
@@ -1006,8 +1012,10 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         model.noteLimitResets(now: now.addingTimeInterval(700))
         XCTAssertNil(model.toast)
 
-        // Used up. Before the reset: silence. At the reset: once.
+        // Used up: said as it happens, then silence until the reset, and at the reset once.
         model.usage = usage(fiveHour: 100, weekly: 18)
+        XCTAssertEqual(model.toast?.kind, .limitWarning)
+        model.dismissToast()
         model.noteLimitResets(now: now.addingTimeInterval(300))
         XCTAssertNil(model.toast)
         sounds.played = []
@@ -1023,6 +1031,7 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
 
         // Two windows used up: the agent can only work again when both have opened.
         model.usage = usage(fiveHour: 100, weekly: 100, fiveHourResets: 900, weeklyResets: 1800)
+        model.dismissToast()
         model.noteLimitResets(now: now.addingTimeInterval(901))
         XCTAssertNil(model.toast, "the week is still full")
         model.noteLimitResets(now: now.addingTimeInterval(1801))
@@ -1669,5 +1678,61 @@ extension AppModelTests {
         model.refreshWiringAfterUpdate(isBundled: true)
         try await Task.sleep(nanoseconds: 300_000_000)
         XCTAssertNil(model.settings.lastWiredVersion)
+    }
+}
+
+// MARK: - Requests that are settled elsewhere, or left waiting
+
+extension AppModelTests {
+    func testARequestAnsweredInTheAgentsOwnDialogLeavesTheIsland() async throws {
+        async let asked = bridge(event("PermissionRequest", tool: "Bash", command: "rm -rf build"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        // Another call of the same session ran: not this one.
+        _ = await bridge(event("PostToolUse", tool: "Bash", command: "ls"))
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(model.pending.count, 1)
+        // The call it asked about ran: it was allowed in the agent's own dialog.
+        _ = await bridge(event("PostToolUse", tool: "Bash", command: "rm -rf build"))
+        let gone = await eventually { self.model.pending.isEmpty }
+        XCTAssertTrue(gone)
+        let output = await asked
+        XCTAssertEqual(output.status, 0)
+        XCTAssertEqual(output.stdout, "", "the hook is let go without a decision")
+        XCTAssertEqual(model.sessions.first?.phase, .working)
+    }
+
+    func testATurnThatEndedTakesItsRequestsAlong() async throws {
+        async let asked = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        _ = await bridge(event("Stop"))
+        let gone = await eventually { self.model.pending.isEmpty }
+        XCTAssertTrue(gone)
+        let output = await asked
+        XCTAssertEqual(output.stdout, "")
+    }
+
+    func testAnUnansweredRequestGoesBackToTheAgent() async throws {
+        XCTAssertEqual(NikoSettings().approvalWaitMinutes, 10)
+        async let asked = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        model.handBackOverdueRequests(now: Date().addingTimeInterval(9 * 60))
+        XCTAssertEqual(model.pending.count, 1, "not yet")
+        model.handBackOverdueRequests(now: Date().addingTimeInterval(11 * 60))
+        XCTAssertTrue(model.pending.isEmpty)
+        let output = await asked
+        XCTAssertEqual(output.stdout, "", "answered by nobody")
+        XCTAssertEqual(model.sessions.first?.phase, .needsAttention, "the agent asks in its own window now")
+
+        model.settings.approvalWaitMinutes = 0
+        async let again = bridge(event("PermissionRequest", tool: "Bash"))
+        let shownAgain = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shownAgain)
+        model.handBackOverdueRequests(now: Date().addingTimeInterval(86_400))
+        XCTAssertEqual(model.pending.count, 1, "never, when asked never to")
+        model.decide(model.pending[0].id, .allowOnce)
+        _ = await again
     }
 }

@@ -110,6 +110,15 @@ to what turned up when somebody did.
 | The first count of a large transcript collection | Peak memory of the counting process from 91 MB to 48 MB (resident 211 MB to 125 MB) and 30 s to 18 s on a few gigabytes of real transcripts |
 | When each connected agent was last heard from | Built; shown in Settings → Agents |
 
+## Released: 0.10.0
+
+| Area | State |
+|---|---|
+| Pace, outlook and warnings for plan limits (ideas from agent-hud-open) | Built and covered by tests with stand-in readings; the outlook appears once the app has an hour of readings, the warnings were not waited for on a real plan |
+| An unanswered request goes back to the agent after a while; one answered in the agent's own window leaves | Built and covered by tests with the real bridge binary |
+| The last 24 hours, four weeks by weekday and hour, cache hits | Built; seen with real transcripts in a development build |
+| Copilot's allowances | Built and covered by tests with a recorded shape; the endpoint was checked through `gh` (field names only), the app's own lookup was not run (it would read gh's Keychain item) |
+
 ## Next
 
 Everything below needs something only the owner of a Mac can give, or hardware

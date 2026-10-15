@@ -63,7 +63,7 @@ public final class AppModel: ObservableObject {
 
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
-        public enum Kind: Sendable { case completed, failed, limitReset }
+        public enum Kind: Sendable { case completed, failed, limitReset, limitWarning }
         public var key: SessionKey
         public var title: String
         public var kind: Kind
@@ -272,7 +272,10 @@ public final class AppModel: ObservableObject {
         pruneTimer = timer
         let goneTimer = Timer(timeInterval: 15, repeats: true) { [weak self] _ in
             guard let self else { return }
-            MainActor.assumeIsolated { self.endGoneSessions() }
+            MainActor.assumeIsolated {
+                self.handBackOverdueRequests()
+                self.endGoneSessions()
+            }
         }
         RunLoop.main.add(goneTimer, forMode: .common)
         self.goneTimer = goneTimer
@@ -547,6 +550,11 @@ public final class AppModel: ObservableObject {
         let event = delivery.event
         let change = store.apply(event, evidence: delivery.evidence, now: now)
         if lastHeard[event.source].map({ now.timeIntervalSince($0) >= 20 }) ?? true { lastHeard[event.source] = now }
+        // Answered in the agent's own dialog: the agent goes on, but leaves our hook waiting.
+        for request in pending where event.settles(request.event) {
+            request.replier.send(ReplyBuilder.line(for: .passToTerminal, event: request.event))
+            requestWithdrawn(request.id, resolving: false)
+        }
 
         if let replier = delivery.replier {
             if grants.covers(event) {
@@ -643,12 +651,22 @@ public final class AppModel: ObservableObject {
         soundPlayer?.play(event)
     }
 
-    /// One warning when a rate-limit window crosses 90 %.
+    /// Every reading of a plan window goes into the watch; a window crossing 90 %, or running
+    /// out before its reset at the pace of late, is said once per cycle.
     private func noteRateLimits(previous: UsageSnapshot) {
-        let threshold = 90.0
-        let before = previous.rateLimits.map(\.usedPercent).max() ?? 0
-        let after = usage.rateLimits.map(\.usedPercent).max() ?? 0
-        if after >= threshold, before < threshold { play(.limit) }
+        let now = Date()
+        var alerts: [QuotaWatch.Alert] = []
+        for agent in usage.agents where agent.id != "all" {
+            for window in agent.limits {
+                alerts += quotaWatch.record(agent: agent.id, window: window, at: agent.limitsCapturedAt ?? now, now: now)
+            }
+        }
+        if now.timeIntervalSince(quotaSavedAt) > 300 {
+            quotaSavedAt = now
+            let watch = quotaWatch, file = paths.cache.appendingPathComponent("quota-history.json")
+            DispatchQueue.global(qos: .utility).async { watch.save(to: file) }
+        }
+        for alert in alerts { warn(alert) }
         // A window that is used up is remembered with the time it opens again.
         for agent in usage.agents where agent.id != "all" {
             for window in agent.limits where window.usedPercent >= 99.5 {
@@ -659,8 +677,45 @@ public final class AppModel: ObservableObject {
         }
     }
 
+    /// The pace a window has been used at lately, and where it leads.
+    func outlook(agent: String, window: RateLimitWindow) -> QuotaOutlook? {
+        quotaWatch.outlook(agent: agent, window: window)
+    }
+
+    private func warn(_ alert: QuotaWatch.Alert) {
+        let title: String
+        let agent: String
+        switch alert {
+        case .nearlyFull(let who, let window):
+            agent = who
+            title = L("%@: %@ %lld%% used", AgentRegistry.displayName(for: who), LimitWords.name(window), Int(window.usedPercent.rounded()))
+        case .runsOutEarly(let who, let window, let at):
+            agent = who
+            title = L("%@: %@ runs out in about %@", AgentRegistry.displayName(for: who), LimitWords.name(window),
+                      LimitWords.span(max(60, at.timeIntervalSinceNow.wholeSeconds)))
+        }
+        log.info("plan limit warning for \(agent)")
+        play(.limit)
+        if settings.pushEnabled, hasPushKey, !settings.isQuiet(at: Date()), !settings.pushOnlyWhenAway || isAway {
+            send(PushMessage(title: AgentRegistry.displayName(for: agent), body: title), subject: "limit/" + agent)
+        }
+        guard !isExpanded, !(isAway && settings.quietWhenAway) else { return }
+        // A finished turn's card or a request matters more than this.
+        guard completion == nil, pending.isEmpty else { return }
+        toast = Toast(key: SessionKey(source: agent, sessionID: ""), title: title, kind: .limitWarning)
+        toastTask?.cancel()
+        toastTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            self?.toast = nil
+        }
+    }
+
     /// Windows that were used up, with the agent and the time they open again.
     private var fullWindows: [String: (agent: String, resets: Date)] = [:]
+    /// Readings of each plan window, for its pace (kept between launches: percentages and times only).
+    private lazy var quotaWatch = QuotaWatch.load(from: paths.cache.appendingPathComponent("quota-history.json"))
+    private var quotaSavedAt = Date.distantPast
     /// Limits that opened again while nobody was at the screen.
     private var resetsWhileAway: [String] = []
 
@@ -971,16 +1026,30 @@ public final class AppModel: ObservableObject {
         toast = nil
     }
 
-    private func requestWithdrawn(_ id: UInt64) {
+    /// `resolving`: the session is no longer waiting on the user (false when the event that
+    /// settled the request has already said what the session does now, or the agent asks anew).
+    private func requestWithdrawn(_ id: UInt64, resolving: Bool = true) {
         guard let index = pending.firstIndex(where: { $0.id == id }) else { return }
         let request = pending.remove(at: index)
         if focusedRequestID == id { focusedRequestID = nil }
         if pending.isEmpty, expandReason == .attention { collapse() }
         if !pending.contains(where: { $0.sessionKey == request.sessionKey }) {
-            store.resolveAttention(request.sessionKey, activity: .thinking)
+            if resolving { store.resolveAttention(request.sessionKey, activity: .thinking) }
             notifier?.clear(session: request.sessionKey)
         }
         publish()
+    }
+
+    /// A request nobody answered within Settings' wait goes back to the agent's own prompt,
+    /// answered by nobody. The row keeps saying that the agent needs permission.
+    func handBackOverdueRequests(now: Date = Date()) {
+        let minutes = settings.approvalWaitMinutes
+        guard minutes > 0 else { return }
+        for request in pending where now.timeIntervalSince(request.receivedAt) >= TimeInterval(minutes * 60) {
+            request.replier.send(ReplyBuilder.line(for: .passToTerminal, event: request.event))
+            log.info("request handed back to \(request.sessionKey.source) after \(minutes) min")
+            requestWithdrawn(request.id, resolving: false)
+        }
     }
 
     private func publish() {

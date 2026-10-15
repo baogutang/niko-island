@@ -78,6 +78,7 @@ public final class UsageStore {
       reasoning_tokens INTEGER NOT NULL,
       estimated_cost REAL NOT NULL, cost_source TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS events_day ON events(day);
+    CREATE INDEX IF NOT EXISTS events_ts ON events(ts);
     """
 
     var db: SQLiteDB

@@ -271,7 +271,7 @@ final class DocsTests: XCTestCase {
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
         XCTAssertFalse(NikoSettings().codexLimitsLookup)
         XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
-                                                    "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com"])
+                                                    "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com", "api.github.com"])
         XCTAssertFalse(NikoSettings().kimiLimitsLookup || NikoSettings().minimaxLimitsLookup || NikoSettings().geminiLimitsLookup)
         XCTAssertFalse(NikoSettings().updateChecks, "the pages say the version check is off until switched on")
         XCTAssertEqual(UpdateCheck.latest.host, "api.github.com")

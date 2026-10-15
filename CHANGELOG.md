@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.10.0] - 2026-10-15
+
+Ideas from agent-hud-open (Apache-2.0), rebuilt here in this project's own code.
+
+### Added
+- **A warning before a plan runs out.** Every reading of a plan's limits is
+  kept (percentages and times only) to tell how fast it is being used: over
+  the last hour of a five-hour window, the last day of a weekly one. The
+  island says it once per cycle when a window crosses 90 %, or when, at the
+  pace of late, it would run out before it resets; with a cue, and to your
+  phone if that is on. Nothing is said about readings that were already there
+  when the app started, or that are more than half an hour old.
+- **The pace under each limit**: so many percent an hour, and either "runs
+  out in about 1h 20m, before the reset" or "about 64 % by the reset", with
+  the bar showing where the pace leads. Limits are coloured by how full they
+  are: under 70 %, from 70 %, from 90 %.
+- **A request you did not answer goes back to the agent** after 10 minutes
+  (Settings → General; 1 to 60 minutes, or never), answered by nobody, so an
+  agent is never stuck behind a card you did not see.
+- **The last 24 hours in quarter hours, and four weeks by weekday and hour**,
+  in the usage view, with the cache hit rate of the last seven days.
+- **Copilot's monthly allowances** (premium requests, chat, completions),
+  off until switched on, with the sign-in the GitHub CLI keeps, sent only to
+  `api.github.com`.
+
+### Fixed
+- **A request answered in the agent's own dialog stays on the island.**
+  Claude Code shows its own prompt next to the hook and, once it is answered
+  there, leaves the hook waiting. The island now lets such a request go as
+  soon as the session reports that very call (same tool, same input) as done,
+  or its turn as over, and the hook ends without a decision.
+
 ## [0.9.1] - 2026-10-14
 
 ### Fixed

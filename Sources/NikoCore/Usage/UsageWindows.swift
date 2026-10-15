@@ -19,6 +19,18 @@ extension UsageStore {
         }
     }
 
+    /// Tokens per agent in stretches of `seconds` (counted from 1970), since `timestamp`:
+    /// stretch → agent → tokens.
+    public func stretches(since timestamp: Double, seconds: Int) throws -> [Int: [String: Int]] {
+        let rows = try db.query("""
+            SELECT CAST(ts / ? AS INTEGER), agent, SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens)
+            FROM events WHERE ts >= ? GROUP BY 1, 2
+            """, [.integer(Int64(seconds)), .real(timestamp)])
+        var out: [Int: [String: Int]] = [:]
+        for row in rows { out[row[0].intValue, default: [:]][row[1].stringValue ?? ""] = row[2].intValue }
+        return out
+    }
+
     /// Tokens and cost per agent and day.
     public func dailyTotalsByAgent(fromDay: String, toDay: String) throws -> [String: [String: (tokens: Int, cost: Double)]] {
         let rows = try db.query("""
