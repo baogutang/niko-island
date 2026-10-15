@@ -8,7 +8,7 @@ import Carbon.HIToolbox
 @MainActor
 final class Hotkey {
     enum Key: UInt32, CaseIterable {
-        case toggle = 1, allow, deny, jump
+        case toggle = 1, allow, deny, jump, switcher
 
         var code: Int {
             switch self {
@@ -16,6 +16,7 @@ final class Hotkey {
             case .allow: return kVK_ANSI_A
             case .deny: return kVK_ANSI_D
             case .jump: return kVK_ANSI_J
+            case .switcher: return kVK_ANSI_S
             }
         }
 
@@ -25,6 +26,7 @@ final class Hotkey {
             case .allow: return "⌃⌥A"
             case .deny: return "⌃⌥D"
             case .jump: return "⌃⌥J"
+            case .switcher: return "⌃⌥S"
             }
         }
     }

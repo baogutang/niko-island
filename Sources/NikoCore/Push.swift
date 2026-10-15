@@ -53,8 +53,28 @@ public enum PushRequest {
         return octets[0] == 10 || (octets[0] == 192 && octets[1] == 168) || (octets[0] == 172 && (16...31).contains(octets[1]))
     }
 
-    /// `key` is Bark's device key or ntfy's topic.
-    public static func make(server: String, service: PushService, key: String, message: PushMessage) -> URLRequest? {
+    /// How a server of one's own is signed in to: "user:password" (basic auth, Bark or ntfy
+    /// behind a password) or an access token (ntfy's "tk_…"). Sent only to a server the user
+    /// typed in, never to the services' public ones.
+    static func authorization(_ signIn: String?, server: String) -> String? {
+        guard let signIn = signIn?.trimmingCharacters(in: .whitespacesAndNewlines), !signIn.isEmpty,
+              !server.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
+        if signIn.contains(":") { return "Basic " + Data(signIn.utf8).base64EncodedString() }
+        return "Bearer " + signIn
+    }
+
+    /// The sign-in written into a server address ("https://user:pass@host"), and the address without it.
+    public static func splitSignIn(_ server: String) -> (server: String, signIn: String)? {
+        guard var parts = URLComponents(string: server.trimmingCharacters(in: .whitespacesAndNewlines)),
+              let user = parts.user, !user.isEmpty else { return nil }
+        let signIn = user + ":" + (parts.password ?? "")
+        parts.user = nil
+        parts.password = nil
+        return parts.string.map { ($0, signIn) }
+    }
+
+    /// `key` is Bark's device key or ntfy's topic; `signIn` is for a server of one's own.
+    public static func make(server: String, service: PushService, key: String, signIn: String? = nil, message: PushMessage) -> URLRequest? {
         let secret = key.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !secret.isEmpty, let url = endpoint(server: server, service: service) else { return nil }
         var body = JSONObject()
@@ -74,6 +94,7 @@ public enum PushRequest {
         request.httpBody = JSONValue.object(body).serializedData(.compact)
         request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         request.setValue("niko-island/\(NikoVersion.current)", forHTTPHeaderField: "User-Agent")
+        if let authorization = authorization(signIn, server: server) { request.setValue(authorization, forHTTPHeaderField: "Authorization") }
         return request
     }
 }
@@ -93,18 +114,23 @@ public actor PushClient {
 
     /// The Keychain account the key is kept under.
     public static let account = "push-key"
+    /// The Keychain account of the sign-in to a server of one's own.
+    public static let signInAccount = "push-sign-in"
     /// The same thing is not said twice within this many seconds.
     static let repeatAfter: TimeInterval = 30
 
     private let transport: Transport
     private let key: @Sendable () -> String?
+    private let signIn: @Sendable () -> String?
     private let clock: @Sendable () -> Date
     private var lastSent: [String: Date] = [:]
 
     public init(transport: Transport? = nil, key: @escaping @Sendable () -> String? = { ProviderKeychain.read(PushClient.account) },
+                signIn: @escaping @Sendable () -> String? = { ProviderKeychain.read(PushClient.signInAccount) },
                 clock: @escaping @Sendable () -> Date = { Date() }) {
         self.transport = transport ?? PushClient.network
         self.key = key
+        self.signIn = signIn
         self.clock = clock
     }
 
@@ -117,7 +143,10 @@ public actor PushClient {
             lastSent[subject] = now
             lastSent = lastSent.filter { now.timeIntervalSince($0.value) < 600 }
         }
-        guard let key = key(), let request = PushRequest.make(server: server, service: service, key: key, message: message) else { return .notSetUp }
+        let signIn = server.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : self.signIn()
+        guard let key = key(), let request = PushRequest.make(server: server, service: service, key: key, signIn: signIn, message: message) else {
+            return .notSetUp
+        }
         do {
             let (_, status) = try await transport(request)
             return (200..<300).contains(status) ? .sent : .refused(status)

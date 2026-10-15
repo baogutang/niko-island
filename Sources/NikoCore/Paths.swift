@@ -79,6 +79,8 @@ public struct NikoPaths: Sendable, Equatable {
     public var bridgeCache: URL { bin.appendingPathComponent(".bridge-cache") }
     public var bridgeMiss: URL { bin.appendingPathComponent(".bridge-miss") }
     public var settingsFile: URL { root.appendingPathComponent("settings.json") }
+    /// The agents the user connected, kept by the installer (see `ConnectedAgents`).
+    public var connectedAgentsFile: URL { root.appendingPathComponent("connected-agents.json") }
     public var logFile: URL { logs.appendingPathComponent("niko-island.log") }
 
     public var allDirectories: [URL] { [root, bin, run, cache, data, usageDir, logs] }

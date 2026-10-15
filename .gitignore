@@ -7,3 +7,6 @@ build/
 *.log
 .swiftpm/
 .claude/
+.rea-evidence/
+# Competitive study notes: local reference only, never published
+docs/reference/

@@ -35,6 +35,9 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         attentionRequests = 0
         model.jumpHandler = { [weak self] session in self?.jumps.append(session.key) }
         model.onAttentionNeeded = { [weak self] in self?.attentionRequests += 1 }
+        // The bridge runs under whatever app runs the tests, often the one in front: as far as
+        // the tests know, nothing is (a test that cares sets it).
+        model.frontmostApp = { nil }
         XCTAssertTrue(model.start(usage: false))
     }
 
@@ -1734,5 +1737,197 @@ extension AppModelTests {
         XCTAssertEqual(model.pending.count, 1, "never, when asked never to")
         model.decide(model.pending[0].id, .allowOnce)
         _ = await again
+    }
+}
+
+// MARK: - Staying out of the way (0.11)
+
+extension AppModelTests {
+    func testHiddenSessionsAreNotListedAndTheirRequestsGoBackToTheAgent() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        _ = await bridge(event("UserPromptSubmit", extra: ",\"prompt\":\"nightly eval run 42\""))
+        let listed = await eventually { self.model.sessions.count == 1 }
+        XCTAssertTrue(listed)
+        // The live preview in Settings counts what a rule would hide before it is added.
+        XCTAssertEqual(model.sessionsMatching(folder: "/tmp/demo-project"), 1)
+        XCTAssertEqual(model.sessionsMatching(folder: "/tmp/demo"), 0, "a folder rule is a folder, not a prefix of a name")
+        XCTAssertEqual(model.sessionsMatching(prompt: "EVAL RUN"), 1, "case does not matter")
+        XCTAssertEqual(model.listedFolders, ["/tmp/demo-project"])
+
+        model.hideSessions(inFolder: "/tmp/demo-project")
+        XCTAssertTrue(model.sessions.isEmpty, "hidden at once")
+        sounds.played = []
+        let output = await bridge(event("PermissionRequest", tool: "Bash"))
+        XCTAssertEqual(output.status, 0)
+        XCTAssertEqual(output.stdout, "", "left to the agent's own prompt")
+        XCTAssertTrue(model.pending.isEmpty)
+        XCTAssertFalse(model.isExpanded)
+        XCTAssertTrue(sounds.played.isEmpty)
+        XCTAssertTrue(notifier.notes.isEmpty)
+
+        model.settings.silencedFolders = []
+        XCTAssertEqual(model.sessions.count, 1, "back as soon as the rule goes")
+        model.settings.silencedPrompts = ["eval run"]
+        XCTAssertTrue(model.sessions.isEmpty, "a prompt rule hides it as well")
+    }
+
+    func testQuietNowKeepsTheIslandShutAndSilentButTheRequestWaits() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        model.setQuietNow(minutes: 60)
+        XCTAssertTrue(model.settings.isQuietNow(at: Date()))
+        XCTAssertFalse(model.settings.isQuietNow(at: Date().addingTimeInterval(3700)), "it ends by itself")
+        async let asked = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown, "the request still waits on the island")
+        XCTAssertFalse(model.isExpanded)
+        XCTAssertTrue(sounds.played.isEmpty)
+        model.setQuietNow(minutes: 0)
+        XCTAssertFalse(model.settings.isQuietNow(at: Date()))
+        model.decide(model.pending[0].id, .deny)
+        _ = await asked
+
+        // From a link: at most a day, and off again.
+        model.follow(.quiet(minutes: nil))
+        XCTAssertEqual(model.settings.quietNowUntil - Date().timeIntervalSince1970, 86_400, accuracy: 5)
+        model.setQuietNow(minutes: Int.max)
+        XCTAssertEqual(model.settings.quietNowUntil - Date().timeIntervalSince1970, 86_400, accuracy: 5)
+        model.follow(.quietOff)
+        XCTAssertEqual(model.settings.quietNowUntil, 0)
+    }
+
+    func testTheIslandDoesNotOpenOverTheAgentsOwnWindow() async throws {
+        terminalEnvironment = ["__CFBundleIdentifier": "com.apple.Terminal", "TERM_PROGRAM": "Apple_Terminal"]
+        model.frontmostApp = { "com.apple.Terminal" }
+        async let asked = bridge(event("PermissionRequest", tool: "Bash"))
+        let shown = await eventually { self.model.pending.count == 1 }
+        XCTAssertTrue(shown)
+        XCTAssertFalse(model.isExpanded, "its terminal is in front: the user is looking at it")
+        XCTAssertEqual(IslandGlance(model: model).tone, .attention, "the closed island still says so")
+        // Another app in front: the reminder opens it as usual.
+        model.frontmostApp = { "com.apple.Safari" }
+        model.settings.reminderMinutes = 5
+        model.remindAboutWaiting(now: model.pending[0].receivedAt.addingTimeInterval(301))
+        XCTAssertTrue(model.isExpanded)
+        model.decide(model.pending[0].id, .deny)
+        _ = await asked
+
+        model.settings.notOverAgentWindow = false
+        model.collapse()
+        model.frontmostApp = { "com.apple.Terminal" }
+        async let again = bridge(event("PermissionRequest", tool: "Bash"))
+        let opened = await eventually { self.model.isExpanded }
+        XCTAssertTrue(opened, "switched off: it opens whatever is in front")
+        model.decide(model.pending[0].id, .deny)
+        _ = await again
+    }
+
+    func testABurstOfPromptsIsOneCue() {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        model.settings.setSound(true, for: .started)
+        let t0 = Date()
+        for step in 0..<6 { model.play(.started, now: t0.addingTimeInterval(Double(step) * 0.8)) }
+        XCTAssertEqual(sounds.played, [.started], "a script starting six sessions is one cue")
+        model.play(.started, now: t0.addingTimeInterval(30))
+        model.play(.started, now: t0.addingTimeInterval(36))
+        XCTAssertEqual(sounds.played, [.started, .started, .started], "two prompts typed by hand are two")
+    }
+
+    func testAFinishedTurnNobodyLookedAtIsBroughtUpOnce() async throws {
+        let sounds = RecordingSoundPlayer()
+        model.soundPlayer = sounds
+        model.settings.soundsEnabled = true
+        model.settings.reminderMinutes = 5
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        let idle = await eventually { self.model.sessions.first?.phase == .waiting }
+        XCTAssertTrue(idle)
+        let finished = Date()
+        sounds.played = []
+        model.remindAboutUnread(now: finished.addingTimeInterval(400))
+        XCTAssertTrue(sounds.played.isEmpty, "off unless asked for")
+        model.settings.remindUnread = true
+        model.remindAboutUnread(now: finished.addingTimeInterval(200))
+        XCTAssertTrue(sounds.played.isEmpty, "not yet")
+        model.remindAboutUnread(now: finished.addingTimeInterval(400))
+        XCTAssertEqual(sounds.played, [.completed])
+        model.remindAboutUnread(now: finished.addingTimeInterval(4000))
+        XCTAssertEqual(sounds.played, [.completed], "once")
+
+        // Going to the session reads it.
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await bridge(event("Stop"))
+        _ = await eventually { self.model.sessions.first?.phase == .waiting }
+        model.jump(to: key)
+        sounds.played = []
+        model.remindAboutUnread(now: Date().addingTimeInterval(400))
+        XCTAssertTrue(sounds.played.isEmpty)
+    }
+
+    func testARuleTheUserWroteDecidesWhereAJumpGoes() async throws {
+        var opened: [URL] = []
+        model.openLink = { opened.append($0); return true }
+        _ = await bridge(event("UserPromptSubmit"))
+        _ = await eventually { self.model.sessions.count == 1 }
+        model.jump(to: key)
+        XCTAssertEqual(jumps, [key], "no rule: the terminal")
+        XCTAssertTrue(opened.isEmpty)
+        model.settings.jumpRules = [JumpRule(match: "codex", url: "codex://x"), JumpRule(match: "Claude Code", url: "vscode://file{cwd}")]
+        model.jump(to: key)
+        XCTAssertEqual(opened.map(\.absoluteString), ["vscode://file/tmp/demo-project"])
+        XCTAssertEqual(jumps, [key], "the link went instead")
+        // A link the system cannot open falls back to the terminal.
+        model.openLink = { _ in false }
+        model.jump(to: key)
+        XCTAssertEqual(jumps, [key, key])
+    }
+
+    func testOnlyTheInstalledAppPutsHooksBack() async throws {
+        ConnectedAgents.save(["claude"], paths: model.paths)
+        // A test's runtime folder is never the standard one: nothing is rewritten, nothing is said.
+        model.restoreRemovedHooks(isBundled: true)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertNil(model.toast)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: scratch.file("home/.claude/settings.json").path))
+    }
+
+    func testRemovedHooksReturnOnlyForRememberedAgentsAndRespectBackoff() async throws {
+        // Model an installed app while keeping every file inside this test's private tree.
+        let home = scratch.file("home")
+        let settingsFile = scratch.file("home/.claude/settings.json")
+        scratch.write("home/.claude/settings.json", "{\"model\":\"opus\"}")
+        scratch.write("home/.codex/config.toml", "model = \"example\"\n")
+        let installedPaths = NikoPaths(root: scratch.paths.root, isDefaultLocation: true)
+        let installed = AppModel(paths: installedPaths, home: home, log: .inMemory())
+        defer { installed.stop() }
+        ConnectedAgents.save(["claude"], paths: installedPaths)
+        let now = Date()
+        installed.restoreRemovedHooks(now: now, isBundled: true)
+        let restored = await eventually {
+            (try? String(contentsOf: settingsFile, encoding: .utf8).contains("niko-bridge")) == true
+                && !installed.restoreRunning
+        }
+        XCTAssertTrue(restored)
+        let saved = try String(contentsOf: settingsFile, encoding: .utf8)
+        XCTAssertTrue(saved.contains("opus"), "foreign settings survive a repair")
+        XCTAssertEqual(try String(contentsOf: scratch.file("home/.codex/config.toml"), encoding: .utf8), "model = \"example\"\n",
+                       "an agent the user never connected is left alone")
+
+        scratch.write("home/.claude/settings.json", "{\"model\":\"opus\"}")
+        installed.restoreRemovedHooks(now: now.addingTimeInterval(121), isBundled: true)
+        let checked = await eventually { !installed.restoreRunning }
+        XCTAssertTrue(checked)
+        XCTAssertFalse(try String(contentsOf: settingsFile, encoding: .utf8).contains("niko-bridge"), "ten-minute repair backoff")
+        installed.restoreRemovedHooks(now: now.addingTimeInterval(601), isBundled: true)
+        let restoredAgain = await eventually {
+            (try? String(contentsOf: settingsFile, encoding: .utf8).contains("niko-bridge")) == true
+                && !installed.restoreRunning
+        }
+        XCTAssertTrue(restoredAgain)
     }
 }

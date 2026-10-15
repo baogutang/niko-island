@@ -20,16 +20,27 @@ trap 'rm -rf "$WORK"' EXIT
 "$BIN" internal render-icon "$WORK/AppIcon.iconset"
 iconutil -c icns "$WORK/AppIcon.iconset" -o "$ROOT/Assets/AppIcon.icns"
 
+# The search field is an AppKit control: ImageRenderer cannot draw it. Keep the
+# native-window capture with sample sessions when regenerating the SwiftUI art.
+if [ -f "$ROOT/docs/images/island-quick-switcher.png" ]; then
+    cp "$ROOT/docs/images/island-quick-switcher.png" "$WORK/island-quick-switcher.png"
+fi
 rm -rf "$ROOT/docs/images"
 mkdir -p "$ROOT/docs/images"
 cp "$WORK/AppIcon.iconset/icon_256x256.png" "$ROOT/docs/images/icon.png"
 "$BIN" internal render-preview "$ROOT/docs/images" -AppleLanguages "(en)" >/dev/null
+if [ -f "$WORK/island-quick-switcher.png" ]; then
+    cp "$WORK/island-quick-switcher.png" "$ROOT/docs/images/island-quick-switcher.png"
+fi
 
 mkdir -p "$ROOT/website/mascots"
 cp "$WORK/AppIcon.iconset/icon_128x128@2x.png" "$ROOT/website/icon.png"
 for image in island-sessions island-question island-usage island-settings-sounds island-settings-island island-onboarding island-onboarding-agents; do
     cp "$ROOT/docs/images/$image.png" "$ROOT/website/$image.png"
 done
+if [ -f "$ROOT/docs/images/island-quick-switcher.png" ]; then
+    cp "$ROOT/docs/images/island-quick-switcher.png" "$ROOT/website/island-quick-switcher.png"
+fi
 cp "$ROOT/docs/images/island-demo.gif" "$ROOT/website/island-demo.gif"
 cp "$ROOT"/docs/images/mascots/*.gif "$ROOT/website/mascots/"
 find "$ROOT/docs/images" "$ROOT/website" -type f \( -name '*.png' -o -name '*.gif' \) -exec stat -f '%8z  %N' {} + | sed "s|$ROOT/||"

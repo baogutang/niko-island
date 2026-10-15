@@ -137,6 +137,33 @@ public struct Installer: Sendable {
         return apply(plan)
     }
 
+    /// Agents whose current wiring carries our marker (left-overs of older versions do not count).
+    public static func wiredAgents(in report: ScanReport) -> Set<String> {
+        Set(AgentRegistry.installable.filter { agent in
+            guard let scanned = report.agents[agent.id], scanned.directory == .present else { return false }
+            return agent.activeFiles.contains { file in
+                scanned.files[file]?.data.map { String(decoding: $0, as: UTF8.self).contains(NikoVersion.hookMarker) } ?? false
+            }
+        }.map(\.id))
+    }
+
+    /// The installer remembers which agents the user connected, whoever ran it (the app, the
+    /// command line): that list, and nothing else, is what the app puts back when another tool
+    /// takes our hooks out. Removing an agent takes it off the list.
+    private func rememberConnected(_ plan: InstallPlan) {
+        let before = ConnectedAgents.load(paths: options.paths)
+        var connected = before
+        for outcome in plan.outcomes {
+            switch (plan.action, outcome.status) {
+            case (.install, .changed), (.install, .unchanged): connected.insert(outcome.id)
+            case (.uninstall, .changed), (.uninstall, .unchanged): connected.remove(outcome.id)
+            default: break
+            }
+        }
+        guard connected != before else { return }
+        ConnectedAgents.save(connected, paths: options.paths)
+    }
+
     /// Agents an earlier install connected: one of their files, current or left
     /// over from an older version, carries our hook marker.
     public static func connectedAgents(in report: ScanReport) -> [String] {
@@ -651,6 +678,7 @@ public struct Installer: Sendable {
 
     /// Side effects that only make sense once the configs are in their final state.
     private func finish(_ plan: InstallPlan, result: inout InstallResult) {
+        rememberConnected(plan)
         switch plan.action {
         case .install:
             if plan.isNoOp {
@@ -731,5 +759,22 @@ extension InstallResult {
             lines.append("Nothing to do.")
         }
         return lines.joined(separator: "\n")
+    }
+}
+
+/// The agents the user connected, in a file of its own: the app rewrites the whole
+/// settings file whenever a setting changes, which would lose a list the command line
+/// had written meanwhile. Only ids are kept.
+public enum ConnectedAgents {
+    public static func load(paths: NikoPaths) -> Set<String> {
+        guard let data = try? Data(contentsOf: paths.connectedAgentsFile),
+              let items = (try? JSONValue.parse(data))?.arrayValue else { return [] }
+        return Set(items.compactMap(\.stringValue))
+    }
+
+    public static func save(_ ids: Set<String>, paths: NikoPaths) {
+        try? FileManager.default.createDirectory(at: paths.root, withIntermediateDirectories: true)
+        let value = JSONValue.array(ids.sorted().map(JSONValue.string))
+        _ = AtomicFile.write(value.serializedData(.compact), to: paths.connectedAgentsFile.path, mode: 0o600)
     }
 }

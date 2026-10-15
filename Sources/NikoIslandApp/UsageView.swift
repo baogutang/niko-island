@@ -9,6 +9,9 @@ struct UsageView: View {
     @ObservedObject var model: AppModel
     @Environment(\.look) private var look
     @Environment(\.isStaticPreview) private var isStaticPreview
+    /// The bar chart shows days, or the twelve months.
+    @AppStorage("NikoUsageByMonth") private var byMonth = false
+    @Namespace private var spanSpace
 
     private var usage: UsageSnapshot { model.usage }
 
@@ -35,7 +38,9 @@ struct UsageView: View {
                 tiles
                 if current.id == "all" { allLimits } else { limits(current) }
                 HStack(alignment: .top, spacing: 22) {
-                    if current.days.contains(where: { $0.tokens > 0 }) { chart.frame(width: 200) }
+                    if current.days.contains(where: { $0.tokens > 0 }) || current.months.contains(where: { $0.tokens > 0 }) {
+                        chart.frame(width: 200)
+                    }
                     if !current.models.isEmpty { breakdown }
                 }
                 if current.quarters.contains(where: { $0 > 0 }) || current.weekHours.joined().contains(where: { $0 > 0 }) {
@@ -108,6 +113,8 @@ struct UsageView: View {
         return tileFrame {
             Text(title.uppercased()).font(look.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
             Text(unpriced ? tokenText(window.tokens) : costText(window.cost))
+                .contentTransition(.numericText())
+                .animation(Motion.smooth(look.motion), value: window.cost)
                 .font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
             Text(unpriced ? L("tokens, no list price") : L("%@ tokens", tokenText(window.tokens)))
                 .font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
@@ -154,9 +161,12 @@ struct UsageView: View {
                         Capsule().fill(tint)
                             .frame(width: max(4, proxy.size.width * CGFloat(window.usedPercent / 100)))
                     }
+                    .animation(Motion.smooth(look.motion), value: window.usedPercent)
                 }
                 .frame(height: 5)
                 Text(String(format: "%.0f%%", window.usedPercent)).font(look.mono(12, .medium))
+                    .contentTransition(.numericText(value: window.usedPercent))
+                    .animation(Motion.smooth(look.motion), value: window.usedPercent)
                     .foregroundStyle(level == .ok ? Theme.primary : tint).frame(width: 40, alignment: .trailing)
                 Text(resetText(window.resetsAt)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
                     .frame(width: 112, alignment: .trailing)
@@ -276,22 +286,64 @@ struct UsageView: View {
     // MARK: Chart and models
 
     private var chart: some View {
-        let days = current.days
-        let peak = max(days.map(\.tokens).max() ?? 1, 1)
-        return HStack(alignment: .bottom, spacing: 6) {
-            ForEach(days) { day in
-                VStack(spacing: 4) {
-                    RoundedRectangle(cornerRadius: look.radius(4), style: .continuous)
-                        .fill(day.id == days.last?.id ? look.accent : look.accent.opacity(0.35))
-                        .frame(height: max(3, 50 * CGFloat(day.tokens) / CGFloat(peak)))
-                    Text(String(day.id.suffix(2))).font(look.mono(9, .regular)).foregroundStyle(Theme.tertiary)
+        let months = byMonth && current.months.contains(where: { $0.tokens > 0 })
+        let bars = months ? current.months : current.days
+        let peak = max(bars.map(\.tokens).max() ?? 1, 1)
+        return VStack(alignment: .leading, spacing: 8) {
+            spanPicker
+            HStack(alignment: .bottom, spacing: months ? 3 : 6) {
+                ForEach(bars) { bar in
+                    VStack(spacing: 4) {
+                        RoundedRectangle(cornerRadius: look.radius(months ? 3 : 4), style: .continuous)
+                            .fill(bar.id == bars.last?.id ? look.accent : look.accent.opacity(bar.tokens > 0 ? 0.35 : 0.12))
+                            .frame(height: bar.tokens > 0 ? max(3, 50 * CGFloat(bar.tokens) / CGFloat(peak)) : 2)
+                        Text(months ? monthLabel(bar.id) : String(bar.id.suffix(2)))
+                            .font(look.mono(months ? 8 : 9, .regular)).foregroundStyle(Theme.tertiary)
+                            .lineLimit(1).fixedSize()
+                    }
+                    .frame(maxWidth: .infinity)
+                    .help("\(bar.id): \(costText(bar.cost)), \(tokenText(bar.tokens))")
                 }
-                .frame(maxWidth: .infinity)
-                .help("\(day.id): \(costText(day.cost)), \(tokenText(day.tokens))")
+            }
+            .frame(height: 68, alignment: .bottom)
+            .animation(Motion.smooth(), value: months)
+        }
+        .accessibilityLabel(months ? L("Tokens per month, last 12 months") : L("Tokens per day, last 7 days"))
+    }
+
+    /// "7 days | 12 months": a sliding white capsule, as the agent pills.
+    private var spanPicker: some View {
+        HStack(spacing: 2) {
+            ForEach([false, true], id: \.self) { months in
+                let selected = months == byMonth
+                Button { withAnimation(Motion.snappy()) { byMonth = months } } label: {
+                    Text(months ? L("12 months") : L("7 days"))
+                        .font(look.body(10.5, .semibold))
+                        .foregroundStyle(selected ? Color.black : Theme.secondary)
+                        .padding(.horizontal, 8).padding(.vertical, 3)
+                        .background {
+                            if selected { Capsule().fill(Color.white).matchedGeometryEffect(id: "span", in: spanSpace) }
+                        }
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
-        .frame(height: 68, alignment: .bottom)
-        .accessibilityLabel(L("Tokens per day, last 7 days"))
+        .padding(2)
+        .background(Capsule().fill(Color.white.opacity(0.08)))
+    }
+
+    /// The month's initial in the app's language ("O"), or its number where months are numbered.
+    private func monthLabel(_ id: String) -> String {
+        let parts = id.split(separator: "-")
+        guard parts.count == 2, let month = Int(parts[1]), (1...12).contains(month) else { return id }
+        let formatter = DateFormatter()
+        formatter.locale = Localization.locale
+        // Twelve bars in 200 points: one letter fits; where months are numbered ("10月"), the number.
+        let short = formatter.shortStandaloneMonthSymbols ?? []
+        if short.count == 12, short[month - 1].first?.isNumber == true { return String(month) }
+        let letters = formatter.veryShortStandaloneMonthSymbols ?? []
+        return letters.count == 12 ? letters[month - 1] : String(month)
     }
 
     /// The last 24 hours in quarter hours: when the work happened today.

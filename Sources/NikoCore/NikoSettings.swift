@@ -217,7 +217,95 @@ public struct NikoSettings: Sendable, Equatable {
     static func halfHour(_ minutes: Int) -> Int { min(1410, max(0, minutes / 30 * 30)) }
 
     /// Whether `date` falls inside the quiet stretch. A stretch may run over midnight.
+    /// "Quiet now", until this moment (seconds since 1970; 0: off). Set from the menu, the
+    /// settings, or a `nikoisland://quiet` link (what a Shortcuts automation for a Focus calls).
+    public var quietNowUntil: Double {
+        get { raw["quietNowUntil"]?.doubleValue ?? 0 }
+        set { raw["quietNowUntil"] = .number(String(newValue)) }
+    }
+
+    /// Quiet now: no sounds, nothing to a phone, and the island does not open by itself.
+    public func isQuietNow(at date: Date) -> Bool { quietNowUntil > date.timeIntervalSince1970 }
+
+    /// The island does not open by itself for a session whose own window is in front: you are looking at it already.
+    public var notOverAgentWindow: Bool {
+        get { bool("notOverAgentWindow", default: true) }
+        set { raw["notOverAgentWindow"] = .bool(newValue) }
+    }
+
+    /// Sessions in these folders (and below) are not listed, make no sound and send nothing.
+    public var silencedFolders: [String] {
+        get { (raw["silencedFolders"]?.arrayValue ?? []).compactMap(\.stringValue) }
+        set { raw["silencedFolders"] = .array(newValue.map(JSONValue.string)) }
+    }
+
+    /// Nor are sessions whose first prompt contains one of these (case does not matter).
+    public var silencedPrompts: [String] {
+        get { (raw["silencedPrompts"]?.arrayValue ?? []).compactMap(\.stringValue) }
+        set { raw["silencedPrompts"] = .array(newValue.map(JSONValue.string)) }
+    }
+
+    /// Links the user wrote for going to a session (Settings → Sessions), first match wins.
+    public var jumpRules: [JumpRule] {
+        get {
+            (raw["jumpRules"]?.arrayValue ?? []).compactMap { item in
+                guard let match = item["match"]?.stringValue, let url = item["url"]?.stringValue else { return nil }
+                return JumpRule(match: match, url: url)
+            }
+        }
+        set {
+            raw["jumpRules"] = .array(newValue.map { rule in
+                var object = JSONObject()
+                object["match"] = .string(rule.match)
+                object["url"] = .string(rule.url)
+                return .object(object)
+            })
+        }
+    }
+
+    /// Whether a session falls under the rules above.
+    public func silences(cwd: String?, firstPrompt: String?) -> Bool {
+        if let cwd {
+            let path = (cwd as NSString).standardizingPath
+            for folder in silencedFolders where !folder.isEmpty {
+                let rule = (folder as NSString).standardizingPath
+                if path == rule || path.hasPrefix(rule.hasSuffix("/") ? rule : rule + "/") { return true }
+            }
+        }
+        if let prompt = firstPrompt?.lowercased(), !prompt.isEmpty {
+            for rule in silencedPrompts {
+                let words = rule.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+                if !words.isEmpty, prompt.contains(words) { return true }
+            }
+        }
+        return false
+    }
+
+    /// Hooks of a connected agent that another tool took out are put back (and the user is told).
+    public var restoreRemovedHooks: Bool {
+        get { bool("restoreRemovedHooks", default: true) }
+        set { raw["restoreRemovedHooks"] = .bool(newValue) }
+    }
+
+    /// The reminder about waiting requests also covers finished turns nobody has looked at.
+    public var remindUnread: Bool {
+        get { bool("remindUnread", default: false) }
+        set { raw["remindUnread"] = .bool(newValue) }
+    }
+
+    /// A plan window is said to be nearly used up from this share on.
+    public static let limitWarningChoices = [70, 80, 90, 95]
+
+    public var limitWarningPercent: Int {
+        get {
+            let stored = raw["limitWarningPercent"]?.intValue ?? 90
+            return NikoSettings.limitWarningChoices.contains(stored) ? stored : 90
+        }
+        set { raw["limitWarningPercent"] = .int(newValue) }
+    }
+
     public func isQuiet(at date: Date, calendar: Calendar = .current) -> Bool {
+        if isQuietNow(at: date) { return true }
         guard quietHoursEnabled, quietFrom != quietUntil else { return false }
         let parts = calendar.dateComponents([.hour, .minute], from: date)
         let minute = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
@@ -282,6 +370,12 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     /// ⌃⌥J goes to whatever needs the user: the waiting request, else the session that stopped last. Off unless switched on.
+    /// ⌃⌥S opens the quick switcher.
+    public var switcherHotkey: Bool {
+        get { bool("switcherHotkey", default: true) }
+        set { raw["switcherHotkey"] = .bool(newValue) }
+    }
+
     public var jumpHotkey: Bool {
         get { bool("jumpHotkey", default: false) }
         set { raw["jumpHotkey"] = .bool(newValue) }

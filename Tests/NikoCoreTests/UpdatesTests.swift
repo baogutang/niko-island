@@ -137,7 +137,7 @@ final class UpdatesTests: XCTestCase {
         try FileManager.default.createDirectory(at: missing.appendingPathComponent("Contents"), withIntermediateDirectories: true)
         scratch.write("work/Gone.app/Contents/Info.plist", "x")
         XCTAssertThrowsError(try Updater.replace(current, with: missing, trash: { url in
-            try trash(url)
+            _ = try trash(url)
             try FileManager.default.removeItem(at: missing)   // gone before it could be moved
             return bin.appendingPathComponent(url.lastPathComponent)
         }))

@@ -32,6 +32,9 @@ final class IslandWindowController: NSObject {
     private var overlayRect: CGRect = .zero
     private var monitors: [Any] = []
     private var pointerInside = false
+    /// A two-finger pull on the island is under way, and how far it has gone.
+    private var pulling = false
+    private var pulled: CGFloat = 0
     private var openTimer: DispatchWorkItem?
     private var closeTimer: DispatchWorkItem?
     private let traceLayout = ProcessInfo.processInfo.environment["NIKO_ISLAND_DEBUG"] != nil
@@ -322,6 +325,11 @@ final class IslandWindowController: NSObject {
             if let self { MainActor.assumeIsolated { self.pointerMoved() } }
             return event
         }) { monitors.append(monitor) }
+        // Two fingers on the island: see `scrolled`.
+        if let monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel, handler: { [weak self] event in
+            guard let self else { return event }
+            return MainActor.assumeIsolated { self.scrolled(event) } ? nil : event
+        }) { monitors.append(monitor) }
         // A click anywhere else puts the island away. Nothing pending is decided by that.
         if let monitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown], handler: { [weak self] _ in
             guard let self else { return }
@@ -372,6 +380,42 @@ final class IslandWindowController: NSObject {
                 self.quicken(for: 0.6)
             }
         }
+    }
+
+    /// Pulling the closed island down with two fingers opens it; pushing the open island's
+    /// top band up closes it. The island follows the fingers with resistance and springs back
+    /// if they let go before it gives. Only a trackpad does this: a mouse wheel scrolls the list.
+    /// Returns true when the event was used up here.
+    private func scrolled(_ event: NSEvent) -> Bool {
+        guard event.hasPreciseScrollingDeltas else { return false }
+        // Momentum after the fingers left belongs to the pull that started it.
+        if event.phase.isEmpty, !event.momentumPhase.isEmpty { return pulling }
+        let fingersDown = event.isDirectionInvertedFromDevice ? event.scrollingDeltaY : -event.scrollingDeltaY
+        if event.phase.contains(.began) {
+            let location = NSEvent.mouseLocation
+            let rect = islandScreenRect
+            let onTopBand = rect != .zero && location.y >= rect.maxY - 44
+            pulling = pointerInside && (!model.isExpanded || onTopBand)
+            pulled = 0
+            return pulling
+        }
+        guard pulling else { return false }
+        if event.phase.contains(.changed) {
+            pulled += fingersDown
+            let shown = model.isExpanded ? min(0, pulled) : max(0, pulled)
+            var instant = Transaction()
+            instant.disablesAnimations = true
+            withTransaction(instant) { model.pull = shown }
+        } else if event.phase.contains(.ended) || event.phase.contains(.cancelled) {
+            pulling = false
+            if !model.isExpanded, pulled > 36 {
+                model.expand(.click)
+            } else if model.isExpanded, pulled < -46 {
+                model.collapse()
+            }
+            withAnimation(Motion.snappy(model.settings.motion.factor)) { model.pull = 0 }
+        }
+        return true
     }
 
     private func schedule(_ slot: inout DispatchWorkItem?, after delay: TimeInterval, _ work: @escaping @MainActor () -> Void) {

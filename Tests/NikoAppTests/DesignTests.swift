@@ -53,6 +53,32 @@ final class DesignTests: XCTestCase {
         XCTAssertFalse(small.boundingRect.isNull)
     }
 
+    func testAPullGivesLessTheFurtherItGoesAndNeverPastItsLimit() {
+        XCTAssertEqual(Rubber.band(0, limit: 22), 0)
+        var previous: CGFloat = 0
+        for distance in stride(from: CGFloat(4), through: 400, by: 4) {
+            let stretched = Rubber.band(distance, limit: 22)
+            XCTAssertGreaterThan(stretched, previous, "it keeps following the finger")
+            XCTAssertLessThan(stretched, 22, "but never past the limit")
+            XCTAssertLessThan(stretched - previous, 4 * 0.55 + 0.001, "and gives less with every point")
+            previous = stretched
+        }
+    }
+
+    func testTheIslandsCornersAreContinuousAndItsEarsMeetTheSidesSmoothly() {
+        let rect = CGRect(x: 0, y: 0, width: 640, height: 300)
+        let path = IslandShape(ear: 10, radius: 30).path(in: rect)
+        // A continuous corner starts further up the side than a circular one would (1.53 radii, not 1).
+        XCTAssertTrue(path.contains(CGPoint(x: 10.5, y: 300 - 31)), "straight side above the corner")
+        XCTAssertFalse(path.contains(CGPoint(x: 11, y: 296)), "rounded away at the bottom")
+        XCTAssertTrue(path.contains(CGPoint(x: 40, y: 299)), "and flat along the bottom")
+        // The closed island is short: the corners shrink to fit under the ears instead of overlapping them.
+        let closed = IslandShape(ear: 8, radius: 14).path(in: CGRect(x: 0, y: 0, width: 200, height: 28))
+        XCTAssertEqual(closed.boundingRect.height, 28, accuracy: 0.01)
+        XCTAssertTrue(closed.contains(CGPoint(x: 100, y: 27)))
+        XCTAssertFalse(closed.contains(CGPoint(x: 8.5, y: 27.5)))
+    }
+
     func testMetrics() {
         XCTAssertEqual(IslandMetrics.notched.collapsedWidth(contentWidth: 50), 186 + 2 * IslandMetrics.wing)
         XCTAssertEqual(IslandMetrics.plain.collapsedWidth(contentWidth: 20), 96)

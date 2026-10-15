@@ -44,6 +44,19 @@ extension UsageStore {
         return out
     }
 
+    /// Tokens and cost per agent and month ("YYYY-MM") from a day on.
+    public func monthlyTotalsByAgent(fromDay: String) throws -> [String: [String: (tokens: Int, cost: Double)]] {
+        let rows = try db.query("""
+            SELECT agent, substr(day, 1, 7), SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens), SUM(estimated_cost)
+            FROM events WHERE day >= ? GROUP BY 1, 2
+            """, [.text(fromDay)])
+        var out: [String: [String: (tokens: Int, cost: Double)]] = [:]
+        for row in rows {
+            out[row[0].stringValue ?? "", default: [:]][row[1].stringValue ?? ""] = (row[2].intValue, row[3].doubleValue)
+        }
+        return out
+    }
+
     /// Tokens and estimated cost per session since `timestamp`, keyed "agent/session id".
     public func sessionTotals(since timestamp: Double, limit: Int = 300) throws -> [String: UsageSnapshot.SessionUse] {
         let rows = try db.query("""

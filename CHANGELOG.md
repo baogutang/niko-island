@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.11.0] - 2026-10-15
+
+### Added
+- Quick session search with ⌃⌥S, fuzzy project/prompt/agent matching and keyboard selection. Pending requests open on the island.
+- Quiet-now durations and `nikoisland://quiet` links for Shortcuts; keep the island closed over the agent's own window, hide session folders or prompt fragments, remind about unread finished turns and warn once near the context limit.
+- Restore removed hooks only for previously connected agents, with a two-minute check, ten-minute repair backoff and an opt-out. Deliberate uninstall clears the remembered connection.
+- Configurable plan warning level (70 / 80 / 90 / 95%, default 90%), six months of monthly usage, WezTerm / kitty pane jumps and custom app links.
+- Basic / Bearer authentication for explicitly configured self-hosted Bark / ntfy servers.
+
+### Changed
+- Metal night-sea welcome, Core Animation creatures and confetti, shared transition curves, continuous island corners and list overscroll.
+- Bursts of work-started events share a sound cue. READMEs and the bilingual website describe the new controls and use regenerated native view artwork.
+
+### Fixed
+- Huge quiet-duration inputs are clamped before integer conversion or multiplication.
+- Session search leaves candidate navigation and Return to the input method until composition commits.
+
+### Verification
+- 422 local automated tests, 5 environment-dependent skips, no failures; private-file hook repair/backoff verification.
+- Native search focus and IME/Return checks; notifications-enabled packaged-app smoke through three synthetic turns and SessionEnd.
+- Actual Metal presentation on one 5K / 75 Hz display: 75.0 FPS over six seconds; rendering view released on close. This does not certify 120 Hz, notch layouts, physical Intel hardware, notification buttons or delivery to a phone.
+
 ## [0.10.0] - 2026-10-15
 
 Ideas from agent-hud-open (Apache-2.0), rebuilt here in this project's own code.

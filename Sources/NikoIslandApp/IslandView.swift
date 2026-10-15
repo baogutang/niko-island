@@ -32,6 +32,7 @@ struct IslandBody: View {
     var metrics: IslandMetrics
     @Environment(\.look) private var look
     @Environment(\.isStaticPreview) private var isStaticPreview
+    @Namespace private var space
 
     var body: some View {
         let recap = model.isExpanded ? nil : model.recap
@@ -39,39 +40,62 @@ struct IslandBody: View {
         let showsCard = card != nil || recap != nil
         let housing = metrics.hasNotch && !model.isExpanded && !showsCard
         let corner = (model.isExpanded ? 30 : (showsCard ? 24 : 13)) * (housing ? 1 : look.islandRadiusScale)
-        let shape = IslandShape(ear: model.isExpanded ? 10 : (showsCard ? 8 : 6), radius: corner)
-        // Opening has a little bounce; closing is quicker and settles without one,
+        let shape = IslandShape(ear: model.isExpanded ? 11 : (showsCard ? 9 : 6), radius: corner)
+        // Opening settles with the lightest overshoot; closing is quicker and has none,
         // so the island is out of the way the moment it is not wanted.
-        let spring = model.isExpanded ? Animation.spring(response: 0.34 * look.motion, dampingFraction: 0.84)
-            : Animation.spring(response: 0.24 * look.motion, dampingFraction: 0.95)
+        let spring = model.isExpanded || showsCard ? Motion.open(look.motion) : Motion.close(look.motion)
+        let lifted = model.isExpanded || showsCard
         return VStack(spacing: 0) {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
-                    .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.08)))
+                    .transition(.islandContent(delay: 0.07))
             } else if let recap {
                 RecapCard(model: model, recap: recap, metrics: metrics)
-                    .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.06)))
+                    .transition(.islandContent(delay: 0.06))
             } else if let card {
                 CompletionCard(model: model, completion: card, metrics: metrics)
-                    .transition(.opacity.animation(.easeOut(duration: 0.18).delay(0.06)))
+                    .transition(.islandContent(delay: 0.06))
             } else {
                 CollapsedIsland(model: model, metrics: metrics)
-                    .transition(.opacity.animation(.easeOut(duration: 0.1)))
+                    .transition(.islandContent(delay: 0.04))
             }
         }
+        // Pulled down while closed, the island stretches after the fingers.
+        .padding(.bottom, model.isExpanded ? 0 : Rubber.band(max(0, model.pull), limit: 22))
         .frame(width: model.isExpanded ? CGFloat(model.settings.islandWidth.points) : nil)
         .background(IslandSurface(shape: shape, style: look.style, housing: housing))
+        .overlay {
+            // A hairline of light along the island's edge, so it holds its shape against a dark desktop.
+            if !housing {
+                shape.stroke(LinearGradient(colors: [Color.white.opacity(0.02), Color.white.opacity(0.09)], startPoint: .top, endPoint: .bottom),
+                             lineWidth: 1.5)
+            }
+        }
         .clipShape(shape)
         .contentShape(shape)
-        .shadow(color: .black.opacity(model.isExpanded ? 0.55 : (showsCard ? 0.45 : 0)), radius: 24, y: 14)
+        // Pushed up while open, it gives a little, as if pressed back into the edge.
+        .scaleEffect(x: 1, y: model.isExpanded ? 1 - Rubber.band(max(0, -model.pull), limit: 40) / 520 : 1, anchor: .top)
+        // Two shadows, as light has: a soft ambient one far out and a firmer one close in.
+        .shadow(color: .black.opacity(lifted ? 0.32 : 0), radius: 34, y: 18)
+        .shadow(color: .black.opacity(lifted ? 0.28 : 0), radius: 8, y: 4)
+        .environment(\.islandNamespace, isStaticPreview ? nil : space)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: IslandFrameKey.self, value: proxy.frame(in: .named("island-canvas")))
         })
         .animation(isStaticPreview ? nil : spring, value: model.isExpanded)
         .animation(isStaticPreview ? nil : spring, value: model.toast)
-        .animation(isStaticPreview ? nil : Animation.spring(response: 0.36 * look.motion, dampingFraction: 0.86), value: model.completion)
-        .animation(isStaticPreview ? nil : Animation.spring(response: 0.36 * look.motion, dampingFraction: 0.86), value: model.recap)
+        .animation(isStaticPreview ? nil : Motion.land(look.motion), value: model.completion)
+        .animation(isStaticPreview ? nil : Motion.land(look.motion), value: model.recap)
         .animation(isStaticPreview ? nil : spring, value: model.badge)
+    }
+}
+
+/// Resistance that grows with distance: a pull of x points moves the thing less and less,
+/// never more than `limit` (the curve scroll views rubber-band with).
+enum Rubber {
+    static func band(_ x: CGFloat, limit: CGFloat) -> CGFloat {
+        guard x > 0, limit > 0 else { return 0 }
+        return limit * (1 - 1 / (x * 0.55 / limit + 1))
     }
 }
 
@@ -81,6 +105,8 @@ struct IslandBody: View {
 struct IslandGlance: Equatable {
     enum Tone { case idle, working, waiting, attention, done, failed, warning }
     var source: String?
+    /// The session the glance is about, when it is about one.
+    var key: SessionKey?
     var text: String
     var tone: Tone
     var count: Int
@@ -89,24 +115,28 @@ struct IslandGlance: Equatable {
     init(model: AppModel) {
         if let toast = model.toast {
             source = toast.key.source
+            key = toast.key.sessionID.isEmpty ? nil : toast.key
             text = toast.title
-            tone = toast.kind == .failed ? .failed : toast.kind == .limitWarning ? .warning : .done
+            tone = toast.kind == .failed ? .failed : (toast.kind == .limitWarning || toast.kind == .notice) ? .warning : .done
             count = 0
         } else if let request = model.pending.first {
             let session = model.sessions.first { $0.key == request.sessionKey }
             let project = AutoNamer.projectName(cwd: request.event.cwd) ?? AgentRegistry.displayName(for: request.event.source)
             source = request.event.source
+            key = request.sessionKey
             text = L("%@ needs you", session.map { AutoNamer.projectName(cwd: $0.cwd) ?? project } ?? project)
             tone = .attention
             count = model.pending.count
         } else if let working = model.sessions.first(where: { $0.phase == .working }) {
             source = working.source
+            key = working.key
             let detail = working.activity.detail.map { " " + $0 } ?? ""
             text = working.activity.localizedVerb + detail
             tone = .working
             count = model.sessions.filter { $0.phase == .working }.count
         } else if let waiting = model.sessions.first {
             source = waiting.source
+            key = waiting.key
             text = L("%lld waiting", model.sessions.count)
             tone = .waiting
             count = 0
@@ -135,6 +165,7 @@ struct CollapsedIsland: View {
     @ObservedObject var model: AppModel
     var metrics: IslandMetrics
     @Environment(\.look) private var look
+    @Environment(\.islandNamespace) private var namespace
 
     var body: some View {
         let glance = IslandGlance(model: model)
@@ -174,8 +205,10 @@ struct CollapsedIsland: View {
     private func mascot(_ glance: IslandGlance) -> some View {
         if let source = glance.source {
             MascotView(source: source, size: 17, animated: glance.tone == .working)
+                .travels(glance.key.map { "creature/" + $0.description } ?? "creature/none", in: namespace)
         } else {
             MascotView(sprite: Mascots.island, size: 17).opacity(0.75)
+                .travels("creature/island", in: namespace)
         }
     }
 
@@ -185,12 +218,13 @@ struct CollapsedIsland: View {
         case .attention:
             HStack(spacing: 3) {
                 Image(systemName: "bell.fill").font(.system(size: 9, weight: .bold))
-                if glance.count > 1 { Text("\(glance.count)").font(look.mono(10, .bold)) }
+                    .symbolEffect(.bounce, value: glance.count)
+                if glance.count > 1 { Text("\(glance.count)").font(look.mono(10, .bold)).contentTransition(.numericText()) }
             }
             .foregroundStyle(Theme.amber)
         case .working:
             if glance.count > 1 {
-                Text("\(glance.count)").font(look.mono(10, .bold)).foregroundStyle(look.accent)
+                Text("\(glance.count)").font(look.mono(10, .bold)).foregroundStyle(look.accent).contentTransition(.numericText())
             } else {
                 Circle().fill(look.accent).frame(width: 6, height: 6)
             }
@@ -227,10 +261,11 @@ struct ExpandedIsland: View {
             header
             Group {
                 switch model.route {
-                case .sessions: SessionsPane(model: model)
-                case .usage: UsageView(model: model)
+                case .sessions: SessionsPane(model: model).transition(.rise)
+                case .usage: UsageView(model: model).transition(.rise)
                 }
             }
+            .animation(Motion.smooth(look.motion), value: model.route)
             .padding(.horizontal, 24)
             .padding(.top, 10)
             .padding(.bottom, 22)
@@ -257,6 +292,12 @@ struct ExpandedIsland: View {
                 .help(L("A newer version can be installed from Settings → About."))
             }
             Spacer(minLength: 0)
+            if model.sessions.count > 3 {
+                IconButton(symbol: "magnifyingglass", label: L("Find a session")) {
+                    model.collapse()
+                    model.onOpenSwitcher?()
+                }
+            }
             IconButton(symbol: "chart.bar.fill", active: model.route == .usage, label: L("Usage")) {
                 model.route = model.route == .usage ? .sessions : .usage
             }
@@ -277,6 +318,8 @@ struct SessionsPane: View {
     @ObservedObject var model: AppModel
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var listHeight: CGFloat = 0
+    @State private var hovered: SessionKey?
+    @Namespace private var hoverSpace
 
     /// Height of the list before it scrolls: the number of rows the user asked for.
     private var maxListHeight: CGFloat {
@@ -284,12 +327,17 @@ struct SessionsPane: View {
     }
 
     var body: some View {
+        content.animation(isStaticPreview ? nil : Motion.smooth(look.motion), value: model.focusedRequestID)
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 0) {
             if case .other(let message)? = model.startFailure {
                 notice(L("Niko Island could not start listening"), detail: message)
             }
             if let request = model.focusedRequest {
                 RequestDetailView(model: model, request: request).id(request.id)
+                    .transition(.rise)
             }
             let rows = model.sessions.filter { $0.key != model.focusedRequest?.sessionKey }
             if !rows.isEmpty {
@@ -317,7 +365,13 @@ struct SessionsPane: View {
                         })
                 }
                 .frame(height: min(max(listHeight, 44), maxListHeight))
-                .onPreferenceChange(ListHeightKey.self) { listHeight = $0 }
+                .onPreferenceChange(ListHeightKey.self) { height in
+                    // The list grows and shrinks to its rows on the same spring as everything else.
+                    withAnimation(listHeight == 0 ? nil : Motion.smooth(look.motion)) { listHeight = height }
+                }
+                .onHover { inside in
+                    if !inside { withAnimation(Motion.snappy(look.motion)) { hovered = nil } }
+                }
             }
         }
     }
@@ -339,10 +393,13 @@ struct SessionsPane: View {
                     .accessibilityAddTraits(.isHeader)
                 }
                 ForEach(group.sessions) { session in
-                    SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project)
+                    SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project,
+                                   hovered: isStaticPreview ? nil : $hovered, hoverSpace: isStaticPreview ? nil : hoverSpace)
+                        .transition(.row)
                 }
             }
         }
+        .animation(isStaticPreview ? nil : Motion.smooth(look.motion), value: rows.map(\.key))
     }
 
     /// Nothing to list. Say what the island can see instead of leaving it at that:

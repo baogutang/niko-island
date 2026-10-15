@@ -450,6 +450,8 @@ public final class UsageEngine: @unchecked Sendable {
             let fiveHours = try store.totals(since: now.timeIntervalSince1970 - 5 * 3600)
             let month = try store.totals(since: now.timeIntervalSince1970 - 30 * 86_400)
             let perDay = try store.dailyTotalsByAgent(fromDay: first, toDay: today)
+            let monthIDs = UsageSnapshot.monthIDs(endingAt: now, calendar: calendar)
+            let perMonth = try store.monthlyTotalsByAgent(fromDay: (monthIDs.first ?? "") + "-01")
             // The last day in quarter hours, and four weeks by weekday and hour, for the charts.
             let quarterNow = Int(now.timeIntervalSince1970 / 900)
             let quarterRows = try store.stretches(since: Double((quarterNow - 95) * 900), seconds: 900)
@@ -466,6 +468,10 @@ public final class UsageEngine: @unchecked Sendable {
                 agent.models = pick(snapshot.week)
                 agent.days = id == "all" ? snapshot.days : dayIDs.map {
                     UsageSnapshot.Day(id: $0, tokens: perDay[id]?[$0]?.tokens ?? 0, cost: perDay[id]?[$0]?.cost ?? 0)
+                }
+                agent.months = monthIDs.map { month in
+                    let rows = id == "all" ? perMonth.values.compactMap { $0[month] } : [perMonth[id]?[month]].compactMap { $0 }
+                    return UsageSnapshot.Day(id: month, tokens: rows.reduce(0) { $0 + $1.tokens }, cost: rows.reduce(0) { $0 + $1.cost })
                 }
                 agent.limits = limits[id]?.windows ?? []
                 agent.limitsCapturedAt = limits[id]?.capturedAt

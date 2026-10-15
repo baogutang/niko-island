@@ -96,6 +96,8 @@ public struct UsageSnapshot: Sendable, Equatable {
         /// Per model, last seven days.
         public var models: [UsageTotals] = []
         public var days: [Day] = []
+        /// The last twelve months, oldest first, ending with this one (ids "YYYY-MM").
+        public var months: [Day] = []
         public var limits: [RateLimitWindow] = []
         public var limitsCapturedAt: Date?
         public var limitsSource: LimitsSource?
@@ -159,6 +161,16 @@ public struct UsageSnapshot: Sendable, Equatable {
     public var weekTokens: Int { week.reduce(0) { $0 + $1.tokens } }
     public var isEmpty: Bool { week.isEmpty && rateLimits.isEmpty }
 
+    /// "YYYY-MM" of the twelve months ending with the one `now` is in, oldest first.
+    public static func monthIDs(endingAt now: Date, calendar: Calendar) -> [String] {
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
+        return (0..<12).reversed().map { back in
+            let date = calendar.date(byAdding: .month, value: -back, to: start) ?? start
+            let parts = calendar.dateComponents([.year, .month], from: date)
+            return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        }
+    }
+
     /// Totals per agent, largest first.
     public static func byAgent(_ rows: [UsageTotals]) -> [UsageTotals] {
         var merged: [String: UsageTotals] = [:]
@@ -217,6 +229,11 @@ public struct UsageSnapshot: Sendable, Equatable {
             agent.limitsCapturedAt = limits.isEmpty ? nil : now.addingTimeInterval(-40)
             agent.limitsSource = limits.isEmpty ? nil : source
             agent.month = Window(tokens: Int(Double(agent.week.tokens) * 3.7), cost: agent.week.cost * 3.7, messages: agent.week.messages * 4)
+            // Made up: a slow start in the year that picks up.
+            let monthly = [0, 0, 0.2, 0.35, 0.3, 0.5, 0.62, 0.55, 0.8, 0.9, 1.0, 0.7]
+            agent.months = zip(UsageSnapshot.monthIDs(endingAt: now, calendar: calendar), monthly).map { id, part in
+                Day(id: id, tokens: Int(Double(agent.month.tokens) * part), cost: agent.month.cost * part)
+            }
             return agent
         }
         snapshot.agents = [

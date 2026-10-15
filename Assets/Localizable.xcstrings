@@ -211,6 +211,16 @@
         }
       }
     },
+    "%@: hooks put back": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：被移走的钩子已放回"
+          }
+        }
+      }
+    },
     "%lld agents on this Mac are not connected": {
       "localizations": {
         "zh-Hans": {
@@ -411,6 +421,16 @@
         }
       }
     },
+    "12 months": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "12 个月"
+          }
+        }
+      }
+    },
     "2 hours": {
       "localizations": {
         "zh-Hans": {
@@ -541,6 +561,16 @@
         }
       }
     },
+    "A link starts with the app's own scheme (like vscode:), not http or file.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "链接要以应用自己的协议开头（比如 vscode:），不能是 http 或 file。"
+          }
+        }
+      }
+    },
     "A newer version can be installed from Settings → About.": {
       "localizations": {
         "zh-Hans": {
@@ -601,6 +631,26 @@
         }
       }
     },
+    "A search box over everything: type part of a project, a prompt or an agent, then ↩ to go there.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "浮在一切之上的搜索框：输入项目、提示词或代理的一部分，按 ↩ 直接过去。"
+          }
+        }
+      }
+    },
+    "A session in one of these folders, or whose first prompt contains one of these words, is not listed, plays no sound and sends nothing. What it asks for is left to the agent's own prompt.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "位于这些文件夹里、或首条提示词包含这些词的会话：不显示、不出声、不推送。它的请求交给代理自己的提示处理。"
+          }
+        }
+      }
+    },
     "A session that has stopped gets a line to type a follow-up into. It is sent into the terminal the agent runs in, as if typed there: a tmux pane, an iTerm2 session or a Terminal tab, and only while the agent itself is waiting at that prompt. Sessions in a desktop app have no such way in. macOS will ask before the first one.": {
       "localizations": {
         "zh-Hans": {
@@ -621,6 +671,16 @@
         }
       }
     },
+    "A sign-in for your server is saved in your Keychain.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "你服务器的登录信息已保存在钥匙串里。"
+          }
+        }
+      }
+    },
     "A turn ended because something failed.": {
       "localizations": {
         "zh-Hans": {
@@ -637,6 +697,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "关于"
+          }
+        }
+      }
+    },
+    "Add": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "添加"
           }
         }
       }
@@ -667,6 +737,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "超过这个时间还没回答的请求，会交还给代理自己的提示，不替你做任何决定，这样代理不会卡在一张你没看到的卡片上。"
+          }
+        }
+      }
+    },
+    "Agent or app": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理或应用"
           }
         }
       }
@@ -757,6 +837,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "用 %@ 允许，用 %@ 拒绝"
+          }
+        }
+      }
+    },
+    "Also remind me of finished turns I have not looked at": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完成了但我还没看的回合也提醒我"
           }
         }
       }
@@ -1211,6 +1301,16 @@
         }
       }
     },
+    "Choose a folder…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "选择文件夹…"
+          }
+        }
+      }
+    },
     "Choose any that apply": {
       "localizations": {
         "zh-Hans": {
@@ -1317,6 +1417,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "点击回到会话"
+          }
+        }
+      }
+    },
+    "Clicking a session brings its terminal tab forward where the terminal allows it (Terminal, iTerm2, tmux, WezTerm, and kitty with remote control on); elsewhere its app. A rule here opens a link instead, for sessions of one agent or in one app. {cwd}, {project}, {session} and {agent} are filled in.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击会话时，终端支持的话会切到它所在的标签页（终端、iTerm2、tmux、WezTerm，以及开启了远程控制的 kitty），否则切到它所在的应用。这里的规则会改为打开一个链接，可按代理或应用设置。{cwd}、{project}、{session}、{agent} 会被自动填入。"
           }
         }
       }
@@ -1621,6 +1731,16 @@
         }
       }
     },
+    "Do not open over the agent's own window": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理自己的窗口在前台时不弹开"
+          }
+        }
+      }
+    },
     "Empty: the service's own. A server of your own needs https, or an address on this network.": {
       "localizations": {
         "zh-Hans": {
@@ -1651,6 +1771,16 @@
         }
       }
     },
+    "Examples": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "示例"
+          }
+        }
+      }
+    },
     "Export diagnostics": {
       "localizations": {
         "zh-Hans": {
@@ -1677,6 +1807,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "文件与音效包"
+          }
+        }
+      }
+    },
+    "Find a Session…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找会话…"
+          }
+        }
+      }
+    },
+    "Find a session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找会话"
+          }
+        }
+      }
+    },
+    "Find a session with %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "用 %@ 查找会话"
+          }
+        }
+      }
+    },
+    "Find a session: project, prompt or agent": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查找会话：项目、提示词或代理"
           }
         }
       }
@@ -1747,6 +1917,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "跟随菜单栏时，小岛会随桌面一起滑走；把指针推到屏幕顶端，它会和菜单栏一起降下来。"
+          }
+        }
+      }
+    },
+    "For %lld h": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 小时"
+          }
+        }
+      }
+    },
+    "For %lld min": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 分钟"
+          }
+        }
+      }
+    },
+    "For a day": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一天"
           }
         }
       }
@@ -1891,6 +2091,16 @@
         }
       }
     },
+    "Going to a session": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "跳转到会话"
+          }
+        }
+      }
+    },
     "Has a question for you": {
       "localizations": {
         "zh-Hans": {
@@ -1907,6 +2117,46 @@
           "stringUnit": {
             "state": "translated",
             "value": "你好"
+          }
+        }
+      }
+    },
+    "Hidden sessions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏的会话"
+          }
+        }
+      }
+    },
+    "Hide": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏"
+          }
+        }
+      }
+    },
+    "Hide a folder": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏一个文件夹"
+          }
+        }
+      }
+    },
+    "Hide every session in %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "隐藏 %@ 里的所有会话"
           }
         }
       }
@@ -2057,6 +2307,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "它不会抢走你正在输入的键盘焦点。"
+          }
+        }
+      }
+    },
+    "Its hooks were taken out and could not be put back: %@. Press Connect once the file can be written again.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它的钩子被移走了，且没能放回：%@。等文件可以写入后，点一下「接入」。"
           }
         }
       }
@@ -2481,12 +2741,32 @@
         }
       }
     },
+    "No session matches.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有匹配的会话。"
+          }
+        }
+      }
+    },
     "No sessions": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "没有会话"
+          }
+        }
+      }
+    },
+    "No sessions yet.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "还没有会话。"
           }
         }
       }
@@ -2507,6 +2787,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "这段时间内不播放声音，也不往手机发消息。灵动岛本身照常显示。"
+          }
+        }
+      }
+    },
+    "No sounds, no cards, nothing to the phone. Also from a link, for Shortcuts or a Focus automation: nikoisland://quiet?minutes=60, and nikoisland://quiet/off.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不出声、不弹卡片、不推送到手机。也可以用链接控制，方便接入快捷指令或专注模式自动化：nikoisland://quiet?minutes=60，以及 nikoisland://quiet/off。"
           }
         }
       }
@@ -2631,6 +2921,16 @@
         }
       }
     },
+    "Off": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
     "Off by default. Each moment below can be switched on its own.": {
       "localizations": {
         "zh-Hans": {
@@ -2677,6 +2977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "关闭时，只在需要你决定或有问题要问时才发。"
+          }
+        }
+      }
+    },
+    "Once per window and cycle, on the island and to your phone if that is on. A warning also comes when the recent pace would use a window up before it resets.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "每个窗口每个周期只提醒一次，显示在小岛上，开启了手机推送的话也会推送。按最近的速度会在重置前用完时，也会提前提醒。"
           }
         }
       }
@@ -2961,6 +3271,16 @@
         }
       }
     },
+    "Put back hooks another tool took out": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "其他工具移走的钩子自动放回"
+          }
+        }
+      }
+    },
     "Put started, attention, completed, error or limit (.wav, .aiff, .mp3, .m4a) in the sounds folder, or a pack folder with an openpeon.json manifest inside its packs folder.": {
       "localizations": {
         "zh-Hans": {
@@ -2987,6 +3307,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "定时免打扰"
+          }
+        }
+      }
+    },
+    "Quiet now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "立即免打扰"
+          }
+        }
+      }
+    },
+    "Quiet until %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "免打扰到 %@"
+          }
+        }
+      }
+    },
+    "Quiet until %@. Requests still wait for you on the island.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "免打扰到 %@。请求仍会在小岛上等你。"
           }
         }
       }
@@ -3261,6 +3611,16 @@
         }
       }
     },
+    "Sent only to the server above, never to a public one.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只发给上面的服务器，绝不会发给公共服务器。"
+          }
+        }
+      }
+    },
     "Sent to its terminal": {
       "localizations": {
         "zh-Hans": {
@@ -3411,6 +3771,16 @@
         }
       }
     },
+    "Show them again": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "重新显示"
+          }
+        }
+      }
+    },
     "Show them…": {
       "localizations": {
         "zh-Hans": {
@@ -3461,6 +3831,16 @@
         }
       }
     },
+    "Sign-in, if your server asks: user:password, or an ntfy token": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "服务器需要登录时填写：用户名:密码，或 ntfy 访问令牌"
+          }
+        }
+      }
+    },
     "Skip": {
       "localizations": {
         "zh-Hans": {
@@ -3487,6 +3867,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "干活时小小一块，需要你时才展开"
+          }
+        }
+      }
+    },
+    "Some tools rewrite an agent's config and drop entries they do not know. A connected agent whose hooks went missing is connected again, at most every ten minutes, and the island says so. Removing an agent here or with niko-island uninstall stops this for it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有些工具会重写代理的配置，并丢掉它们不认识的条目。已接入代理的钩子不见了时会重新接入（每个代理最多十分钟一次），小岛会告诉你。在这里移除代理或运行 niko-island uninstall 后就不会再放回。"
           }
         }
       }
@@ -3567,6 +3957,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止自动批准"
+          }
+        }
+      }
+    },
+    "Stop being quiet": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "结束免打扰"
           }
         }
       }
@@ -3891,6 +4291,16 @@
         }
       }
     },
+    "Tokens per month, last 12 months": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 12 个月每月 token 数"
+          }
+        }
+      }
+    },
     "Tokens per quarter hour, last 24 hours": {
       "localizations": {
         "zh-Hans": {
@@ -4061,6 +4471,26 @@
         }
       }
     },
+    "Warn me when a plan window reaches": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "套餐窗口用到多少时提醒我"
+          }
+        }
+      }
+    },
+    "Warnings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "提醒"
+          }
+        }
+      }
+    },
     "Watch the island at the top of the screen: this is what it does all day.": {
       "localizations": {
         "zh-Hans": {
@@ -4191,6 +4621,16 @@
         }
       }
     },
+    "While the terminal or app a session runs in is in front, its requests and finished turns stay on the closed island instead of opening it: you are already looking at them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会话所在的终端或应用在前台时，它的请求和完成的回合只显示在收起的小岛上，不会自动弹开：你本来就在看着它。"
+          }
+        }
+      }
+    },
     "While you were away": {
       "localizations": {
         "zh-Hans": {
@@ -4221,12 +4661,52 @@
         }
       }
     },
+    "With everything below it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "包括其下所有子文件夹。"
+          }
+        }
+      }
+    },
+    "With the reminder above: a turn that finished while you were elsewhere gets the cue again, until you open the island or go to the session.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配合上面的提醒：你不在时完成的回合会再响一次提示音，直到你打开小岛或跳转到该会话。"
+          }
+        }
+      }
+    },
+    "Words in the first prompt": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "首条提示词里的词"
+          }
+        }
+      }
+    },
     "Work started": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "开始工作"
+          }
+        }
+      }
+    },
+    "Would hide %lld of the sessions listed now.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会隐藏当前列表中的 %lld 个会话。"
           }
         }
       }
@@ -4351,6 +4831,16 @@
         }
       }
     },
+    "close": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
+          }
+        }
+      }
+    },
     "compacting": {
       "localizations": {
         "zh-Hans": {
@@ -4441,6 +4931,16 @@
         }
       }
     },
+    "go to it": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "前往"
+          }
+        }
+      }
+    },
     "hardly used lately": {
       "localizations": {
         "zh-Hans": {
@@ -4457,6 +4957,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "有问题要问"
+          }
+        }
+      }
+    },
+    "hides %lld now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前隐藏 %lld 个"
           }
         }
       }
@@ -4531,6 +5041,16 @@
         }
       }
     },
+    "move": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "移动"
+          }
+        }
+      }
+    },
     "needs permission": {
       "localizations": {
         "zh-Hans": {
@@ -4541,12 +5061,32 @@
         }
       }
     },
+    "needs you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在等你"
+          }
+        }
+      }
+    },
     "no event since Niko Island started": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Niko Island 启动以来还没收到事件"
+          }
+        }
+      }
+    },
+    "none listed now": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "当前没有"
           }
         }
       }

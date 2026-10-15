@@ -49,6 +49,13 @@ struct IslandMetrics: Equatable, Sendable {
 
 /// The island's outline: flush with the top of the screen, flaring into small
 /// concave "ears" where it meets the edge, with generously rounded bottom corners.
+///
+/// The bottom corners are continuous-curvature corners (the curvature ramps
+/// up instead of jumping from straight to round), and each ear is a cubic
+/// Bézier that leaves the screen edge along it and meets the island's side
+/// along that side: the island grows out of the edge instead of being stuck
+/// to it. Ear and radius animate, so the closed tab, the open island and a
+/// card are one body changing shape.
 struct IslandShape: Shape {
     var ear: CGFloat = 8
     var radius: CGFloat = 26
@@ -61,20 +68,66 @@ struct IslandShape: Shape {
         }
     }
 
+    /// A continuous corner of radius r runs this far along each side (the curvature ramps in over it).
+    static let reach: CGFloat = 1.52866
+
     func path(in rect: CGRect) -> Path {
-        let e = min(ear, rect.width / 4)
-        let r = min(radius, (rect.width - 2 * e) / 2, rect.height - e)
+        guard rect.width > 1, rect.height > 1 else { return Path(rect) }
+        let k = Self.reach
+        let e = max(0, min(ear, rect.width / 4))
+        // The ears, a little taller than wide so they read as a fillet, not a notch; the corners fit below them.
+        let height = e > 0.5 ? min(e * 1.3, rect.height * 0.45) : 0
+        let r = max(0, min(radius, (rect.width - 2 * e) / (2 * k), (rect.height - height) / k))
+        let left = rect.minX + e, right = rect.maxX - e, top = rect.minY, bottom = rect.maxY
+
+        // Drawn as one outline rather than a union of shapes: no boolean operation on every frame.
         var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addQuadCurve(to: CGPoint(x: rect.minX + e, y: rect.minY + e), control: CGPoint(x: rect.minX + e, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX + e, y: rect.maxY - r))
-        path.addQuadCurve(to: CGPoint(x: rect.minX + e + r, y: rect.maxY), control: CGPoint(x: rect.minX + e, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX - e - r, y: rect.maxY))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX - e, y: rect.maxY - r), control: CGPoint(x: rect.maxX - e, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX - e, y: rect.minY + e))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY), control: CGPoint(x: rect.maxX - e, y: rect.minY))
+        path.move(to: CGPoint(x: rect.minX, y: top))
+        if height > 0 {
+            // Leaves the screen edge along it, meets the island's side along that side.
+            path.addCurve(to: CGPoint(x: left, y: top + height),
+                          control1: CGPoint(x: rect.minX + e * 0.62, y: top),
+                          control2: CGPoint(x: left, y: top + height * 0.38))
+        } else {
+            path.addLine(to: CGPoint(x: left, y: top))
+        }
+        path.addLine(to: CGPoint(x: left, y: bottom - k * r))
+        Self.corner(&path, at: CGPoint(x: left, y: bottom), r: r, dx: 1, dy: -1, vertical: true)
+        path.addLine(to: CGPoint(x: right - k * r, y: bottom))
+        Self.corner(&path, at: CGPoint(x: right, y: bottom), r: r, dx: -1, dy: -1, vertical: false)
+        path.addLine(to: CGPoint(x: right, y: top + height))
+        if height > 0 {
+            path.addCurve(to: CGPoint(x: rect.maxX, y: top),
+                          control1: CGPoint(x: right, y: top + height * 0.38),
+                          control2: CGPoint(x: rect.maxX - e * 0.62, y: top))
+        } else {
+            path.addLine(to: CGPoint(x: rect.maxX, y: top))
+        }
         path.closeSubpath()
         return path
+    }
+
+    /// One continuous corner (the three cubics of the usual "squircle" corner) at `point`.
+    /// `dx`, `dy` point from the corner into the shape; `vertical`: arriving along the vertical side.
+    private static func corner(_ path: inout Path, at point: CGPoint, r: CGFloat, dx: CGFloat, dy: CGFloat, vertical: Bool) {
+        guard r > 0.01 else {
+            path.addLine(to: point)
+            return
+        }
+        // Offsets along the side the corner starts on (a) and the other one (b), in radii.
+        let segments: [((CGFloat, CGFloat), (CGFloat, CGFloat), (CGFloat, CGFloat))] = [
+            ((0, 1.08849), (0, 0.86840), (0.07491, 0.63149)),
+            ((0.16906, 0.37282), (0.37282, 0.16906), (0.63149, 0.07491)),
+            ((0.86840, 0), (1.08849, 0), (1.52866, 0)),
+        ]
+        func at(_ offset: (CGFloat, CGFloat)) -> CGPoint {
+            // offset.0 runs along the side the corner ends on, offset.1 along the one it starts on.
+            vertical ? CGPoint(x: point.x + dx * offset.0 * r, y: point.y + dy * offset.1 * r)
+                     : CGPoint(x: point.x + dx * offset.1 * r, y: point.y + dy * offset.0 * r)
+        }
+        for (c1, c2, end) in segments {
+            path.addCurve(to: at(end), control1: at(c1), control2: at(c2))
+        }
     }
 }
 

@@ -238,16 +238,36 @@ struct PillButtonStyle: ButtonStyle {
         case .destructive: fill = Theme.coral.opacity(0.20); text = Theme.coral
         case .ghost: fill = .clear; text = Theme.secondary
         }
-        return configuration.label
+        return PillBody(label: configuration.label, isPressed: configuration.isPressed, fill: fill, text: text, large: large,
+                        lifts: kind == .primary || kind == .neutral)
+    }
+}
+
+/// A pill that answers the pointer: it brightens under it and gives a little when pressed.
+private struct PillBody<Label: View>: View {
+    var label: Label
+    var isPressed: Bool
+    var fill: Color
+    var text: Color
+    var large: Bool
+    var lifts: Bool
+    @State private var hovering = false
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        label
             .font(Theme.body(large ? 13.5 : 12.5, .semibold))
             .lineLimit(1)
             .padding(.horizontal, large ? 18 : 13)
             .padding(.vertical, large ? 9.5 : 7)
             .foregroundStyle(text)
-            .background(Capsule().fill(fill.opacity(configuration.isPressed ? 0.65 : 1)))
+            .background(Capsule().fill(fill.opacity(isPressed ? 0.7 : 1)))
+            .overlay(Capsule().fill(Color.white.opacity(hovering && lifts && isEnabled && !isPressed ? 0.08 : 0)))
             .contentShape(Capsule())
-            .scaleEffect(configuration.isPressed ? 0.97 : 1)
-            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+            .scaleEffect(isPressed ? 0.955 : 1)
+            .animation(Motion.snappy(), value: isPressed)
+            .animation(Motion.snappy(), value: hovering)
+            .onHover { hovering = $0 }
     }
 }
 
@@ -258,17 +278,21 @@ struct IconButton: View {
     var label: String
     var action: () -> Void
     @State private var hovering = false
+    @Environment(\.look) private var look
 
     var body: some View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.system(size: 12, weight: .semibold))
                 .foregroundStyle(active ? Color.black : Theme.primary.opacity(hovering ? 1 : 0.8))
+                .contentTransition(.symbolEffect(.replace))
                 .frame(width: 26, height: 22)
-                .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
+                .background(RoundedRectangle(cornerRadius: look.radius(7), style: .continuous)
                     .fill(active ? Color.white : Color.white.opacity(hovering ? 0.18 : 0.10)))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PressStyle())
+        .animation(Motion.snappy(), value: hovering)
+        .animation(Motion.snappy(), value: active)
         .onHover { hovering = $0 }
         .help(label)
         .accessibilityLabel(label)
@@ -306,13 +330,33 @@ private struct SwitchTrack: View {
             .fill(isOn ? look.accent : Color.white.opacity(0.16))
             .frame(width: 36 * scale, height: 21 * scale)
             .overlay(alignment: isOn ? .trailing : .leading) {
-                Circle().fill(Color.white).frame(width: 17 * scale, height: 17 * scale).padding(2 * scale)
+                Circle().fill(Color.white).frame(width: 17 * scale, height: 17 * scale)
+                    .shadow(color: .black.opacity(0.25), radius: 1.5, y: 1)
+                    .padding(2 * scale)
             }
-            .animation(.easeOut(duration: 0.14), value: isOn)
+            .animation(Motion.snappy(), value: isOn)
+    }
+}
+
+/// Any button: gives a little when pressed, and springs back.
+struct PressStyle: ButtonStyle {
+    /// How far it gives: small things a lot, wide rows only a little.
+    var pressed: CGFloat = 0.93
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? pressed : 1)
+            .animation(Motion.snappy(), value: configuration.isPressed)
     }
 }
 
 struct LevelSlider: View {
+    /// Quarters pull the knob in when it comes near them, so the round values are easy to hit.
+    static func snapped(_ value: Double) -> Double {
+        let nearest = (value * 4).rounded() / 4
+        return abs(value - nearest) < 0.025 ? nearest : value
+    }
+
     @Binding var value: Double
     @Environment(\.look) private var look
 
@@ -328,7 +372,7 @@ struct LevelSlider: View {
             .frame(height: 18)
             .contentShape(Rectangle())
             .gesture(DragGesture(minimumDistance: 0).onChanged { drag in
-                value = min(1, max(0, drag.location.x / max(1, width)))
+                value = LevelSlider.snapped(min(1, max(0, drag.location.x / max(1, width))))
             })
         }
         .frame(height: 18)
@@ -342,19 +386,28 @@ struct ChoicePills<Value: Hashable>: View {
     @Binding var selection: Value
     /// Drawn larger on a large welcome screen; type is laid out at that size, never magnified.
     var scale: CGFloat = 1
+    @Namespace private var space
+    @Environment(\.isStaticPreview) private var isStaticPreview
 
     var body: some View {
         HStack(spacing: 6 * scale) {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                Button { selection = option.value } label: {
+                let chosen = selection == option.value
+                Button { withAnimation(Motion.snappy()) { selection = option.value } } label: {
                     Text(option.label)
                         .font(Theme.body(12 * scale, .semibold))
                         .padding(.horizontal, 12 * scale).padding(.vertical, 6.5 * scale)
-                        .foregroundStyle(selection == option.value ? Color.black : Theme.primary.opacity(0.85))
-                        .background(Capsule().fill(selection == option.value ? Color.white : Color.white.opacity(0.10)))
+                        .foregroundStyle(chosen ? Color.black : Theme.primary.opacity(0.85))
+                        .background {
+                            // The white pill slides to the new choice instead of jumping there.
+                            Capsule().fill(Color.white.opacity(0.10))
+                            if chosen {
+                                Capsule().fill(Color.white).travels("choice", in: isStaticPreview ? nil : space)
+                            }
+                        }
                         .contentShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressStyle())
             }
         }
     }

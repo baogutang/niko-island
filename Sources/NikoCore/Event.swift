@@ -41,6 +41,12 @@ public struct TerminalContext: Sendable, Equatable {
     public var tty: String?
     public var tmux: String?
     public var tmuxPane: String?
+    /// WezTerm's pane id and the socket of its GUI (`WEZTERM_PANE`, `WEZTERM_UNIX_SOCKET`).
+    public var weztermPane: String?
+    public var weztermSocket: String?
+    /// kitty's window id and its remote-control address (`KITTY_WINDOW_ID`, `KITTY_LISTEN_ON`).
+    public var kittyWindow: String?
+    public var kittyListenOn: String?
     public var bundleID: String?
     public var pid: Int32?
     /// Executable paths of the bridge's ancestors, nearest first (self-reported).
@@ -58,6 +64,10 @@ public struct TerminalContext: Sendable, Equatable {
         tty = object["tty"]?.stringValue
         tmux = object["tmux"]?.stringValue
         tmuxPane = object["tmux_pane"]?.stringValue
+        weztermPane = object["wezterm_pane"]?.stringValue
+        weztermSocket = object["wezterm_socket"]?.stringValue
+        kittyWindow = object["kitty_window_id"]?.stringValue
+        kittyListenOn = object["kitty_listen_on"]?.stringValue
         bundleID = object["bundle_id"]?.stringValue
         pid = object["pid"]?.intValue.flatMap { Int32(exactly: $0) }
         ancestors = (object["ancestors"]?.arrayValue ?? []).compactMap(\.stringValue)
@@ -71,6 +81,10 @@ public struct TerminalContext: Sendable, Equatable {
         if let tty { object["tty"] = .string(tty) }
         if let tmux { object["tmux"] = .string(tmux) }
         if let tmuxPane { object["tmux_pane"] = .string(tmuxPane) }
+        if let weztermPane { object["wezterm_pane"] = .string(weztermPane) }
+        if let weztermSocket { object["wezterm_socket"] = .string(weztermSocket) }
+        if let kittyWindow { object["kitty_window_id"] = .string(kittyWindow) }
+        if let kittyListenOn { object["kitty_listen_on"] = .string(kittyListenOn) }
         if let bundleID { object["bundle_id"] = .string(bundleID) }
         if let pid { object["pid"] = .int(Int(pid)) }
         if !ancestors.isEmpty { object["ancestors"] = .array(ancestors.map(JSONValue.string)) }

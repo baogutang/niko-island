@@ -93,6 +93,8 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 struct SettingsRootView: View {
     @ObservedObject var model: AppModel
     @Environment(\.isStaticPreview) private var isStaticPreview
+    @Namespace private var selection
+    @State private var hovered: SettingsPage?
 
     private var page: SettingsPage { SettingsPage(rawValue: model.settingsPage) ?? .general }
 
@@ -104,7 +106,10 @@ struct SettingsRootView: View {
                 if isStaticPreview {
                     SettingsPageView(model: model, page: page)
                 } else {
-                    ScrollView(.vertical, showsIndicators: false) { SettingsPageView(model: model, page: page) }
+                    ScrollView(.vertical, showsIndicators: false) {
+                        SettingsPageView(model: model, page: page).id(page).transition(.rise)
+                    }
+                    .animation(Motion.smooth(), value: page)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -125,7 +130,7 @@ struct SettingsRootView: View {
             .padding(.top, 38)
             .padding(.bottom, 12)
             ForEach(SettingsPage.allCases) { item in
-                Button { model.settingsPage = item.rawValue } label: {
+                Button { withAnimation(Motion.snappy()) { model.settingsPage = item.rawValue } } label: {
                     HStack(spacing: 10) {
                         Image(systemName: item.symbol)
                             .font(.system(size: 13, weight: .semibold))
@@ -139,11 +144,22 @@ struct SettingsRootView: View {
                         Spacer(minLength: 0)
                     }
                     .padding(8)
-                    .background(RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(page == item ? Color.white.opacity(0.10) : Color.clear))
+                    .background {
+                        // One selection that slides from item to item, and a fainter one that follows the pointer.
+                        if page == item {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.10))
+                                .travels("settings-selection", in: isStaticPreview ? nil : selection)
+                        } else if hovered == item {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color.white.opacity(0.045))
+                                .transition(.opacity.animation(Motion.fadeIn(0.15)))
+                        }
+                    }
                     .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PressStyle())
+                .onHover { inside in
+                    if inside { hovered = item } else if hovered == item { hovered = nil }
+                }
             }
             Spacer(minLength: 0)
             Text(L("Version %@", NikoVersion.current)).font(Theme.mono(10.5, .regular)).foregroundStyle(Theme.quaternary)
@@ -168,6 +184,10 @@ struct SettingsPageView: View {
     @State private var kimiKeyDraft = ""
     @State private var minimaxKeyDraft = ""
     @State private var pushKeyDraft = ""
+    @State private var promptRuleDraft = ""
+    @State private var pushSignInDraft = ""
+    @State private var jumpMatchDraft = ""
+    @State private var jumpLinkDraft = ""
     @Environment(\.look) private var look
 
     var body: some View {
@@ -281,6 +301,9 @@ struct SettingsPageView: View {
                 toggleRow(L("Allow with %@, deny with %@", Hotkey.Key.allow.display, Hotkey.Key.deny.display),
                           L("Only for a request the island is showing: with the island closed, the first press opens it. The keys are left to other apps while nothing is waiting. Questions are never answered this way."),
                           isOn: settingsBinding(\.decisionHotkeys))
+                toggleRow(L("Find a session with %@", Hotkey.Key.switcher.display),
+                          L("A search box over everything: type part of a project, a prompt or an agent, then ↩ to go there."),
+                          isOn: settingsBinding(\.switcherHotkey))
                 toggleRow(L("Go to what needs me with %@", Hotkey.Key.jump.display),
                           L("Opens the island on a waiting request; with none, goes to the session that stopped last."),
                           isOn: settingsBinding(\.jumpHotkey))
@@ -293,6 +316,13 @@ struct SettingsPageView: View {
                 choiceRow(L("Remind me about a request left waiting"), L("The cue plays again, up to three times, and a line goes to your phone if that is switched on. Not while the screen is locked."),
                           options: NikoSettings.reminderChoices.map { ($0, $0 == 0 ? L("Never") : L("After %lld min", $0)) },
                           selection: settingsBinding(\.reminderMinutes))
+                toggleRow(L("Do not open over the agent's own window"),
+                          L("While the terminal or app a session runs in is in front, its requests and finished turns stay on the closed island instead of opening it: you are already looking at them."),
+                          isOn: settingsBinding(\.notOverAgentWindow))
+                toggleRow(L("Also remind me of finished turns I have not looked at"),
+                          L("With the reminder above: a turn that finished while you were elsewhere gets the cue again, until you open the island or go to the session."),
+                          isOn: settingsBinding(\.remindUnread))
+                quietNowRow
                 toggleRow(L("Quiet hours"), L("No sounds and nothing sent to a phone between these times. The island itself shows what it always shows."),
                           divider: !model.settings.quietHoursEnabled, isOn: settingsBinding(\.quietHoursEnabled))
                 if model.settings.quietHoursEnabled {
@@ -304,6 +334,34 @@ struct SettingsPageView: View {
                           selection: settingsBinding(\.language))
             }
         }
+    }
+
+    /// Quiet for a while, from here or from a link (a Focus automation in Shortcuts can open it).
+    private var quietNowRow: some View {
+        let until = model.settings.quietNowUntil
+        let on = model.settings.isQuietNow(at: Date())
+        let detail = on ? L("Quiet until %@. Requests still wait for you on the island.", Self.time(Date(timeIntervalSince1970: until)))
+            : L("No sounds, no cards, nothing to the phone. Also from a link, for Shortcuts or a Focus automation: nikoisland://quiet?minutes=60, and nikoisland://quiet/off.")
+        return row(L("Quiet now"), detail) {
+            if on {
+                Button(L("Stop")) { model.setQuietNow(minutes: 0) }.buttonStyle(PillButtonStyle())
+            } else {
+                Menu {
+                    ForEach([30, 60, 120, 240], id: \.self) { minutes in
+                        Button(minutes < 60 ? L("For %lld min", minutes) : L("For %lld h", minutes / 60)) { model.setQuietNow(minutes: minutes) }
+                    }
+                    Button(L("For a day")) { model.setQuietNow(minutes: nil) }
+                } label: {
+                    Chip(text: L("Off"))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+        }
+    }
+
+    static func time(_ date: Date) -> String {
+        date.formatted(Calendar.current.isDateInToday(date) ? .dateTime.hour().minute() : .dateTime.weekday().hour().minute())
     }
 
     /// A time of day in half-hour steps.
@@ -353,7 +411,11 @@ struct SettingsPageView: View {
                         .textFieldStyle(.plain).font(Theme.mono(12)).frame(width: 230)
                         .padding(.horizontal, 10).padding(.vertical, 6)
                         .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                        .onChange(of: model.settings.pushServer) { _, _ in model.takeSignInOutOfPushServer() }
                 }
+            }
+            if !model.settings.pushServer.trimmingCharacters(in: .whitespaces).isEmpty || model.hasPushSignIn {
+                pushSignInRow
             }
             toggleRow(L("Only while the screen is locked or asleep"), L("At the Mac, the island is how you are told."), isOn: settingsBinding(\.pushOnlyWhenAway))
             toggleRow(L("Also when an agent finishes"), L("Off: only when one needs a decision or has a question."), isOn: settingsBinding(\.pushWhenFinished))
@@ -374,6 +436,43 @@ struct SettingsPageView: View {
         case .notSetUp?: return L("There is no key yet, or the server address cannot be used.")
         case .refused(let status)?: return L("The server said no (%lld). Check the key.", status)
         case .unreachable?: return L("The server could not be reached.")
+        }
+    }
+
+    /// A server of one's own behind a password, or an ntfy server with access tokens.
+    private var pushSignInRow: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                if model.hasPushSignIn {
+                    Image(systemName: "lock.fill").font(.system(size: 11)).foregroundStyle(look.accent)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(L("A sign-in for your server is saved in your Keychain.")).font(Theme.body(12.5)).foregroundStyle(Theme.primary)
+                        Text(L("Sent only to the server above, never to a public one.")).font(Theme.body(11)).foregroundStyle(Theme.tertiary)
+                    }
+                    Spacer(minLength: 8)
+                    Button(L("Remove")) {
+                        model.setPushSignIn(nil)
+                        pushSignInDraft = ""
+                    }.buttonStyle(PillButtonStyle())
+                } else if isStaticPreview {
+                    Text(L("Sign-in, if your server asks: user:password, or an ntfy token")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                        .padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                } else {
+                    SecureField(L("Sign-in, if your server asks: user:password, or an ntfy token"), text: $pushSignInDraft)
+                        .textFieldStyle(.plain).font(Theme.mono(12))
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Button(L("Save")) {
+                        model.setPushSignIn(pushSignInDraft)
+                        pushSignInDraft = ""
+                    }
+                    .buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(pushSignInDraft.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                }
+            }
+            .padding(.vertical, 10)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
         }
     }
 
@@ -522,8 +621,182 @@ struct SettingsPageView: View {
             }
             Text(L("Sessions found this way can be watched and jumped to. Approving from the island needs the agent to be connected."))
                 .font(Theme.body(12)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
+            hiddenSessions
+            jumpRules
         }
     }
+
+    /// Links the user wrote for going to a session: an editor's link to a folder, a launcher's, a script's.
+    private var jumpRules: some View {
+        card(L("Going to a session")) {
+            Text(L("Clicking a session brings its terminal tab forward where the terminal allows it (Terminal, iTerm2, tmux, WezTerm, and kitty with remote control on); elsewhere its app. A rule here opens a link instead, for sessions of one agent or in one app. {cwd}, {project}, {session} and {agent} are filled in."))
+                .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 10)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+            ForEach(Array(model.settings.jumpRules.enumerated()), id: \.offset) { index, rule in
+                VStack(spacing: 0) {
+                    HStack(spacing: 10) {
+                        Text(rule.match).font(Theme.body(12.5, .semibold)).foregroundStyle(Theme.primary).lineLimit(1)
+                        Image(systemName: "arrow.right").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.tertiary)
+                        Text(rule.url).font(Theme.mono(11.5)).foregroundStyle(Theme.secondary).lineLimit(1).truncationMode(.middle)
+                        Spacer(minLength: 8)
+                        IconButton(symbol: "xmark", label: L("Remove")) {
+                            withAnimation(Motion.smooth()) { _ = model.settings.jumpRules.remove(at: index) }
+                        }
+                    }
+                    .padding(.vertical, 8)
+                    Rectangle().fill(Theme.hairline).frame(height: 1)
+                }
+                .transition(.row)
+            }
+            HStack(spacing: 8) {
+                if isStaticPreview {
+                    Text(L("Agent or app")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                        .padding(.horizontal, 10).padding(.vertical, 7).frame(width: 120, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    Text("vscode://file{cwd}").font(Theme.mono(12)).foregroundStyle(Theme.tertiary)
+                        .padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                } else {
+                    TextField(L("Agent or app"), text: $jumpMatchDraft)
+                        .textFieldStyle(.plain).font(Theme.body(12.5)).frame(width: 120)
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    TextField("vscode://file{cwd}", text: $jumpLinkDraft)
+                        .textFieldStyle(.plain).font(Theme.mono(12))
+                        .padding(.horizontal, 10).padding(.vertical, 7)
+                        .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                        .onSubmit(addJumpRule)
+                }
+                Menu {
+                    Button("VS Code → vscode://file{cwd}") { jumpMatchDraft = "VS Code"; jumpLinkDraft = "vscode://file{cwd}" }
+                    Button("Cursor → cursor://file{cwd}") { jumpMatchDraft = "Cursor"; jumpLinkDraft = "cursor://file{cwd}" }
+                    Button("Windsurf → windsurf://file{cwd}") { jumpMatchDraft = "Windsurf"; jumpLinkDraft = "windsurf://file{cwd}" }
+                } label: {
+                    Image(systemName: "wand.and.stars").font(.system(size: 12))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+                .help(L("Examples"))
+                Button(L("Add"), action: addJumpRule).buttonStyle(PillButtonStyle(kind: .primary))
+                    .disabled(!canAddJumpRule)
+            }
+            .padding(.vertical, 10)
+            if !jumpLinkDraft.isEmpty, !JumpRule(match: "*", url: jumpLinkDraft).isUsable {
+                Text(L("A link starts with the app's own scheme (like vscode:), not http or file."))
+                    .font(Theme.body(11)).foregroundStyle(Theme.amber).padding(.bottom, 8)
+            }
+        }
+    }
+
+    private var canAddJumpRule: Bool { JumpRule(match: jumpMatchDraft, url: jumpLinkDraft).isUsable }
+
+    private func addJumpRule() {
+        guard canAddJumpRule else { return }
+        withAnimation(Motion.smooth()) {
+            model.settings.jumpRules.append(JumpRule(match: jumpMatchDraft.trimmingCharacters(in: .whitespaces),
+                                                     url: jumpLinkDraft.trimmingCharacters(in: .whitespaces)))
+        }
+        jumpMatchDraft = ""
+        jumpLinkDraft = ""
+    }
+
+    /// Sessions the user never wants to see: scripts, evaluations, a sandbox folder. They are not
+    /// listed, make no sound and send nothing; their requests go straight back to the agent's own prompt.
+    private var hiddenSessions: some View {
+        card(L("Hidden sessions")) {
+            Text(L("A session in one of these folders, or whose first prompt contains one of these words, is not listed, plays no sound and sends nothing. What it asks for is left to the agent's own prompt."))
+                .font(Theme.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 10)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+            ForEach(model.settings.silencedFolders, id: \.self) { folder in
+                ruleRow(icon: "folder", text: Self.tilde(folder), matching: model.sessionsMatching(folder: folder)) {
+                    model.settings.silencedFolders.removeAll { $0 == folder }
+                }
+            }
+            ForEach(model.settings.silencedPrompts, id: \.self) { words in
+                ruleRow(icon: "text.quote", text: "“" + words + "”", matching: model.sessionsMatching(prompt: words)) {
+                    model.settings.silencedPrompts.removeAll { $0 == words }
+                }
+            }
+            row(L("Hide a folder"), L("With everything below it.")) {
+                Menu {
+                    let listed = model.listedFolders.filter { !model.settings.silencedFolders.contains($0) }
+                    ForEach(listed, id: \.self) { folder in
+                        Button(Self.tilde(folder)) { model.hideSessions(inFolder: folder) }
+                    }
+                    if !listed.isEmpty { Divider() }
+                    Button(L("Choose a folder…")) { chooseFolderToHide() }
+                } label: {
+                    Chip(text: L("Add"))
+                }
+                .menuStyle(.borderlessButton)
+                .fixedSize()
+            }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    if isStaticPreview {
+                        Text(L("Words in the first prompt")).font(Theme.body(12.5)).foregroundStyle(Theme.tertiary)
+                            .padding(.horizontal, 10).padding(.vertical, 7).frame(maxWidth: .infinity, alignment: .leading)
+                            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                    } else {
+                        TextField(L("Words in the first prompt"), text: $promptRuleDraft)
+                            .textFieldStyle(.plain).font(Theme.body(12.5))
+                            .padding(.horizontal, 10).padding(.vertical, 7)
+                            .background(RoundedRectangle(cornerRadius: 9, style: .continuous).fill(Theme.field))
+                            .onSubmit(addPromptRule)
+                    }
+                    Button(L("Hide"), action: addPromptRule).buttonStyle(PillButtonStyle(kind: .primary))
+                        .disabled(promptRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                }
+                let draft = promptRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                if draft.count >= 3 {
+                    // What the rule would do, before it is added.
+                    Text(L("Would hide %lld of the sessions listed now.", model.sessionsMatching(prompt: draft)))
+                        .font(Theme.body(11)).foregroundStyle(Theme.tertiary)
+                        .contentTransition(.numericText())
+                        .animation(Motion.snappy(), value: model.sessionsMatching(prompt: draft))
+                }
+            }
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func ruleRow(icon: String, text: String, matching: Int, remove: @escaping () -> Void) -> some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 10) {
+                Image(systemName: icon).font(.system(size: 11)).foregroundStyle(Theme.secondary).frame(width: 16)
+                Text(text).font(Theme.body(12.5)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.middle)
+                Spacer(minLength: 8)
+                Text(matching == 0 ? L("none listed now") : L("hides %lld now", matching))
+                    .font(Theme.body(11)).foregroundStyle(Theme.tertiary)
+                    .contentTransition(.numericText())
+                IconButton(symbol: "xmark", label: L("Show them again"), action: remove)
+            }
+            .padding(.vertical, 8)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
+        }
+        .transition(.row)
+    }
+
+    private func addPromptRule() {
+        let words = promptRuleDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard words.count >= 3, !model.settings.silencedPrompts.contains(words) else { return }
+        withAnimation(Motion.smooth()) { model.settings.silencedPrompts.append(words) }
+        promptRuleDraft = ""
+    }
+
+    private func chooseFolderToHide() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.allowsMultipleSelection = false
+        panel.prompt = L("Hide")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.hideSessions(inFolder: url.standardizedFileURL.path)
+    }
+
+    static func tilde(_ path: String) -> String { (path as NSString).abbreviatingWithTildeInPath }
 
     // MARK: Agents
 
@@ -590,6 +863,12 @@ struct SettingsPageView: View {
                         .buttonStyle(PillButtonStyle(kind: agent.wired ? .neutral : .primary))
                         .disabled(model.maintenance.busy)
                     }
+                    if let note = model.maintenance.repairNotes[agent.id] {
+                        // Its hooks were taken out by another tool and could not be put back.
+                        Text(L("Its hooks were taken out and could not be put back: %@. Press Connect once the file can be written again.", note))
+                            .font(Theme.body(11.5)).foregroundStyle(Theme.amber)
+                            .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
+                    }
                     if agent.wired, let followUp = agent.followUp {
                         Text(L(followUp)).font(Theme.body(11.5)).foregroundStyle(Theme.amber)
                             .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
@@ -599,6 +878,11 @@ struct SettingsPageView: View {
                 .padding(.vertical, 10)
                 if index < model.maintenance.agents.count - 1 { Rectangle().fill(Theme.hairline).frame(height: 1) }
             }
+        }
+        card {
+            toggleRow(L("Put back hooks another tool took out"),
+                      L("Some tools rewrite an agent's config and drop entries they do not know. A connected agent whose hooks went missing is connected again, at most every ten minutes, and the island says so. Removing an agent here or with niko-island uninstall stops this for it."),
+                      divider: false, isOn: settingsBinding(\.restoreRemovedHooks))
         }
         Text(L("Connecting adds entries tagged niko-bridge to the agent's config after a backup. Removing takes out only those entries."))
             .font(Theme.body(12)).foregroundStyle(Theme.tertiary).fixedSize(horizontal: false, vertical: true)
@@ -790,6 +1074,12 @@ struct SettingsPageView: View {
                           L("Premium requests, chat and completions for the month. Reads the sign-in the GitHub CLI (gh) keeps on this Mac (in ~/.config/gh, or your Keychain: macOS may ask you first) and sends it to api.github.com, nowhere else. Asked every ten minutes."),
                           divider: lookupNote(ProviderLimitsClient.copilot) != nil, isOn: settingsBinding(\.copilotLimitsLookup))
                 if let note = lookupNote(ProviderLimitsClient.copilot) { lookupStatus(note, divider: false) }
+            }
+            card(L("Warnings")) {
+                choiceRow(L("Warn me when a plan window reaches"),
+                          L("Once per window and cycle, on the island and to your phone if that is on. A warning also comes when the recent pace would use a window up before it resets."),
+                          divider: false, options: NikoSettings.limitWarningChoices.map { ($0, "\($0) %") },
+                          selection: settingsBinding(\.limitWarningPercent))
             }
             card(L("Price list")) {
                 toggleRow(L("Refresh the model price list from the network (weekly)"),

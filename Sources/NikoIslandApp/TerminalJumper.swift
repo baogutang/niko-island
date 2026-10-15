@@ -16,6 +16,20 @@ enum TerminalJumper {
                 }
             }
             var selected = false
+            func isRunning(_ bundleID: String) -> Bool { !NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).isEmpty }
+            if let pane = target.weztermPane, isRunning("com.github.wez.wezterm"), let wezterm = TerminalJump.locateWezTerm(ancestors: ancestors) {
+                let environment = TerminalJump.weztermEnvironment(for: target)
+                let tab = TerminalJump.weztermListQuery(for: target)
+                    .flatMap { run(wezterm, $0, environment: environment, timeout: 4) }
+                    .flatMap { TerminalJump.weztermTab(ofPane: pane, listing: $0) }
+                for arguments in TerminalJump.weztermCommands(for: target, tab: tab) {
+                    _ = run(wezterm, arguments, environment: environment, timeout: 4)
+                }
+            }
+            if let arguments = TerminalJump.kittyCommand(for: target), isRunning("net.kovidgoyal.kitty"),
+               let kitty = TerminalJump.locateKitty(ancestors: ancestors) {
+                _ = run(kitty, arguments, timeout: 4)
+            }
             if let script = TerminalJump.appleScript(for: target, clientTTY: clientTTY) {
                 // osascript keeps the Apple Events round trip off our main thread.
                 // The first use triggers the system's Automation consent prompt.
@@ -82,18 +96,27 @@ enum TerminalJumper {
         }
     }
 
-    private static func run(_ executable: String, _ arguments: [String]) -> String? {
+    private static func run(_ executable: String, _ arguments: [String], environment: [String: String] = [:],
+                            timeout: TimeInterval? = nil) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
+        if !environment.isEmpty {
+            process.environment = ProcessInfo.processInfo.environment.merging(environment) { $1 }
+        }
         let out = Pipe()
         process.standardOutput = out
         process.standardError = FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         guard (try? process.run()) != nil else { return nil }
+        // A terminal's own command line tool that hangs is given up on. (Not osascript: the
+        // first use waits on the system's consent prompt for as long as the user reads it.)
+        let deadline = DispatchWorkItem { if process.isRunning { process.terminate() } }
+        if let timeout { DispatchQueue.global().asyncAfter(deadline: .now() + timeout, execute: deadline) }
         let data = out.fileHandleForReading.readDataToEndOfFile()
         process.waitUntilExit()
-        return String(decoding: data, as: UTF8.self)
+        deadline.cancel()
+        return process.terminationReason == .exit ? String(decoding: data, as: UTF8.self) : nil
     }
 }
 

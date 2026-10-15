@@ -145,6 +145,17 @@ $ICON_KEY
     <true/>
     <key>NSPrincipalClass</key>
     <string>NSApplication</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+        <dict>
+            <key>CFBundleURLName</key>
+            <string>$BUNDLE_ID</string>
+            <key>CFBundleURLSchemes</key>
+            <array>
+                <string>nikoisland</string>
+            </array>
+        </dict>
+    </array>
     <key>NSAppleEventsUsageDescription</key>
     <string>Niko Island uses Apple Events only to bring the terminal tab that is waiting for you to the front.</string>
     <key>NSHumanReadableCopyright</key>

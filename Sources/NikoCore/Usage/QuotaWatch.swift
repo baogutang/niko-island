@@ -44,7 +44,7 @@ public struct QuotaWatch: Sendable {
     }
 
     public enum Alert: Sendable, Equatable {
-        /// The window crossed 90 % used.
+        /// The window crossed the warning share (90 % unless chosen otherwise).
         case nearlyFull(agent: String, window: RateLimitWindow)
         /// At the recent pace the window runs out before it resets.
         case runsOutEarly(agent: String, window: RateLimitWindow, at: Date)
@@ -70,7 +70,9 @@ public struct QuotaWatch: Sendable {
     static func key(agent: String, window: String) -> String { agent + "/" + window }
 
     /// Adds a reading and returns whatever it makes worth saying.
-    public mutating func record(agent: String, window: RateLimitWindow, at time: Date, now: Date = Date()) -> [Alert] {
+    /// `nearlyFullAt`: the share from which a window counts as nearly used up (90 unless the user chose otherwise).
+    public mutating func record(agent: String, window: RateLimitWindow, at time: Date, now: Date = Date(),
+                                nearlyFullAt threshold: Double = 90) -> [Alert] {
         guard window.usedPercent.isFinite else { return [] }
         let key = Self.key(agent: agent, window: window.id)
         var series = samples[key] ?? []
@@ -92,7 +94,7 @@ public struct QuotaWatch: Sendable {
         let cycle = window.resetsAt.map { String(Int($0.timeIntervalSince1970 / 3600)) } ?? "-"
         var alerts: [Alert] = []
         func once(_ what: String) -> Bool { said[key, default: []].insert(what + "@" + cycle).inserted }
-        if let previous, previous.used < 90, sample.used >= 90, once("90") {
+        if let previous, previous.used < threshold, sample.used >= threshold, once("full") {
             alerts.append(.nearlyFull(agent: agent, window: window))
         }
         if sample.used >= Self.forecastFrom, sample.used < 99.5, let outlook = outlook(agent: agent, window: window, now: now),

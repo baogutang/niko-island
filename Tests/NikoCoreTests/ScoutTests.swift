@@ -182,7 +182,7 @@ final class TranscriptScoutTests: XCTestCase {
     }
 
     func testFindsRecentSessionsAndFollowsThemAsTheyGrow() throws {
-        let scratch = try Scratch()
+        let scratch = Scratch()
         let home = scratch.url
         let claude = home.appendingPathComponent(".claude/projects/-tmp-proj/11111111-aaaa.jsonl")
         let old = home.appendingPathComponent(".claude/projects/-tmp-proj/22222222-old.jsonl")
@@ -217,7 +217,7 @@ final class TranscriptScoutTests: XCTestCase {
     }
 
     func testOnlyTheTailOfALongTranscriptIsRead() throws {
-        let scratch = try Scratch()
+        let scratch = Scratch()
         let file = scratch.url.appendingPathComponent(".claude/projects/p/33333333.jsonl")
         let prompt = #"{"type":"user","message":{"role":"user","content":"The first ask"}}"# + "\n"
         let filler = String(repeating: #"{"type":"assistant","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","name":"Read","input":{"file_path":"/tmp/a.swift"}}]}}"# + "\n", count: 400)

@@ -31,6 +31,8 @@ public struct MaintenanceState: Sendable, Equatable {
     /// Set when the bundled bridge still carries the download quarantine flag:
     /// the shell command that clears it.
     public var quarantineFix: String?
+    /// Why an agent's hooks could not be put back, by agent id: what to fix by hand.
+    public var repairNotes: [String: String] = [:]
 
     public init() {}
 }
@@ -97,6 +99,64 @@ extension AppModel {
                 self.maintenance.agents = rows
             }
         }
+    }
+
+    /// Hooks of an agent the user connected, taken out since by another tool (a config
+    /// switcher, a dotfiles sync), are put back, and the user is told so. Checked every two
+    /// minutes; an agent is put back at most once every ten minutes, so a tool that keeps
+    /// taking them out is not fought over and over. Only the installed app on the standard
+    /// runtime folder does this, as with the re-wiring after an update.
+    func restoreRemovedHooks(now: Date = Date(), isBundled: Bool = Bundle.main.bundleURL.pathExtension == "app") {
+        guard settings.restoreRemovedHooks, isBundled, paths.isDefaultLocation,
+              !maintenance.busy, !restoreRunning, now.timeIntervalSince(restoreCheckedAt) >= 120 else { return }
+        restoreCheckedAt = now
+        restoreRunning = true
+        let home = self.home, paths = self.paths
+        let recent = restoredAt.filter { now.timeIntervalSince($0.value) < 600 }.map(\.key)
+        let bridge = Shims.locateBridgeBinary(), executable = Bundle.main.executablePath
+        Task.detached(priority: .utility) {
+            var options = InstallOptions(home: home, paths: paths)
+            var missing: [String] = []
+            var result: InstallResult?
+            let wanted = ConnectedAgents.load(paths: paths).sorted()
+            if !wanted.isEmpty, let report = try? Installer(options: options).scan(.uninstall) {
+                let wired = Installer.wiredAgents(in: report)
+                // An agent that is no longer on this Mac has nothing to put back.
+                missing = wanted.filter { id in
+                    report.agents[id]?.directory == .present && !wired.contains(id) && !recent.contains(id)
+                }
+                if !missing.isEmpty {
+                    options.agentIDs = missing
+                    options.includeStatusLine = false
+                    options.bridgeBinary = bridge
+                    options.appExecutable = executable
+                    result = Installer(options: options).run(.install)
+                }
+            }
+            await MainActor.run { self.restored(missing, result: result, at: now) }
+        }
+    }
+
+    private func restored(_ agents: [String], result: InstallResult?, at now: Date) {
+        restoreRunning = false
+        guard let result, !agents.isEmpty else { return }
+        for id in agents { restoredAt[id] = now }
+        var back: [String] = []
+        for outcome in result.plan.outcomes where agents.contains(outcome.id) {
+            if case .skipped(let reason) = outcome.status {
+                maintenance.repairNotes[outcome.id] = reason
+            } else if result.touched(outcome.id), result.applied {
+                maintenance.repairNotes[outcome.id] = nil
+                back.append(outcome.id)
+            }
+        }
+        if let error = result.error { log.error("putting hooks back failed: \(error)") }
+        guard !back.isEmpty else { return }
+        let names = Localization.list(back.map { AgentRegistry.displayName(for: $0) })
+        log.info("hooks taken out by another tool were put back: \(back.joined(separator: ", "))")
+        refreshMaintenance()
+        guard !isExpanded, completion == nil, pending.isEmpty else { return }
+        notify(Toast(key: SessionKey(source: back[0], sessionID: ""), title: L("%@: hooks put back", names), kind: .notice), for: 10)
     }
 
     /// Runs the installer off the main thread. Only ever called from an explicit click.

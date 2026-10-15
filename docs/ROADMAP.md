@@ -119,6 +119,15 @@ to what turned up when somebody did.
 | The last 24 hours, four weeks by weekday and hour, cache hits | Built; seen with real transcripts in a development build |
 | Copilot's allowances | Built and covered by tests with a recorded shape; the endpoint was checked through `gh` (field names only), the app's own lookup was not run (it would read gh's Keychain item) |
 
+## Released: 0.11.0
+
+| Area | State |
+|---|---|
+| Quick search, quiet-now links, hidden sessions and unread/context reminders | Built; parser/model coverage plus native field focus and IME/Return smoke |
+| Restore hooks removed by another tool | Private-file installer/repair/backoff checks; standard runtime guard verified; actual agent configs untouched during acceptance |
+| Configurable warning threshold, six monthly totals, self-hosted push authentication, WezTerm/kitty and custom links | Built and fixture-tested; live phone delivery and those terminal emulators remain unverified |
+| Metal welcome and shared motion | Live 5120×2880 / 2× / 75 Hz presentation measured at 75.0 FPS; close releases the Metal view. 120 Hz and notch hardware still need a separate check |
+
 ## Next
 
 Everything below needs something only the owner of a Mac can give, or hardware
@@ -141,7 +150,7 @@ that was not there.
 
 - Adapters for Mistral Vibe, DeepSeek CLI, Pi / OhMyPi and OpenClaw.
 - Kimi Code's older home (`~/.kimi`), for installations that have not moved.
-- Sounds that respect Focus modes.
+- Automatic system Focus integration. Quiet-now URLs for owner-created Shortcuts automations ship in 0.11.0.
 - Monitoring agents on remote machines over SSH.
 - Opening a new terminal window to re-attach a detached tmux session.
 

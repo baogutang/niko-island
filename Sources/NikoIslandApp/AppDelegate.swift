@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
+    private var switcher: QuickSwitcherController?
     private var island: IslandWindowController?
     private var settingsWindow: SettingsWindowController?
     private var notifier: SystemNotifier?
@@ -46,7 +47,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         model.hasKimiKey = ProviderKeychain.exists(ProviderLimitsClient.kimiAccount)
         model.hasMiniMaxKey = ProviderKeychain.exists(ProviderLimitsClient.minimaxAccount)
         model.hasPushKey = ProviderKeychain.exists(PushClient.account)
-        model.start()
+        model.hasPushSignIn = ProviderKeychain.exists(PushClient.signInAccount)
+        // Development: `-NikoUsageDisabled YES` leaves usage counting off, so a run measures what it is about.
+        model.start(usage: !UserDefaults.standard.bool(forKey: "NikoUsageDisabled"))
         if model.startFailure == .anotherInstanceRunning {
             // One island is enough: the running instance keeps the socket.
             NSApp.terminate(nil)
@@ -57,17 +60,22 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.island = island
         island.show()
         statusItem = StatusItemController(model: model)
+        let switcher = QuickSwitcherController(model: model)
+        self.switcher = switcher
+        model.onOpenSwitcher = { [weak switcher] in switcher?.toggle() }
 
         Hotkey.shared.action = { [weak self] in self?.model.toggleExpanded() }
         Hotkey.shared.actions[.allow] = { [weak self] in self?.model.decideByKey(.allow) }
         Hotkey.shared.actions[.deny] = { [weak self] in self?.model.decideByKey(.deny) }
         Hotkey.shared.actions[.jump] = { [weak self] in self?.model.jumpToWhatNeedsMe() }
+        Hotkey.shared.actions[.switcher] = { [weak self] in self?.switcher?.toggle() }
         model.$settings
             .receive(on: DispatchQueue.main)
             .sink { settings in
                 Localization.use(language: settings.language)
                 Hotkey.shared.setEnabled(settings.hotkeyEnabled)
                 Hotkey.shared.set(.jump, enabled: settings.jumpHotkey)
+                Hotkey.shared.set(.switcher, enabled: settings.switcherHotkey)
             }
             .store(in: &subscriptions)
         // ⌃⌥A and ⌃⌥D belong to us only while a request is waiting; otherwise other apps keep them.
@@ -168,6 +176,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     public func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool { true }
+
+    /// `nikoisland://` links, from Shortcuts, a Focus automation, a launcher or a script.
+    public func application(_ application: NSApplication, open urls: [URL]) {
+        for url in urls {
+            guard let link = IslandLink(url) else {
+                model.log.info("ignored a link it does not know: \(url.scheme ?? "")://\(url.host ?? "")")
+                continue
+            }
+            model.follow(link)
+        }
+    }
 }
 
 /// Entry point used by the `niko-island` executable when no CLI subcommand was given.

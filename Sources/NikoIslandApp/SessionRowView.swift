@@ -66,8 +66,12 @@ struct SessionRowView: View {
     var now: Date
     /// Off under a heading that already names the project.
     var showsProject = true
+    /// The row the pointer is over. One highlight serves the whole list and slides to it.
+    var hovered: Binding<SessionKey?>? = nil
+    var hoverSpace: Namespace.ID? = nil
     @State private var hovering = false
     @Environment(\.look) private var look
+    @Environment(\.islandNamespace) private var islandSpace
 
     private var pendingHere: AppModel.PendingRequest? {
         model.pending.first { $0.sessionKey == session.key }
@@ -90,9 +94,22 @@ struct SessionRowView: View {
         }
         .padding(.vertical, look.compact ? 5 : 9)
         .padding(.horizontal, 10)
-        .background(RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).fill(hovering ? Theme.hover : Color.clear))
+        .background {
+            if let hovered, let hoverSpace {
+                if hovered.wrappedValue == session.key {
+                    RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).fill(Theme.hover)
+                        .matchedGeometryEffect(id: "row-highlight", in: hoverSpace)
+                }
+            } else {
+                RoundedRectangle(cornerRadius: look.radius(14), style: .continuous).fill(hovering ? Theme.hover : Color.clear)
+            }
+        }
         .padding(.horizontal, -10)
-        .onHover { hovering = $0 }
+        .onHover { inside in
+            hovering = inside
+            // Entering a row takes the highlight; the list itself lets it go when the pointer leaves it.
+            if inside, let hovered { withAnimation(Motion.snappy(look.motion)) { hovered.wrappedValue = session.key } }
+        }
         .contextMenu {
             Button(L("Open in Terminal")) { model.jump(to: session.key) }
             if let reply = session.lastReply, !reply.isEmpty {
@@ -108,12 +125,19 @@ struct SessionRowView: View {
                 Button(L("Stop auto-approving")) { model.revokeGrants(for: session.key) }
             }
             Button(L("Dismiss")) { model.dismiss(session.key) }
+            if let folder = session.cwd, !folder.isEmpty {
+                Divider()
+                Button(L("Hide every session in %@", (folder as NSString).lastPathComponent)) {
+                    withAnimation(Motion.smooth()) { model.hideSessions(inFolder: folder) }
+                }
+            }
         }
     }
 
     private var summary: some View {
         HStack(alignment: .top, spacing: 13) {
             MascotView(source: session.source, size: 30, animated: session.phase == .working)
+                .travels("creature/" + session.key.description, in: islandSpace)
                 .padding(.top, 2)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -171,7 +195,7 @@ struct SessionRowView: View {
                     Chip(text: L("context %@", context.label), tint: context.isNearlyFull ? Theme.amber : nil)
                 }
                 if session.subagents > 0 { Chip(text: L("%lld helpers", session.subagents), tint: Theme.sky) }
-                if session.phase == .needsAttention { BellBadge() }
+                if session.phase == .needsAttention { BellBadge().transition(.scale(scale: 0.4).combined(with: .opacity)) }
             }
             .padding(.top, 1)
         }
@@ -180,6 +204,7 @@ struct SessionRowView: View {
     private var activityLine: some View {
         HStack(spacing: 5) {
             Circle().fill(Theme.color(for: session.phase, accent: look.accent)).frame(width: 6, height: 6)
+                .animation(Motion.smooth(look.motion), value: session.phase)
             Text(session.activity.localizedVerb)
                 .font(look.body(12, .medium))
                 .foregroundStyle(Theme.color(for: session.phase, accent: look.accent))

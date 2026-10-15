@@ -17,6 +17,12 @@ public struct JumpTarget: Sendable, Equatable {
     public var ttyDevice: String?
     public var tmuxSocket: String?
     public var tmuxPane: String?
+    /// A WezTerm pane, and the socket of the GUI that has it.
+    public var weztermPane: String?
+    public var weztermSocket: String?
+    /// A kitty window, and kitty's remote-control socket (only a unix socket is used).
+    public var kittyWindow: String?
+    public var kittySocket: String?
 
     public init(terminal: TerminalContext, ancestors: [ProcessNode] = []) {
         if let id = terminal.itermSessionID, !id.isEmpty {
@@ -29,12 +35,25 @@ public struct JumpTarget: Sendable, Equatable {
             tmuxSocket = tmux.split(separator: ",").first.map(String.init)
             tmuxPane = terminal.tmuxPane
         }
+        if let pane = terminal.weztermPane, !pane.isEmpty, pane.allSatisfy(\.isNumber) {
+            weztermPane = pane
+            weztermSocket = terminal.weztermSocket.flatMap { $0.hasPrefix("/") ? $0 : nil }
+        }
+        if let window = terminal.kittyWindow, !window.isEmpty, window.allSatisfy(\.isNumber) {
+            kittyWindow = window
+            // "unix:/path" or "unix:@abstract"; a tcp address is not used.
+            kittySocket = terminal.kittyListenOn.flatMap { $0.hasPrefix("unix:") && $0.count > 5 ? $0 : nil }
+        }
         let program = terminal.termProgram ?? ""
         let bundles = [terminal.bundleID].compactMap { $0 } + ancestors.compactMap(\.bundleID)
         if program == "iTerm.app" || (itermSessionGUID != nil && program != "Apple_Terminal") || bundles.contains("com.googlecode.iterm2") {
             app = .iterm2
         } else if program == "Apple_Terminal" || bundles.contains("com.apple.Terminal") {
             app = .appleTerminal
+        } else if weztermPane != nil, program == "WezTerm" || bundles.isEmpty {
+            app = .other(bundleID: bundles.first ?? "com.github.wez.wezterm")
+        } else if kittyWindow != nil, bundles.isEmpty {
+            app = .other(bundleID: "net.kovidgoyal.kitty")
         } else {
             app = .other(bundleID: bundles.first)
         }
@@ -182,6 +201,54 @@ public enum TerminalJump {
         return socket + ["list-clients", "-t", pane, "-F", "#{client_tty}"]
     }
 
+    /// WezTerm: which tab the pane is in is read from `wezterm cli list --format json`, then that tab and the pane are activated.
+    public static func weztermListQuery(for target: JumpTarget) -> [String]? {
+        guard target.weztermPane != nil else { return nil }
+        return ["cli", "--no-auto-start", "list", "--format", "json"]
+    }
+
+    /// The tab of a pane in `wezterm cli list --format json` output.
+    public static func weztermTab(ofPane pane: String, listing: String) -> String? {
+        guard let rows = (try? JSONValue.parse(Data(listing.utf8)))?.arrayValue else { return nil }
+        for row in rows where row["pane_id"]?.intValue.map(String.init) == pane {
+            return row["tab_id"]?.intValue.map(String.init)
+        }
+        return nil
+    }
+
+    public static func weztermCommands(for target: JumpTarget, tab: String?) -> [[String]] {
+        guard let pane = target.weztermPane else { return [] }
+        var commands: [[String]] = []
+        if let tab, tab.allSatisfy(\.isNumber) { commands.append(["cli", "--no-auto-start", "activate-tab", "--tab-id", tab]) }
+        commands.append(["cli", "--no-auto-start", "activate-pane", "--pane-id", pane])
+        return commands
+    }
+
+    /// The environment for `wezterm cli`: the socket of the GUI the pane lives in, when known.
+    public static func weztermEnvironment(for target: JumpTarget) -> [String: String] {
+        target.weztermSocket.map { ["WEZTERM_UNIX_SOCKET": $0] } ?? [:]
+    }
+
+    /// kitty: focus the window through its remote control. Needs `allow_remote_control` and `listen_on` in kitty's config.
+    public static func kittyCommand(for target: JumpTarget) -> [String]? {
+        guard let window = target.kittyWindow, let socket = target.kittySocket else { return nil }
+        return ["@", "--to", socket, "focus-window", "--match", "id:" + window]
+    }
+
+    public static func locateWezTerm(ancestors: [ProcessNode] = []) -> String? {
+        // The GUI's own folder has the command line tool next to it.
+        let siblings = ancestors.map(\.path).filter { ($0 as NSString).lastPathComponent.hasPrefix("wezterm") }
+            .map { (($0 as NSString).deletingLastPathComponent as NSString).appendingPathComponent("wezterm") }
+        let candidates = siblings + ["/Applications/WezTerm.app/Contents/MacOS/wezterm", "/opt/homebrew/bin/wezterm", "/usr/local/bin/wezterm"]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
+    public static func locateKitty(ancestors: [ProcessNode] = []) -> String? {
+        let fromAncestors = ancestors.map(\.path).filter { ($0 as NSString).lastPathComponent == "kitty" }
+        let candidates = fromAncestors + ["/Applications/kitty.app/Contents/MacOS/kitty", "/opt/homebrew/bin/kitty", "/usr/local/bin/kitty"]
+        return candidates.first { FileManager.default.isExecutableFile(atPath: $0) }
+    }
+
     public static func locateTmux(ancestors: [ProcessNode] = []) -> String? {
         let fromAncestors = ancestors.map(\.path).filter { ($0 as NSString).lastPathComponent == "tmux" }
         let candidates = fromAncestors + ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux", "/usr/bin/tmux", "/opt/local/bin/tmux"]
@@ -324,5 +391,69 @@ public enum TerminalReply {
             return "missing"
             """
         }
+    }
+}
+
+/// A jump the user wrote: for sessions of an agent or in an app, open a link instead
+/// (an editor's own link to a folder, a launcher's, a script's). `{cwd}`, `{project}`,
+/// `{session}` and `{agent}` are filled in, each escaped for a link.
+public struct JumpRule: Sendable, Equatable, Codable {
+    /// An agent id ("claude"), an app's name as its row shows it ("VS Code"), a bundle id, or "*" for any session.
+    public var match: String
+    public var url: String
+
+    public init(match: String, url: String) {
+        self.match = match
+        self.url = url
+    }
+
+    public func matches(_ session: Session) -> Bool {
+        let wanted = match.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !wanted.isEmpty else { return false }
+        if wanted == "*" { return true }
+        let names = [session.source, session.hostName, session.hostBundleID, AgentRegistry.displayName(for: session.source)]
+            .compactMap { $0?.lowercased() }
+        return names.contains(wanted)
+    }
+
+    /// The link for this session, or nil when the template does not make one (or would need a folder it has not got).
+    public func link(for session: Session) -> URL? {
+        link(cwd: session.cwd, project: session.cwd.flatMap { AutoNamer.projectName(cwd: $0) },
+             session: session.key.sessionID.isEmpty ? nil : session.key.sessionID, agent: session.source)
+    }
+
+    /// The rule can make a link at all (checked with made-up values before it is added).
+    public var isUsable: Bool {
+        !match.trimmingCharacters(in: .whitespaces).isEmpty
+            && link(cwd: "/Users/someone/Projects/demo app", project: "demo app", session: "0a1b-2c3d", agent: "claude") != nil
+    }
+
+    func link(cwd: String?, project: String?, session: String?, agent: String) -> URL? {
+        let template = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let colon = template.firstIndex(of: ":"), colon > template.startIndex else { return nil }
+        // A link to a web page or a file is not a jump.
+        let scheme = template[..<colon].lowercased()
+        guard !["http", "https", "file", "javascript", "data"].contains(scheme) else { return nil }
+        var path = CharacterSet.urlPathAllowed
+        path.remove(charactersIn: "?#")
+        var part = CharacterSet.urlQueryAllowed
+        part.remove(charactersIn: "&=+?#/")
+        let values: [(String, String?, CharacterSet)] = [
+            ("{cwd}", cwd, path), ("{project}", project, part), ("{session}", session, part), ("{agent}", agent, part),
+        ]
+        var text = template
+        for (token, value, allowed) in values where text.contains(token) {
+            guard let value, let escaped = value.addingPercentEncoding(withAllowedCharacters: allowed) else { return nil }
+            text = text.replacingOccurrences(of: token, with: escaped)
+        }
+        return URL(string: text)
+    }
+
+    /// The first rule that applies to a session, and its link.
+    public static func link(for session: Session, rules: [JumpRule]) -> URL? {
+        for rule in rules where rule.matches(session) {
+            if let link = rule.link(for: session) { return link }
+        }
+        return nil
     }
 }

@@ -9,10 +9,15 @@ final class BackdropStage {
     /// Where the pointer is, from -0.5 to 0.5 across the screen.
     var pointer = CGSize.zero
     var bursts: [Date] = []
+    /// Throws the confetti (set by the layer that draws it).
+    var onCelebrate: (() -> Void)?
+    /// Frames the sea drew in the last second, for the development build's counter.
+    var framesPerSecond = 0
 
     func celebrate() {
         bursts.append(Date())
         if bursts.count > 4 { bursts.removeFirst() }
+        onCelebrate?()
     }
 }
 
@@ -55,15 +60,17 @@ struct OnboardingView: View {
                 SeaBackdrop(stage: stage, unit: u, accent: look.accent, islandBottom: metrics.bandHeight)
                 DemoIsland(model: model, metrics: metrics, stage: demoStage)
                     .offset(y: appeared || isStaticPreview ? 0 : -(metrics.bandHeight + 40))
-                    .animation(.spring(response: 0.7, dampingFraction: 0.58).delay(0.25), value: appeared)
+                    // The island drops into place and bites into the top edge with one small give.
+                    .animation(.spring(response: 0.62, dampingFraction: 0.66).delay(0.25), value: appeared)
 
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
                     content(u)
                         .id(step)
+                        // Pages slide and fade; they are never scaled, which would soften every letter on them mid-way.
                         .transition(.asymmetric(
-                            insertion: .opacity.combined(with: .offset(y: 34 * u)).combined(with: .scale(scale: 0.96)),
-                            removal: .opacity.combined(with: .offset(y: -24 * u)).combined(with: .scale(scale: 1.03))))
+                            insertion: .opacity.combined(with: .offset(y: 22 * u)).animation(Motion.fadeIn(0.42).delay(0.08)),
+                            removal: .opacity.combined(with: .offset(y: -14 * u)).animation(Motion.fadeOut(0.18))))
                     Spacer(minLength: 0)
                     footer(u)
                         .padding(.bottom, 46 * u)
@@ -73,6 +80,17 @@ struct OnboardingView: View {
                 .padding(.horizontal, 40)
                 .padding(.top, metrics.bandHeight + 70 * u)
 
+                if UserDefaults.standard.bool(forKey: "NikoShowFrameRate") {
+                    // Development only: how many frames the sea drew in the last second.
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        Text("\(stage.framesPerSecond) fps").font(.system(size: 12, weight: .semibold, design: .monospaced))
+                            .foregroundStyle(.white.opacity(0.8)).padding(6)
+                            .background(RoundedRectangle(cornerRadius: 6).fill(.black.opacity(0.5)))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.leading, 20)
+                    .padding(.top, metrics.bandHeight + 22 * u)
+                }
                 HStack {
                     Spacer()
                     if step != .done {
@@ -136,7 +154,7 @@ struct OnboardingView: View {
     }
 
     private func go(_ next: Step) {
-        withAnimation(.spring(response: 0.55, dampingFraction: 0.84)) { step = next }
+        withAnimation(Motion.smooth()) { step = next }
     }
 
     private func advance() {
@@ -167,22 +185,26 @@ struct OnboardingView: View {
                     Bobbing(delay: Double(index) * 0.11, travel: 6 * u) {
                         MascotView(sprite: sprite, size: 48 * u, animated: true)
                     }
-                    .scaleEffect(shown ? 1 : 0.01)
-                    .offset(y: shown ? 0 : 26 * u)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.52).delay(0.55 + Double(index) * 0.07), value: revealed)
+                    // Up from below, never scaled: a pixel creature drawn small and enlarged is a blurred one.
+                    .opacity(shown ? 1 : 0)
+                    .offset(y: shown ? 0 : 34 * u)
+                    .animation(.spring(response: 0.55, dampingFraction: 0.62).delay(0.55 + Double(index) * 0.06), value: revealed)
                 }
             }
             VStack(spacing: 12 * u) {
                 // The name arrives a letter at a time, then a light passes over it.
                 HStack(spacing: 0) {
                     ForEach(Array(title.enumerated()), id: \.offset) { index, character in
+                        // Each letter rises out of its own line, as type set from below: sharp all the way.
                         Text(String(character))
                             .font(rounded(92, .heavy, u))
                             .foregroundStyle(LinearGradient(colors: [.white, Color.white.opacity(0.74)], startPoint: .top, endPoint: .bottom))
-                            .opacity(shown ? 1 : 0)
-                            .offset(y: shown ? 0 : 46 * u)
-                            .blur(radius: shown ? 0 : 10)
-                            .animation(.spring(response: 0.6, dampingFraction: 0.66).delay(Double(index) * 0.045), value: revealed)
+                            .offset(y: shown ? 0 : 118 * u)
+                            .opacity(shown ? 1 : 0.0)
+                            .padding(.vertical, 8 * u)
+                            .clipped()
+                            .padding(.vertical, -8 * u)
+                            .animation(.spring(response: 0.72, dampingFraction: 0.8).delay(Double(index) * 0.038), value: revealed)
                     }
                 }
                 .overlay { if !isStaticPreview { Shimmer(delay: 1.5) .mask(Text(NikoVersion.displayName).font(rounded(92, .heavy, u))) } }
@@ -195,8 +217,8 @@ struct OnboardingView: View {
                     .foregroundStyle(Theme.primary.opacity(0.82))
                     .multilineTextAlignment(.center)
                     .opacity(shown ? 1 : 0)
-                    .offset(y: shown ? 0 : 14 * u)
-                    .animation(.easeOut(duration: 0.55).delay(0.7), value: revealed)
+                    .offset(y: shown ? 0 : 12 * u)
+                    .animation(Motion.fadeIn(0.7).delay(0.62), value: revealed)
             }
             Text(L("See what each one is doing, approve and answer where you are, and go back to the right window when you want to."))
                 .font(text(15.5, .regular, u))
@@ -204,7 +226,8 @@ struct OnboardingView: View {
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: 580 * u)
                 .opacity(shown ? 1 : 0)
-                .animation(.easeOut(duration: 0.55).delay(0.95), value: revealed)
+                .offset(y: shown ? 0 : 8 * u)
+                .animation(Motion.fadeIn(0.7).delay(0.86), value: revealed)
         }
     }
 
@@ -726,14 +749,57 @@ struct SeaBackdrop: View {
 
     var body: some View {
         if isStaticPreview {
-            scene(time: 12.4, intro: 30, pointer: .zero, bursts: [])
+            GeometryReader { proxy in
+                if let image = SeaShader.image(size: proxy.size, backing: 2, unit: unit, accent: accent, islandBottom: islandBottom,
+                                               time: 12.4, intro: 30) {
+                    ZStack {
+                        Image(decorative: image, scale: 2).resizable()
+                        swimmers(time: 12.4)
+                    }
+                } else {
+                    scene(time: 12.4, intro: 30, pointer: .zero, bursts: [])
+                }
+            }
+            .ignoresSafeArea()
+        } else if SeaShader.pipeline != nil {
+            // The GPU draws the sea at the display's own resolution and refresh;
+            // Core Animation moves the creatures and throws the confetti.
+            ZStack {
+                SeaMetalView(stage: stage, unit: unit, accent: accent, islandBottom: islandBottom)
+                CreatureStageView(stage: stage, unit: unit, accent: accent, islandBottom: islandBottom)
+            }
+            .ignoresSafeArea()
         } else {
+            // No Metal (a virtual machine, say): the same scene drawn by the CPU.
             TimelineView(.animation) { context in
                 let now = context.date
                 scene(time: now.timeIntervalSinceReferenceDate, intro: now.timeIntervalSince(stage.began), pointer: stage.pointer,
                       bursts: stage.bursts.map { now.timeIntervalSince($0) }.filter { $0 < Confetti.lifetime })
             }
         }
+    }
+
+    /// The creatures where they are at `time`, for documentation images.
+    private func swimmers(time: Double) -> some View {
+        let u = Double(unit)
+        return GeometryReader { proxy in
+            let width = Double(proxy.size.width), height = Double(proxy.size.height)
+            let whale = travel(time, period: 44, offset: 0.12)
+            swimmer(Mascots.whale, size: 66 * unit, facesLeft: true, movingRight: true,
+                    x: whale * (width + 240 * u) - 120 * u, y: height * 0.752 + sin(time * 0.5) * 8 * u, tilt: 0)
+            let boat = travel(time, period: 68, offset: 0.55)
+            swimmer(Mascots.boat, size: 54 * unit, facesLeft: true, movingRight: false,
+                    x: (1 - boat) * (width + 240 * u) - 120 * u, y: height * 0.668 + sin(time * 0.9 + 1) * 5 * u, tilt: 0)
+            let turtle = travel(time, period: 58, offset: 0.8)
+            swimmer(Mascots.turtle, size: 44 * unit, facesLeft: false, movingRight: true,
+                    x: turtle * (width + 200 * u) - 100 * u, y: height * 0.91 + sin(time * 0.7 + 2) * 9 * u, tilt: 0)
+            swimmer(Mascots.jellyfish, size: 40 * unit, facesLeft: false, movingRight: false,
+                    x: width * 0.86 + sin(time * 0.3) * 26 * u, y: height * 0.90 + cos(time * 0.6) * 14 * u, tilt: 0)
+            let gull = travel(time, period: 29, offset: 0.7)
+            swimmer(Mascots.gull, size: 34 * unit, facesLeft: false, movingRight: true,
+                    x: gull * (width + 160 * u) - 80 * u, y: height * 0.19 + sin(time * 1.3) * 12 * u, tilt: 0)
+        }
+        .allowsHitTesting(false)
     }
 
     private func scene(time: Double, intro: Double, pointer: CGSize, bursts: [Double]) -> some View {

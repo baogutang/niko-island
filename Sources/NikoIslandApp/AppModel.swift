@@ -63,7 +63,7 @@ public final class AppModel: ObservableObject {
 
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
-        public enum Kind: Sendable { case completed, failed, limitReset, limitWarning }
+        public enum Kind: Sendable { case completed, failed, limitReset, limitWarning, notice }
         public var key: SessionKey
         public var title: String
         public var kind: Kind
@@ -100,6 +100,9 @@ public final class AppModel: ObservableObject {
     @Published public private(set) var startFailure: StartFailure?
     @Published public private(set) var httpPort: UInt16 = 0
     @Published public private(set) var isExpanded = false
+    /// How far two fingers are pulling the island right now, in points: down (positive) on the
+    /// closed island, up (negative) on the open one's top band. Drawn with rubber-band resistance.
+    @Published public var pull: CGFloat = 0
     @Published public private(set) var expandReason: ExpandReason = .click
     @Published public var route: Route = .sessions
     @Published public private(set) var toast: Toast?
@@ -114,6 +117,7 @@ public final class AppModel: ObservableObject {
     /// How the last line to the phone went; nil until one was sent.
     @Published public internal(set) var pushStatus: PushClient.Outcome?
     @Published public internal(set) var hasPushKey = false
+    @Published public internal(set) var hasPushSignIn = false
     /// Branch per working directory, for the rows that are listed.
     @Published public internal(set) var branches: [String: String] = [:]
     /// Says whether the island can be seen right now (it is away over a full-screen app). Set by the window.
@@ -135,6 +139,7 @@ public final class AppModel: ObservableObject {
                 || settings.glmRegion != oldValue.glmRegion || settings.minimaxRegion != oldValue.minimaxRegion {
                 reconcileProviderLimits()
             }
+            if settings.silencedFolders != oldValue.silencedFolders || settings.silencedPrompts != oldValue.silencedPrompts { publish() }
             if settings.claudeAsksItself != oldValue.claudeAsksItself {
                 if settings.claudeAsksItself { askClaudeCode(force: true) } else { claudeLookup = nil }
             }
@@ -151,6 +156,8 @@ public final class AppModel: ObservableObject {
     public weak var soundPlayer: SoundPlaying?
     /// Opens the settings window (set by the app delegate).
     public var onOpenSettings: (() -> Void)?
+    /// Opens the quick switcher (set by the app delegate).
+    public var onOpenSwitcher: (() -> Void)?
     /// Plays a cue regardless of the switches (the preview buttons in Settings).
     public var onPreviewSound: ((SoundEvent) -> Void)?
     /// The settings page that is showing (raw value of `SettingsPage`).
@@ -375,6 +382,8 @@ public final class AppModel: ObservableObject {
     func refreshPresence() {
         refreshBranches()
         remindAboutWaiting()
+        remindAboutUnread()
+        restoreRemovedHooks()
         askClaudeCode()
         noteLimitResets()
         let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
@@ -416,8 +425,33 @@ public final class AppModel: ObservableObject {
         }
         guard due else { return }
         play(.attention, now: now)
-        if !isExpanded, settings.expandOnAttention { expand(.attention) }
+        if !isExpanded, settings.expandOnAttention, mayOpenByItself(for: pending.first?.sessionKey, now: now) { expand(.attention) }
         onAttentionNeeded?()
+    }
+
+    /// Finished turns nobody has looked at yet, and when they finished (for the optional reminder).
+    private var unread: [SessionKey: Date] = [:]
+    private var unreadReminded: Set<SessionKey> = []
+
+    /// Once per finished turn: the "finished" cue again, when nobody has opened the island or
+    /// gone to the session since. Off unless switched on.
+    func remindAboutUnread(now: Date = Date()) {
+        let minutes = settings.reminderMinutes
+        unread = unread.filter { key, _ in store[key]?.phase == .waiting }
+        guard settings.remindUnread, minutes > 0, !(isAway && settings.quietWhenAway) else { return }
+        let due = unread.filter { key, since in !unreadReminded.contains(key) && now.timeIntervalSince(since) >= Double(minutes) * 60 }
+        guard !due.isEmpty else { return }
+        unreadReminded.formUnion(due.keys)
+        play(.completed, now: now)
+    }
+
+    /// The user has seen what there is to see.
+    private func markRead(_ key: SessionKey? = nil) {
+        if let key {
+            unread[key] = nil
+        } else {
+            unread = [:]
+        }
     }
 
     // MARK: Sessions found on disk
@@ -556,7 +590,11 @@ public final class AppModel: ObservableObject {
             requestWithdrawn(request.id, resolving: false)
         }
 
-        if let replier = delivery.replier {
+        let silenced = isSilenced(event.key)
+        if let replier = delivery.replier, silenced {
+            // A hidden session asks in its own window: nothing here is shown for it.
+            replier.send(ReplyBuilder.line(for: .passToTerminal, event: event))
+        } else if let replier = delivery.replier {
             if grants.covers(event) {
                 replier.send(ReplyBuilder.line(for: .allowOnce, event: event, reason: "allowed for this session"))
                 store.resolveAttention(event.key, activity: Activity.forTool(event.toolName, input: event.toolInput))
@@ -585,15 +623,93 @@ public final class AppModel: ObservableObject {
                                  : [event.toolName, request.summary.detail].compactMap { $0 }.joined(separator: ": "), now: now)
                     }
                     play(.attention)
-                    if settings.expandOnAttention { expand(.attention) }
+                    if settings.expandOnAttention, mayOpenByItself(for: event.key, now: now) { expand(.attention) }
                     onAttentionNeeded?()
                 }
             }
         }
 
+        // A hidden session goes on being followed, but nothing is said about it.
+        guard !silenced else { return }
         // Some agents hand over their closing words with the event itself.
         let carried = (event.raw["last_assistant_message"] ?? event.raw["lastAssistantMessage"])?.stringValue
         react(to: change, replyIsIn: carried.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false)
+    }
+
+    // MARK: Staying out of the way
+
+    /// Whether the island may open by itself for this session now: not while "Quiet now" is on,
+    /// and not when the session's own window is in front (whoever it is for is looking at it).
+    func mayOpenByItself(for key: SessionKey?, now: Date = Date()) -> Bool {
+        if settings.isQuietNow(at: now) { return false }
+        guard settings.notOverAgentWindow, let key, let session = store[key],
+              let front = frontmostApp() else { return true }
+        return !Self.ownerApps(of: session).contains(front)
+    }
+
+    /// The bundle ids of the apps a session lives in: its terminal, its desktop app, its ancestors'.
+    nonisolated static func ownerApps(of session: Session) -> Set<String> {
+        var apps = Set(session.ancestors.compactMap(\.bundleID))
+        if let terminal = session.terminal.bundleID { apps.insert(terminal) }
+        if let host = session.host?.bundleID { apps.insert(host) }
+        apps.remove(NikoVersion.bundleIdentifier)
+        return apps
+    }
+
+    /// Test seam; the app in front otherwise.
+    var frontmostApp: () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+
+    /// "Quiet now" for a while (nil minutes: until switched off by hand, at most a day), or off with 0.
+    public func setQuietNow(minutes: Int?, now: Date = Date()) {
+        if minutes == 0 {
+            settings.quietNowUntil = 0
+        } else {
+            settings.quietNowUntil = now.addingTimeInterval(TimeInterval(min(24 * 60, max(0, minutes ?? 24 * 60)) * 60)).timeIntervalSince1970
+        }
+    }
+
+    /// What a `nikoisland://` link asked for.
+    public func follow(_ link: IslandLink) {
+        switch link {
+        case .quiet(let minutes):
+            setQuietNow(minutes: minutes)
+            log.info("quiet now, from a link")
+        case .quietOff:
+            setQuietNow(minutes: 0)
+            log.info("quiet now switched off, from a link")
+        case .open: expand(.click)
+        case .switcher: onOpenSwitcher?()
+        case .settings(let page):
+            if let page, SettingsPage(rawValue: page) != nil { settingsPage = page }
+            onOpenSettings?()
+        }
+    }
+
+    /// Hidden by the user's rules (Settings → Sessions).
+    func isSilenced(_ key: SessionKey) -> Bool {
+        guard !settings.silencedFolders.isEmpty || !settings.silencedPrompts.isEmpty, let session = store[key] else { return false }
+        return settings.silences(cwd: session.cwd, firstPrompt: session.firstPrompt)
+    }
+
+    /// The folders sessions are listed in, for picking one to hide.
+    var listedFolders: [String] {
+        var seen = Set<String>()
+        return store.ordered.compactMap(\.cwd).filter { !$0.isEmpty && seen.insert($0).inserted }
+    }
+
+    /// How many listed sessions a rule would hide, for the live preview in Settings.
+    func sessionsMatching(folder: String? = nil, prompt: String? = nil) -> Int {
+        var probe = NikoSettings()
+        probe.silencedFolders = folder.map { [$0] } ?? []
+        probe.silencedPrompts = prompt.map { [$0] } ?? []
+        return store.ordered.filter { probe.silences(cwd: $0.cwd, firstPrompt: $0.firstPrompt) }.count
+    }
+
+    /// Hides every session in a folder from now on (a row's menu).
+    public func hideSessions(inFolder folder: String) {
+        guard !settings.silencedFolders.contains(folder) else { return }
+        settings.silencedFolders.append(folder)
+        publish()
     }
 
     /// `replyIsIn`: the agent's closing words are already on the session (they came with the event, or from its transcript).
@@ -605,6 +721,8 @@ public final class AppModel: ObservableObject {
             // Its transcript is still recent: without this it would come straight back as "waiting".
             dismissedAt[key] = Date()
         case .becameIdle(let key):
+            unread[key] = Date()
+            unreadReminded.remove(key)
             if let session = store[key] {
                 announce(.idle, session: session, body: "")
                 presentWhenSettled(key, failed: false, replyIsIn: replyIsIn)
@@ -617,6 +735,7 @@ public final class AppModel: ObservableObject {
             }
             play(.error)
         case .started(let key):
+            markRead(key)
             // The session is at work again: what it said last time is no longer the news.
             if completion?.key == key { dismissCompletion() }
             if toast?.key == key { toast = nil }
@@ -646,10 +765,19 @@ public final class AppModel: ObservableObject {
     /// within a second and a half, so a burst of events is one sound, not ten.
     func play(_ event: SoundEvent, now: Date = Date()) {
         guard settings.shouldPlay(event), !(isAway && settings.quietWhenAway), !settings.isQuiet(at: now) else { return }
+        if event == .started {
+            // Three prompts or more within ten seconds are a burst (a script, a queue): the first cue stands for all of it.
+            startedAt = startedAt.filter { now.timeIntervalSince($0) < 10 } + [now]
+            if startedAt.count > 2 { return }
+        }
         if let last = lastPlayed[event], now.timeIntervalSince(last) < 1.5 { return }
         lastPlayed[event] = now
         soundPlayer?.play(event)
     }
+
+    private var startedAt: [Date] = []
+    /// Sessions whose nearly full context has been pointed out.
+    private var contextWarned: Set<SessionKey> = []
 
     /// Every reading of a plan window goes into the watch; a window crossing 90 %, or running
     /// out before its reset at the pace of late, is said once per cycle.
@@ -658,7 +786,8 @@ public final class AppModel: ObservableObject {
         var alerts: [QuotaWatch.Alert] = []
         for agent in usage.agents where agent.id != "all" {
             for window in agent.limits {
-                alerts += quotaWatch.record(agent: agent.id, window: window, at: agent.limitsCapturedAt ?? now, now: now)
+                alerts += quotaWatch.record(agent: agent.id, window: window, at: agent.limitsCapturedAt ?? now, now: now,
+                                            nearlyFullAt: Double(settings.limitWarningPercent))
             }
         }
         if now.timeIntervalSince(quotaSavedAt) > 300 {
@@ -702,17 +831,15 @@ public final class AppModel: ObservableObject {
         guard !isExpanded, !(isAway && settings.quietWhenAway) else { return }
         // A finished turn's card or a request matters more than this.
         guard completion == nil, pending.isEmpty else { return }
-        toast = Toast(key: SessionKey(source: agent, sessionID: ""), title: title, kind: .limitWarning)
-        toastTask?.cancel()
-        toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 10 * 1_000_000_000)
-            guard !Task.isCancelled else { return }
-            self?.toast = nil
-        }
+        notify(Toast(key: SessionKey(source: agent, sessionID: ""), title: title, kind: .limitWarning), for: 10)
     }
 
     /// Windows that were used up, with the agent and the time they open again.
     private var fullWindows: [String: (agent: String, resets: Date)] = [:]
+    /// Putting removed hooks back: when it last looked, whether it is looking, and when each agent was put back.
+    var restoreCheckedAt = Date.distantPast
+    var restoreRunning = false
+    var restoredAt: [String: Date] = [:]
     /// Readings of each plan window, for its pace (kept between launches: percentages and times only).
     private lazy var quotaWatch = QuotaWatch.load(from: paths.cache.appendingPathComponent("quota-history.json"))
     private var quotaSavedAt = Date.distantPast
@@ -746,10 +873,15 @@ public final class AppModel: ObservableObject {
         play(.completed)
         guard !isExpanded else { return }
         dismissCompletion()
-        toast = Toast(key: SessionKey(source: agent, sessionID: ""), title: L("%@'s limit has reset", AgentRegistry.displayName(for: agent)), kind: .limitReset)
+        notify(Toast(key: SessionKey(source: agent, sessionID: ""), title: L("%@'s limit has reset", AgentRegistry.displayName(for: agent)), kind: .limitReset), for: 12)
+    }
+
+    /// A notice that is not a finished turn: shown whatever the "finished" style, for a fixed time.
+    func notify(_ toast: Toast, for seconds: UInt64) {
+        self.toast = toast
         toastTask?.cancel()
         toastTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 12 * 1_000_000_000)
+            try? await Task.sleep(nanoseconds: seconds * 1_000_000_000)
             guard !Task.isCancelled else { return }
             self?.toast = nil
         }
@@ -765,6 +897,8 @@ public final class AppModel: ObservableObject {
         toast = nil
         dismissCompletion()
         dismissRecap()
+        // Opened by the user: what finished is in front of them now.
+        if reason != .attention { markRead() }
     }
 
     /// Held open for a screenshot (`-NikoOpenIsland`): nothing closes it.
@@ -979,6 +1113,21 @@ public final class AppModel: ObservableObject {
         pushStatus = nil
     }
 
+    /// The sign-in to a server of one's own (user:password, or an ntfy access token). Keychain only.
+    public func setPushSignIn(_ signIn: String?) {
+        let text = signIn?.trimmingCharacters(in: .whitespacesAndNewlines)
+        ProviderKeychain.store(text?.isEmpty == false ? text : nil, account: PushClient.signInAccount)
+        hasPushSignIn = ProviderKeychain.exists(PushClient.signInAccount)
+        pushStatus = nil
+    }
+
+    /// A server address typed with a sign-in in it: the sign-in goes to the Keychain, the address keeps the rest.
+    public func takeSignInOutOfPushServer() {
+        guard let (server, signIn) = PushRequest.splitSignIn(settings.pushServer) else { return }
+        setPushSignIn(signIn)
+        settings.pushServer = server
+    }
+
     private func scheduleCompletionDismissal() {
         completionTask?.cancel()
         guard !completionHeld else { return }
@@ -1053,7 +1202,13 @@ public final class AppModel: ObservableObject {
     }
 
     private func publish() {
-        sessions = store.ordered
+        let hidden = !settings.silencedFolders.isEmpty || !settings.silencedPrompts.isEmpty
+        sessions = hidden ? store.ordered.filter { !settings.silences(cwd: $0.cwd, firstPrompt: $0.firstPrompt) } : store.ordered
+        // A context about to be compacted is worth one cue, the first time it gets there.
+        for session in sessions where session.context?.isNearlyFull == true && contextWarned.insert(session.key).inserted {
+            play(.limit)
+        }
+        contextWarned = contextWarned.filter { key in sessions.contains { $0.key == key && $0.context?.isNearlyFull == true } }
         grantedSessions = Set(sessions.map(\.key).filter { grants.hasGrants(for: $0) })
         badge = Badge(active: sessions.filter { $0.phase == .working }.count, pending: pending.count)
         // A folder not seen before: its branch is looked up now rather than at the next tick.
@@ -1140,8 +1295,14 @@ public final class AppModel: ObservableObject {
 
     public func jump(to key: SessionKey) {
         guard let session = store[key] else { return }
+        markRead(key)
+        // A link the user wrote for sessions like this one goes first.
+        if let link = JumpRule.link(for: session, rules: settings.jumpRules), openLink(link) { return }
         jumpHandler(session)
     }
+
+    /// Test seam; the system opens the link otherwise.
+    var openLink: (URL) -> Bool = { NSWorkspace.shared.open($0) }
 
     /// Removes a card for a session that will never report again (e.g. a killed agent).
     public func dismiss(_ key: SessionKey) {
