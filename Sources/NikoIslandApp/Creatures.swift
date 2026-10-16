@@ -39,34 +39,62 @@ struct CreaturePose {
     var amount: CGFloat = 0.3
     /// Eyes a little wider or narrower than usual.
     var eyeScale: CGFloat = 1
+    /// Seconds after which every movement of this mood repeats exactly, so a loop of
+    /// frames played over and over has no seam.
+    var loop: Double = 5.04
+
+    static func loop(_ mood: CreatureMood) -> Double {
+        switch mood {
+        case .working: return 2.52
+        case .attention: return 2.3
+        case .happy: return 1.84
+        case .failed: return 3.6
+        case .sleeping: return 4.8
+        case .idle, .waiting: return 5.04
+        }
+    }
+
+    /// The angle of a movement that repeats about every `period` seconds, adjusted so a
+    /// whole number of them fits the loop.
+    func angle(_ period: Double, _ offset: Double = 0) -> Double {
+        let count = max(1, (loop / period).rounded())
+        return (t + offset) * 2 * .pi * count / loop
+    }
+
+    /// 0…1 through a movement that repeats about every `period` seconds, fitted to the loop.
+    func phase(_ period: Double, _ offset: Double = 0) -> Double {
+        let count = max(1, (loop / period).rounded())
+        let value = (t + offset) * count / loop
+        return value - floor(value)
+    }
 
     static func make(mood: CreatureMood, t: Double, seed: Double, still: Bool) -> CreaturePose {
-        let time = t + seed * 7.31
-        var pose = CreaturePose(mood: mood, t: time)
-        func wave(_ period: Double, _ offset: Double = 0) -> Double { sin((time + offset) * 2 * .pi / period) }
-        func fraction(_ value: Double) -> Double { value - floor(value) }
+        var pose = CreaturePose(mood: mood, t: t + seed * 7.31)
+        pose.loop = loop(mood)
+        func wave(_ period: Double, _ offset: Double = 0) -> Double { sin(pose.angle(period, offset)) }
         switch mood {
         case .idle:
-            pose.squash = 1 + 0.022 * CGFloat(wave(3.4))
-            pose.look = CGPoint(x: 0.55 * wave(9.1), y: 0.18 * wave(6.7, 1))
-            pose.action = fraction(time / 2.8)
+            pose.squash = 1 + 0.022 * CGFloat(wave(2.52))
+            pose.look = CGPoint(x: 0.55 * wave(5.04), y: 0.18 * wave(2.52, 1))
+            pose.action = pose.phase(2.52)
             pose.amount = 0.35
         case .working:
-            let bounce = abs(sin(time * .pi / 0.42))
+            // A bounce every 0.84 s: the fall and the rise are the two halves of a sine.
+            let bounce = abs(sin(pose.angle(0.84) / 2))
             pose.hop = 3.6 * CGFloat(bounce)
             pose.squash = 0.955 + 0.075 * CGFloat(bounce)
-            pose.look = CGPoint(x: 0.45 + 0.12 * wave(1.7), y: 0.12)
-            pose.action = fraction(time / 0.62)
+            pose.look = CGPoint(x: 0.45 + 0.12 * wave(1.26), y: 0.12)
+            pose.action = pose.phase(0.63)
             pose.amount = 1
             pose.eyeScale = 0.86
         case .waiting:
-            pose.tilt = 0.075 * wave(2.6)
-            pose.squash = 1 + 0.02 * CGFloat(wave(2.6, 0.65))
-            pose.look = CGPoint(x: 0.15 * wave(5.3), y: -0.8)
-            pose.action = fraction(time / 2.2)
+            pose.tilt = 0.075 * wave(2.52)
+            pose.squash = 1 + 0.02 * CGFloat(wave(2.52, 0.65))
+            pose.look = CGPoint(x: 0.15 * wave(5.04), y: -0.8)
+            pose.action = pose.phase(2.52)
             pose.amount = 0.45
         case .attention:
-            let cycle = fraction(time / 1.15)
+            let cycle = pose.phase(1.15)
             if cycle < 0.42 {
                 let x = cycle / 0.42
                 pose.hop = CGFloat(12 * 4 * x * (1 - x))
@@ -75,26 +103,26 @@ struct CreaturePose {
                 pose.squash = 1 - 0.11 * CGFloat(sin((cycle - 0.42) / 0.14 * .pi))
             }
             pose.look = CGPoint(x: 0, y: -0.35)
-            pose.action = fraction(time / 0.5)
+            pose.action = pose.phase(0.575)
             pose.amount = 0.85
             pose.eyeScale = 1.16
         case .happy:
-            let bounce = abs(sin(time * .pi / 0.46))
+            let bounce = abs(sin(pose.angle(0.92) / 2))
             pose.hop = 7 * CGFloat(bounce)
             pose.squash = 0.94 + 0.1 * CGFloat(bounce)
             pose.tilt = 0.07 * wave(0.92)
-            pose.action = fraction(time / 0.7)
+            pose.action = pose.phase(0.46)
             pose.amount = 0.9
         case .failed:
             pose.squash = 0.93
-            pose.tilt = -0.07 + 0.025 * wave(3.1)
+            pose.tilt = -0.07 + 0.025 * wave(3.6)
             pose.look = CGPoint(x: -0.25, y: 0.55)
-            pose.action = fraction(time / 4)
+            pose.action = pose.phase(3.6)
             pose.amount = 0.15
         case .sleeping:
-            pose.squash = 1 + 0.035 * CGFloat(wave(4.6))
+            pose.squash = 1 + 0.035 * CGFloat(wave(4.8))
             pose.tilt = 0.05
-            pose.action = fraction(time / 4.6)
+            pose.action = pose.phase(4.8)
             pose.amount = 0.12
         }
         if still {
@@ -106,13 +134,15 @@ struct CreaturePose {
             return pose
         }
         if mood != .happy, mood != .failed, mood != .sleeping {
-            // A blink every four or five seconds, now and then two in a row.
-            let period = 4.1 + fraction(seed * 3.3) * 1.7
-            let cycle = fraction(time / period)
+            // A blink once a loop, at a moment of its own; now and then two in a row.
+            let cycle = pose.phase(pose.loop)
+            let length = 0.15 / pose.loop
+            let first = (seed * 3.3 - floor(seed * 3.3)) * (1 - 3 * length)
             let blink = { (start: Double) -> CGFloat in
-                cycle >= start && cycle < start + 0.036 ? CGFloat(sin((cycle - start) / 0.036 * .pi)) : 0
+                cycle >= start && cycle < start + length ? CGFloat(sin((cycle - start) / length * .pi)) : 0
             }
-            pose.blink = max(blink(0), fraction(seed * 5.1) > 0.55 ? blink(0.06) : 0)
+            let twice = seed * 5.1 - floor(seed * 5.1) > 0.55
+            pose.blink = max(blink(first), twice ? blink(first + 1.6 * length) : 0)
         }
         return pose
     }
@@ -332,11 +362,12 @@ enum CreatureArt {
         return path
     }
 
-    static func waves(_ ctx: inout GraphicsContext, y: CGFloat, color: Color, t: Double, opacity: Double) {
+    static func waves(_ ctx: inout GraphicsContext, y: CGFloat, color: Color, pose: CreaturePose, offset: Double, opacity: Double) {
         var path = Path()
+        let shift = pose.angle(2.52) + offset
         for step in 0...40 {
             let x = CGFloat(step) * 2.5
-            let point = CGPoint(x: x, y: y + 2.2 * CGFloat(sin(Double(x) * 0.17 + t * 2.6)))
+            let point = CGPoint(x: x, y: y + 2.2 * CGFloat(sin(Double(x) * 0.17 + shift)))
             if step == 0 { path.move(to: point) } else { path.addLine(to: point) }
         }
         ctx.stroke(path, with: .color(color.opacity(opacity)), style: StrokeStyle(lineWidth: 3, lineCap: .round))
@@ -617,8 +648,8 @@ enum CreatureArt {
         face(&hullContext, eyes: CGPoint(x: 41, y: 72.5), CGPoint(x: 59, y: 72.5), r: 4, mouth: CGPoint(x: 50, y: 79.5), width: 6.5,
              colors: c, pose: pose)
         var sea = ground
-        waves(&sea, y: 91, color: c.extra, t: pose.t, opacity: 0.9)
-        waves(&sea, y: 97, color: c.extra, t: pose.t + 1.3, opacity: 0.45)
+        waves(&sea, y: 91, color: c.extra, pose: pose, offset: 0, opacity: 0.9)
+        waves(&sea, y: 97, color: c.extra, pose: pose, offset: 3.4, opacity: 0.45)
     }
 
     /// Trae and Kiro: an octopus whose arms curl as it works.
@@ -790,8 +821,8 @@ enum CreatureArt {
     /// The island, for the app itself and for agents it does not know: a palm that sways.
     static func island(_ ctx: inout GraphicsContext, ground: GraphicsContext, _ c: CreatureColors, _ pose: CreaturePose, _ detail: Bool) {
         var sea = ground
-        waves(&sea, y: 90, color: c.extra, t: pose.t, opacity: 0.85)
-        waves(&sea, y: 96, color: c.extra, t: pose.t + 1.1, opacity: 0.4)
+        waves(&sea, y: 90, color: c.extra, pose: pose, offset: 0, opacity: 0.85)
+        waves(&sea, y: 96, color: c.extra, pose: pose, offset: 2.9, opacity: 0.4)
         var mound = Path()
         mound.move(to: CGPoint(x: 9, y: 87))
         mound.addCurve(to: CGPoint(x: 91, y: 87), control1: CGPoint(x: 18, y: 58), control2: CGPoint(x: 82, y: 58))
@@ -815,7 +846,7 @@ enum CreatureArt {
         for (index, angle) in [-2.9, -2.35, -1.5, -0.75, -0.2].enumerated() {
             var frond = ctx
             frond.translateBy(x: 45, y: 29)
-            frond.rotate(by: .radians(angle + 0.08 * sin(pose.t * 1.3 + Double(index))))
+            frond.rotate(by: .radians(angle + 0.08 * sin(pose.angle(5.04) + Double(index))))
             var shape = Path()
             shape.move(to: .zero)
             shape.addQuadCurve(to: CGPoint(x: 30, y: 5), control: CGPoint(x: 16, y: -10))
@@ -833,10 +864,9 @@ enum CreatureArt {
     // MARK: Things around it
 
     static func accessory(_ ctx: inout GraphicsContext, _ pose: CreaturePose) {
-        let t = pose.t
         switch pose.mood {
         case .attention:
-            let scale = 1 + 0.12 * CGFloat(sin(t * 9))
+            let scale = 1 + 0.12 * CGFloat(sin(pose.angle(0.575)))
             var badge = ctx
             badge.translateBy(x: 86, y: 14 - pose.hop * 0.4)
             badge.scaleBy(x: scale, y: scale)
@@ -850,13 +880,13 @@ enum CreatureArt {
             shape.move(to: CGPoint(x: -9, y: 7)); shape.addLine(to: CGPoint(x: -14, y: 14)); shape.addLine(to: CGPoint(x: -3, y: 8))
             bubble.fill(shape, with: .color(.white.opacity(0.92)))
             for k in 0..<3 {
-                let lift = max(0, sin(t * 4 - Double(k) * 0.9))
+                let lift = max(0, sin(pose.angle(1.26) - Double(k) * 0.9))
                 bubble.fill(Path(ellipseIn: CGRect(x: -9.5 + CGFloat(k) * 7, y: -2 - 2 * CGFloat(lift), width: 5, height: 5)),
                             with: .color(CreatureColors.ink.opacity(0.45 + 0.55 * lift)))
             }
         case .happy:
             for (index, spot) in [CGPoint(x: 13, y: 20), CGPoint(x: 88, y: 26), CGPoint(x: 78, y: 7)].enumerated() {
-                let s = CGFloat(0.55 + 0.45 * sin(t * 5 + Double(index) * 2.1))
+                let s = CGFloat(0.55 + 0.45 * sin(pose.angle(1.24) + Double(index) * 2.1))
                 var star = ctx
                 star.translateBy(x: spot.x, y: spot.y)
                 star.scaleBy(x: s, y: s)
@@ -869,7 +899,7 @@ enum CreatureArt {
                 star.fill(shape, with: .color(index == 1 ? Theme.amber : .white))
             }
         case .failed:
-            let slide = CGFloat((t / 1.8).truncatingRemainder(dividingBy: 1))
+            let slide = CGFloat(pose.phase(1.8))
             var drop = ctx
             drop.translateBy(x: 84, y: 20 + 10 * slide)
             drop.opacity = Double(1 - slide * 0.7)
@@ -880,7 +910,7 @@ enum CreatureArt {
             drop.fill(shape, with: .color(Color(red: 0.55, green: 0.8, blue: 1)))
         case .sleeping:
             for k in 0..<2 {
-                let phase = CGFloat(((t / 2.4) + Double(k) * 0.5).truncatingRemainder(dividingBy: 1))
+                let phase = CGFloat(pose.phase(2.4, Double(k) * 1.2))
                 let text = Text("z").font(.system(size: 13 + 7 * phase, weight: .heavy, design: .rounded))
                     .foregroundColor(.white.opacity(Double(1 - phase) * 0.9))
                 ctx.draw(text, at: CGPoint(x: 78 + 8 * phase, y: 22 - 16 * phase))
@@ -906,12 +936,8 @@ struct CreatureCanvas: View {
         let colors = CreatureColors(sprite)
         let detail = size >= 24
         if lively, moment == nil, !reduceMotion {
-            // Slow moods need few frames; busy ones get the display's pace at a size where it shows.
-            let calm = mood == .idle || mood == .waiting || mood == .sleeping
-            TimelineView(.animation(minimumInterval: calm ? 1.0 / 20 : (size < 26 ? 1.0 / 30 : 1.0 / 60))) { context in
-                canvas(colors, detail: detail, pose: CreaturePose.make(mood: mood, t: context.date.timeIntervalSinceReferenceDate,
-                                                                       seed: seed, still: false))
-            }
+            // Played by Core Animation from frames drawn once: no work for the app while it moves.
+            LiveCreature(sprite: sprite, mood: mood, size: size, seed: seed)
         } else {
             canvas(colors, detail: detail, pose: CreaturePose.make(mood: mood, t: moment ?? 0, seed: moment == nil ? 0 : seed,
                                                                    still: moment == nil))

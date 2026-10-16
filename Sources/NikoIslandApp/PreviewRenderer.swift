@@ -399,13 +399,13 @@ enum PreviewRenderer {
         var ok = true
         for sprite in Mascots.all {
             // A loop of the creature at work, and a still of it at rest.
-            let count = 24
+            let count = 24, loop = CreaturePose.loop(.working)
             let frames: [(CGImage, Double)] = (0..<count).compactMap { index in
                 let view = AnyView(CreatureCanvas(sprite: sprite, mood: .working, lively: false, seed: 0.3,
-                                                  moment: MascotImage.loop * Double(index) / Double(count), size: 72)
+                                                  moment: loop * Double(index) / Double(count), size: 72)
                     .frame(width: 72, height: 72).padding(12)
                     .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black)))
-                return cgImage(of: view, scale: 2).map { ($0, MascotImage.loop / Double(count)) }
+                return cgImage(of: view, scale: 2).map { ($0, loop / Double(count)) }
             }
             let still = AnyView(MascotView(sprite: sprite, size: 72, mood: .idle).padding(12)
                 .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black)))

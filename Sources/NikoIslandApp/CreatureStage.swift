@@ -112,7 +112,7 @@ final class CreatureStageNSView: NSView {
         let scale = window?.backingScaleFactor ?? 2
         for swimmer in swimmers {
             let mood: CreatureMood = swimmer.sprite.name == Mascots.jellyfish.name ? .idle : .working
-            let frames = MascotImage.vector(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale)
+            let frames = CreatureFrames.frames(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale)
             guard let first = frames.first else { continue }
             // Travel: an outer layer crosses the screen at an even pace.
             let lane = CALayer()
@@ -162,9 +162,9 @@ final class CreatureStageNSView: NSView {
                 let paddle = CAKeyframeAnimation(keyPath: "contents")
                 paddle.values = frames
                 paddle.calculationMode = .discrete
-                paddle.duration = MascotImage.loop
+                paddle.duration = CreaturePose.loop(mood)
                 paddle.repeatCount = .infinity
-                paddle.timeOffset = Double.random(in: 0...MascotImage.loop)
+                paddle.timeOffset = Double.random(in: 0...CreaturePose.loop(mood))
                 body.add(paddle, forKey: "paddle")
             }
             lane.addSublayer(body)
@@ -217,24 +217,6 @@ final class CreatureStageNSView: NSView {
 /// exact, and vector creatures as a loop of frames for Core Animation to flip through.
 enum MascotImage {
     @MainActor private static var cache: [String: CGImage] = [:]
-    @MainActor private static var loops: [String: [CGImage]] = [:]
-    /// Seconds in a loop of vector frames: three bounces of a creature at work.
-    static let loop = 2.52
-
-    @MainActor static func vector(_ sprite: MascotSprite, mood: CreatureMood, points: CGFloat, scale: CGFloat, count: Int = 30) -> [CGImage] {
-        let key = "\(sprite.name)/\(mood.rawValue)/\(Int(points * scale))"
-        if let hit = loops[key] { return hit }
-        let frames: [CGImage] = (0..<count).compactMap { index in
-            let renderer = ImageRenderer(content: CreatureCanvas(sprite: sprite, mood: mood, lively: false, seed: MascotView.seed(sprite.name),
-                                                                 moment: loop * Double(index) / Double(count), size: points)
-                .frame(width: points, height: points))
-            renderer.scale = scale
-            return renderer.cgImage
-        }
-        loops[key] = frames
-        return frames
-    }
-
     @MainActor static func make(_ sprite: MascotSprite, frame: Int) -> CGImage? {
         let key = "\(sprite.name)/\(frame)/\(sprite.palette.keys.sorted().map { "\($0)" }.joined())"
         if let hit = cache[key] { return hit }

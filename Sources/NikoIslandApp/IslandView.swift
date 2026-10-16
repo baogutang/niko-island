@@ -74,13 +74,13 @@ struct IslandBody: View {
             }
         }
         .overlay(alignment: .bottom) {
-            if closed, tone == .working, !isStaticPreview { ActivitySheen(color: look.accent) }
+            if closed, tone == .working, !isStaticPreview { EdgeSheen(color: look.accent).frame(height: 3).transition(.opacity) }
         }
         .clipShape(shape)
         .contentShape(shape)
         .background {
             if closed, let glow = Self.glow(tone, accent: look.accent) {
-                IslandGlow(shape: shape, color: glow.color, breathing: glow.breathing, strength: glow.strength)
+                IslandGlow(shape: shape, color: glow.color, strength: glow.strength)
                     .id(tone)
             }
         }
@@ -103,13 +103,13 @@ struct IslandBody: View {
 
 extension IslandBody {
     /// The colour beneath the closed island for what it is saying, if any.
-    static func glow(_ tone: IslandGlance.Tone, accent: Color) -> (color: Color, breathing: Bool, strength: Double)? {
+    static func glow(_ tone: IslandGlance.Tone, accent: Color) -> (color: Color, strength: Double)? {
         switch tone {
-        case .attention: return (Theme.amber, true, 0.9)
-        case .working: return (accent, false, 0.3)
-        case .done: return (accent, false, 0.6)
-        case .failed: return (Theme.coral, false, 0.6)
-        case .warning: return (Theme.amber, false, 0.45)
+        case .attention: return (Theme.amber, 1)
+        case .working: return (accent, 0.3)
+        case .done: return (accent, 0.6)
+        case .failed: return (Theme.coral, 0.6)
+        case .warning: return (Theme.amber, 0.45)
         case .idle, .waiting: return nil
         }
     }

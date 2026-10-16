@@ -1,66 +1,26 @@
 import SwiftUI
 
 // Small motions that say the island is alive without asking to be looked at:
-// a glow beneath it, a light running along its edge while agents work, a dot
-// that breathes, a word that shimmers, rows that arrive one after another.
+// a glow beneath it, a dot that breathes, a word that shimmers, rows that
+// arrive one after another (the light along its edge is in CreatureLayer.swift).
 // All of them stand still in pictures and when Reduce Motion is on.
 
-/// Colour seeping out from under the closed island: amber and breathing when
-/// someone is waiting on you, the accent and faint while agents work, a short
-/// flash of it when a turn finishes.
+/// Colour seeping out from under the closed island: amber when someone is
+/// waiting on you, the accent and faint while agents work, a short flash of it
+/// when a turn finishes. It holds still: it may be there all day.
 struct IslandGlow<S: Shape>: View {
     var shape: S
     var color: Color
-    /// Breathes in and out; otherwise it holds steady.
-    var breathing: Bool
     var strength: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var high = false
 
     var body: some View {
         shape
             .fill(color)
             .blur(radius: 13)
             .scaleEffect(x: 1.04, y: 1.18, anchor: .top)
-            .opacity(strength * (breathing && !reduceMotion ? (high ? 1 : 0.35) : 0.7))
+            .opacity(strength * 0.7)
             .allowsHitTesting(false)
-            .onAppear {
-                guard breathing, !reduceMotion else { return }
-                withAnimation(.easeInOut(duration: 1.15).repeatForever(autoreverses: true)) { high = true }
-            }
             .transition(.opacity.animation(Motion.fadeIn(0.4)))
-    }
-}
-
-/// A short bright stroke that runs along the bottom of the closed island while
-/// agents work: the island is busy even when the creature is too small to see.
-struct ActivitySheen: View {
-    var color: Color
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
-    var body: some View {
-        if reduceMotion {
-            EmptyView()
-        } else {
-            TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                GeometryReader { proxy in
-                    let period = 2.4
-                    let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
-                    // Ease in and out across the width, with a pause off the edges.
-                    let eased = 0.5 - 0.5 * cos(min(1, phase * 1.25) * .pi)
-                    let width = proxy.size.width * 0.38
-                    let x = -width + (proxy.size.width + width) * eased
-                    Capsule()
-                        .fill(LinearGradient(colors: [color.opacity(0), color.opacity(0.95), color.opacity(0)],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .frame(width: width, height: 1.6)
-                        .offset(x: x, y: proxy.size.height - 1.8)
-                        .blur(radius: 0.3)
-                }
-            }
-            .allowsHitTesting(false)
-            .transition(.opacity)
-        }
     }
 }
 
