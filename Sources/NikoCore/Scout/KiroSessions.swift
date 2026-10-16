@@ -7,7 +7,8 @@ extension SessionHost {
 /// Kiro keeps each session in a folder of its own,
 /// `~/.kiro/sessions/<workspace>/sess_<id>/`: `session.json` (title, workspace,
 /// model, times) and `messages.jsonl`, one record per line with a `payload.type`
-/// (`turn_start`, `user`, `assistant`, `tool_call`, `tool_result`, `turn_end`, …).
+/// (`turn_start`, `user`, `assistant`, `tool_call`, `tool_result`, `turn_end`,
+/// `pending_interaction` / `interaction_resolved` around a permission prompt, …).
 /// Both are read, never written; only the end of the record file is read. This
 /// is how a Kiro session shows up without any hook.
 public final class KiroSessions {
@@ -94,6 +95,8 @@ public final class KiroSessions {
     static func apply(_ records: [JSONValue], to reading: inout ZCodeSessions.Reading) {
         var lastWork: Date?
         var housekeeping: Set<String> = []
+        // A permission prompt Kiro is showing, until it says how it was answered.
+        var asking: String?
         for record in records {
             guard let payload = record["payload"], let type = payload["type"]?.stringValue else { continue }
             let at = record["timestamp"]?.stringValue.flatMap(ISOTime.parse).map(Date.init(timeIntervalSince1970:))
@@ -104,6 +107,7 @@ public final class KiroSessions {
                 isWork = payload["kind"]?.stringValue != "other"
                 if !isWork, let id = payload["toolCallId"]?.stringValue { housekeeping.insert(id) }
             case "tool_result": isWork = !(payload["toolCallId"]?.stringValue.map(housekeeping.contains) ?? false)
+            case "pending_interaction", "interaction_resolved": isWork = true
             default: isWork = false
             }
             if isWork, let at { lastWork = at }
@@ -130,7 +134,20 @@ public final class KiroSessions {
                 } else {
                     reading.turn = .tool(Activity.forTool(tool, input: input))
                 }
+            case "pending_interaction":
+                // Kiro asks in its own window (Allow, Always allow, Deny): the island can only say so.
+                asking = payload["toolCallId"]?.stringValue ?? ""
+                let what = payload["question"]?.stringValue.map { Activity.oneLine($0, limit: 96) }
+                reading.turn = .attention(payload["interactionType"]?.stringValue == "tool_approval" || payload["interactionType"] == nil
+                                          ? Activity(verb: "needs permission", detail: what.map(toolLabel))
+                                          : Activity(verb: "has a question", detail: what))
+                reading.since = at
+            case "interaction_resolved":
+                guard asking != nil, payload["toolCallId"]?.stringValue == asking || asking == "" else { continue }
+                asking = nil
+                reading.turn = .thinking
             case "turn_end":
+                asking = nil
                 reading.turn = .finished
                 reading.since = at
             default:
@@ -138,6 +155,12 @@ public final class KiroSessions {
             }
         }
         if let lastWork { reading.updated = min(reading.updated, lastWork) } else { reading.updated = .distantPast }
+    }
+
+    /// "remote/web_search" → "web_search": the tool, without where Kiro keeps it.
+    static func toolLabel(_ question: String) -> String {
+        guard !question.contains(" "), let last = question.split(separator: "/").last else { return question }
+        return String(last)
     }
 
     private static func title(_ text: String) -> String? {

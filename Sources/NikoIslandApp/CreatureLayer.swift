@@ -23,13 +23,11 @@ enum CreatureFrames {
     }
 
     static func frames(_ sprite: MascotSprite, mood: CreatureMood, points: CGFloat, scale: CGFloat) -> [CGImage] {
-        let palette = sprite.palette.keys.sorted().map { "\($0)\(sprite.palette[$0].map { "\($0)" } ?? "")" }.joined()
-        let key = "\(sprite.name)|\(palette)|\(mood.rawValue)|\(Int((points * scale).rounded()))"
+        let key = "\(sprite.name)|\(mood.rawValue)|\(Int((points * scale).rounded()))"
         if let hit = cache[key] { return hit }
         let loop = CreaturePose.loop(mood)
         let count = max(2, Int((loop * rate(mood)).rounded()))
         let columns = 12, rows = (count + columns - 1) / columns
-        let colors = CreatureColors(sprite)
         let seed = MascotView.seed(sprite.name)
         let detail = points >= 24
         let sheet = Canvas { context, _ in
@@ -38,7 +36,7 @@ enum CreatureFrames {
                 cell.translateBy(x: CGFloat(index % columns) * points, y: CGFloat(index / columns) * points)
                 cell.clip(to: Path(CGRect(x: 0, y: 0, width: points, height: points)))
                 let pose = CreaturePose.make(mood: mood, t: loop * Double(index) / Double(count), seed: seed, still: false)
-                CreatureArt.draw(sprite, colors: colors, pose: pose, in: cell, size: CGSize(width: points, height: points), detail: detail)
+                CreatureArt.draw(sprite, pose: pose, in: cell, size: CGSize(width: points, height: points), scale: scale, detail: detail)
             }
         }
         .frame(width: CGFloat(columns) * points, height: CGFloat(rows) * points)
@@ -116,7 +114,7 @@ final class LiveCreatureView: NSView {
     func show(sprite: MascotSprite, mood: CreatureMood, size: CGFloat, seed: Double) {
         shown = (sprite, mood, size, seed)
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
-        let next = "\(sprite.name)|\(sprite.palette.count)|\(mood.rawValue)|\(size)|\(scale)|\(seed)"
+        let next = "\(sprite.name)|\(mood.rawValue)|\(size)|\(scale)|\(seed)"
         guard next != key else { return }
         key = next
         let frames = CreatureFrames.frames(sprite, mood: mood, points: size, scale: scale)

@@ -54,9 +54,9 @@ final class DocsTests: XCTestCase {
             }
             XCTAssertTrue(text.contains(SoundPack.manifestName), readme)
             XCTAssertTrue(text.contains("~/.niko-island/sounds/packs/"), readme)
-            // Every creature shown has its picture.
-            for name in ["starfish", "whale", "boat", "gull", "jellyfish", "turtle", "octopus", "puffer", "island"] {
-                XCTAssertTrue(text.contains("docs/images/mascots/\(name).gif"), "\(readme): \(name)")
+            // Every pet is shown, with its picture.
+            for pet in PixelPets.all {
+                XCTAssertTrue(text.contains("docs/images/mascots/\(pet.name).gif"), "\(readme): \(pet.name)")
             }
         }
     }
@@ -186,7 +186,7 @@ final class DocsTests: XCTestCase {
         for readme in ["README.md", "README.zh-CN.md"] {
             let text = try read(readme)
             for needle in ["~/.claude/projects/", "~/.codex/sessions/", Hotkey.display, "--recommended",
-                           "docs/images/island-onboarding-agents.png", "docs/images/island-settings-island.png", "docs/images/mascots/crab.gif"] {
+                           "docs/images/island-onboarding-agents.png", "docs/images/island-settings-island.png", "docs/images/mascots/zcode.gif"] {
                 XCTAssertTrue(text.contains(needle), "\(readme): \(needle)")
             }
         }
@@ -272,9 +272,9 @@ final class DocsTests: XCTestCase {
         XCTAssertFalse(NikoSettings().codexLimitsLookup)
         XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
                                                     "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com", "api.github.com",
-                                                    "cursor.com"])
+                                                    "cursor.com", "management.us-east-1.kiro.dev", "management.eu-central-1.kiro.dev"])
         XCTAssertFalse(NikoSettings().kimiLimitsLookup || NikoSettings().minimaxLimitsLookup || NikoSettings().geminiLimitsLookup)
-        XCTAssertFalse(NikoSettings().cursorLimitsLookup || NikoSettings().copilotLimitsLookup)
+        XCTAssertFalse(NikoSettings().cursorLimitsLookup || NikoSettings().copilotLimitsLookup || NikoSettings().kiroLimitsLookup)
         XCTAssertEqual(CursorQuotaAPI.request(login: .init(token: "t", userID: "u")).value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"), true)
         XCTAssertFalse(NikoSettings().updateChecks, "the pages say the version check is off until switched on")
         XCTAssertEqual(UpdateCheck.latest.host, "api.github.com")

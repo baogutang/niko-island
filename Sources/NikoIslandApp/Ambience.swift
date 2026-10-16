@@ -1,8 +1,9 @@
+import AppKit
 import SwiftUI
 
 // Small motions that say the island is alive without asking to be looked at:
-// a glow beneath it, a dot that breathes, a word that shimmers, rows that
-// arrive one after another (the light along its edge is in CreatureLayer.swift).
+// a glow beneath it, a dot that breathes, rows that arrive one after another
+// (the light along its edge is in CreatureLayer.swift).
 // All of them stand still in pictures and when Reduce Motion is on.
 
 /// Colour seeping out from under the closed island: amber when someone is
@@ -25,59 +26,72 @@ struct IslandGlow<S: Shape>: View {
 }
 
 /// The status dot of a row: a ring goes out from it while the session works or waits on you.
+/// The ring is a Core Animation layer: a SwiftUI animation that never ends would have the
+/// whole island drawn again on every frame for as long as it is open.
 struct PulseDot: View {
     var color: Color
     var pulsing: Bool
     var size: CGFloat = 6
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.isStaticPreview) private var isStaticPreview
-    @State private var out = false
 
     var body: some View {
         Circle().fill(color)
             .frame(width: size, height: size)
             .background {
                 if pulsing, !reduceMotion, !isStaticPreview {
-                    Circle().stroke(color, lineWidth: 1.2)
-                        .scaleEffect(out ? 2.6 : 1)
-                        .opacity(out ? 0 : 0.7)
-                        .onAppear {
-                            out = false
-                            withAnimation(.easeOut(duration: 1.3).repeatForever(autoreverses: false)) { out = true }
-                        }
-                        .onDisappear { out = false }
+                    PulseRing(color: NSColor(color)).frame(width: size * 3, height: size * 3).allowsHitTesting(false)
                 }
             }
     }
 }
 
-/// Light passing over text, for the word that says an agent is at work.
-struct TextShimmer: ViewModifier {
-    var active: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.isStaticPreview) private var isStaticPreview
+private struct PulseRing: NSViewRepresentable {
+    var color: NSColor
 
-    func body(content: Content) -> some View {
-        if active, !reduceMotion, !isStaticPreview {
-            content.overlay {
-                TimelineView(.animation(minimumInterval: 1.0 / 30)) { context in
-                    GeometryReader { proxy in
-                        let period = 1.9
-                        let phase = context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: period) / period
-                        let band = max(24, proxy.size.width * 0.6)
-                        LinearGradient(colors: [.white.opacity(0), .white.opacity(0.75), .white.opacity(0)],
-                                       startPoint: .leading, endPoint: .trailing)
-                            .frame(width: band)
-                            .offset(x: -band + (proxy.size.width + 2 * band) * phase)
-                    }
-                }
-                .mask(content)
-                .blendMode(.plusLighter)
-                .allowsHitTesting(false)
-            }
-        } else {
-            content
-        }
+    func makeNSView(context: Context) -> PulseRingView { PulseRingView() }
+    func updateNSView(_ view: PulseRingView, context: Context) { view.color = color }
+}
+
+private final class PulseRingView: NSView {
+    private let ring = CAShapeLayer()
+    var color: NSColor = .systemTeal { didSet { ring.strokeColor = color.cgColor } }
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        ring.fillColor = nil
+        ring.lineWidth = 1.2
+        ring.strokeColor = color.cgColor
+        layer?.addSublayer(ring)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        let side = min(bounds.width, bounds.height) / 3
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        ring.frame = bounds
+        ring.path = CGPath(ellipseIn: CGRect(x: bounds.midX - side / 2, y: bounds.midY - side / 2, width: side, height: side), transform: nil)
+        CATransaction.commit()
+        guard ring.animation(forKey: "pulse") == nil else { return }
+        let grow = CABasicAnimation(keyPath: "transform.scale")
+        grow.fromValue = 1
+        grow.toValue = 2.6
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.7
+        fade.toValue = 0
+        let pulse = CAAnimationGroup()
+        pulse.animations = [grow, fade]
+        pulse.duration = 1.3
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        pulse.repeatCount = .infinity
+        pulse.isRemovedOnCompletion = false
+        ring.add(pulse, forKey: "pulse")
     }
 }
 
@@ -102,6 +116,5 @@ struct Cascade: ViewModifier {
 }
 
 extension View {
-    func shimmer(_ active: Bool) -> some View { modifier(TextShimmer(active: active)) }
     func cascade(_ index: Int) -> some View { modifier(Cascade(index: index)) }
 }

@@ -914,7 +914,7 @@ struct SettingsPageView: View {
     /// Any creature can stand for any agent.
     private func creaturePicker(for agent: String) -> some View {
         let chosen = Mascots.sprite(for: agent, choices: model.settings.mascotChoices).name
-        return HStack(spacing: 5) {
+        return ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 5) {
             ForEach(Mascots.all, id: \.name) { sprite in
                 Button {
                     // Picking the agent's own creature clears the choice.
@@ -929,7 +929,7 @@ struct SettingsPageView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel(sprite.name)
             }
-        }
+        } }
         .padding(.leading, 36)
     }
 
@@ -1091,8 +1091,12 @@ struct SettingsPageView: View {
                 if let note = lookupNote(ProviderLimitsClient.copilot) { lookupStatus(note, divider: true) }
                 toggleRow(L("Ask Cursor for my plan's usage"),
                           L("How much of the included usage this billing cycle is spent, for Auto and for the named models, and on-demand spending if it is on. Reads the sign-in Cursor's app keeps on this Mac (its own settings database, read only) and sends it to cursor.com, nowhere else. Asked every ten minutes while Cursor is in use."),
-                          divider: lookupNote(ProviderLimitsClient.cursor) != nil, isOn: settingsBinding(\.cursorLimitsLookup))
-                if let note = lookupNote(ProviderLimitsClient.cursor) { lookupStatus(note, divider: false) }
+                          divider: true, isOn: settingsBinding(\.cursorLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.cursor) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask Kiro for my credits"),
+                          L("How many of this month's credits are spent, and free-trial or bonus credits. Reads the sign-in Kiro keeps on this Mac (~/.aws/sso/cache/kiro-auth-token.json and Kiro's profile), only while it is still good, and sends it to Kiro (management.us-east-1.kiro.dev or management.eu-central-1.kiro.dev), nowhere else. It is never renewed here. Asked every ten minutes while Kiro is in use. What Kiro spent per turn is counted from its own session files either way."),
+                          divider: lookupNote(ProviderLimitsClient.kiro) != nil, isOn: settingsBinding(\.kiroLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.kiro) { lookupStatus(note, divider: false) }
             }
             card(L("Warnings")) {
                 choiceRow(L("Warn me when a plan window reaches"),

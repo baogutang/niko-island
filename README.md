@@ -34,16 +34,27 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/mascots/starfish.gif" width="40" alt="Starfish" title="Claude Code · MiniMax Code">&nbsp;
-  <img src="docs/images/mascots/whale.gif" width="40" alt="Whale" title="Codex · Kimi Code">&nbsp;
-  <img src="docs/images/mascots/crab.gif" width="40" alt="Crab" title="ZCode · Devin">&nbsp;
-  <img src="docs/images/mascots/boat.gif" width="40" alt="Boat" title="Cursor · Windsurf">&nbsp;
-  <img src="docs/images/mascots/gull.gif" width="40" alt="Gull" title="Copilot CLI · CodeBuddy">&nbsp;
-  <img src="docs/images/mascots/jellyfish.gif" width="40" alt="Jellyfish" title="Gemini CLI · Qwen Code">&nbsp;
-  <img src="docs/images/mascots/turtle.gif" width="40" alt="Turtle" title="OpenCode · MiMoCode · Qoder">&nbsp;
-  <img src="docs/images/mascots/octopus.gif" width="40" alt="Octopus" title="Trae · Kiro">&nbsp;
-  <img src="docs/images/mascots/puffer.gif" width="40" alt="Pufferfish" title="Grok CLI · Factory · Amp">&nbsp;
-  <img src="docs/images/mascots/island.gif" width="40" alt="Island" title="Everything else">
+  <img src="docs/images/mascots/clawd.gif" width="36" alt="Clawd" title="Claude Code">&nbsp;
+  <img src="docs/images/mascots/codex.gif" width="36" alt="Codex" title="Codex">&nbsp;
+  <img src="docs/images/mascots/kiro.gif" width="36" alt="Kiro" title="Kiro">&nbsp;
+  <img src="docs/images/mascots/cursor.gif" width="36" alt="Cursor" title="Cursor">&nbsp;
+  <img src="docs/images/mascots/zcode.gif" width="36" alt="ZCode" title="ZCode">&nbsp;
+  <img src="docs/images/mascots/gemini.gif" width="36" alt="Gemini CLI" title="Gemini CLI">&nbsp;
+  <img src="docs/images/mascots/copilot.gif" width="36" alt="Copilot CLI" title="Copilot CLI">&nbsp;
+  <img src="docs/images/mascots/qwen.gif" width="36" alt="Qwen Code" title="Qwen Code · QwenWork">&nbsp;
+  <img src="docs/images/mascots/trae.gif" width="36" alt="Trae" title="Trae">&nbsp;
+  <img src="docs/images/mascots/windsurf.gif" width="36" alt="Windsurf" title="Windsurf">&nbsp;
+  <img src="docs/images/mascots/opencode.gif" width="36" alt="OpenCode" title="OpenCode">&nbsp;
+  <img src="docs/images/mascots/grok.gif" width="36" alt="Grok CLI" title="Grok CLI">&nbsp;
+  <img src="docs/images/mascots/factory.gif" width="36" alt="Factory" title="Factory">&nbsp;
+  <img src="docs/images/mascots/devin.gif" width="36" alt="Devin" title="Devin">&nbsp;
+  <img src="docs/images/mascots/amp.gif" width="36" alt="Amp" title="Amp">&nbsp;
+  <img src="docs/images/mascots/kimi.gif" width="36" alt="Kimi Code" title="Kimi Code">&nbsp;
+  <img src="docs/images/mascots/minimax.gif" width="36" alt="MiniMax Code" title="MiniMax Code">&nbsp;
+  <img src="docs/images/mascots/qoder.gif" width="36" alt="Qoder" title="Qoder">&nbsp;
+  <img src="docs/images/mascots/codebuddy.gif" width="36" alt="CodeBuddy" title="CodeBuddy">&nbsp;
+  <img src="docs/images/mascots/mimo.gif" width="36" alt="MiMoCode" title="MiMoCode">&nbsp;
+  <img src="docs/images/mascots/island.gif" width="36" alt="Island" title="Everything else">
 </p>
 <p align="center">
   <sub>Claude Code · Codex · ZCode · Cursor · Windsurf · Gemini CLI · Trae · Qwen Code · CodeBuddy · Factory · Grok CLI · OpenCode · MiMoCode · Copilot CLI · Qoder · Kimi Code · Devin · Kiro · MiniMax Code · Amp</sub>
@@ -132,10 +143,12 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 <a id="features"></a>
 ## Features
 
+**0.15.0: every agent's own pet; Kiro's prompts and credits.** Each agent now appears as its own mascot or mark in pixels: Clawd for Claude Code, built from the glyphs Claude Code draws him with and moving with his own poses, Kiro's ghost, the Codex cloud, the Cursor cube, Gemini's sparkle, Copilot's face and the rest, pixelated from the vendors' official icons. A permission prompt in Kiro now reaches the island (read from Kiro's own session files, since Kiro has no hook for it), Kiro's credits are counted per turn and its monthly allowance can be asked, and the open island lost its grey halo.
+
 **0.14.0: creatures with feelings, every agent's activity, Cursor's plan.** The creatures are redrawn in vector and act out what their agent is doing: they bounce along and do their own thing at work (the whale spouts, the crab snaps, the octopus curls), hop with a "!" when someone has to decide, smile with ^ ^ and a few sparkles when a turn finishes, look up at you while they wait, and doze off after a long quiet. The Pixel style keeps the pixel ones. A glow seeps out from under the closed island (amber while someone waits on you), a light runs along its edge while agents work, and rows arrive one after another when it opens. Usage gains half a year of activity from every connected agent, Cursor and Gemini CLI included: sessions, prompts and tool calls per day, a streak, and the tools that did the work. Cursor's included usage can be asked for, provider lookups only ask again while that agent is in use, and the headline token counts no longer include the cache reads. A `~/.claude` folder made by another tool no longer passes for Claude Code, and Cursor running Claude Code's hooks shows as Cursor.
 
 <p align="center">
-  <img src="docs/images/mascots/strip.png" width="640" alt="The ten creatures in vector: starfish, whale, jellyfish, turtle, gull, boat, octopus, pufferfish, crab and the island, at rest, at work, pleased and waiting">
+  <img src="docs/images/mascots/strip.png" width="640" alt="Each agent's own mascot or mark in pixels: Clawd for Claude Code, the Codex cloud, the Kiro ghost, the Cursor cube and the rest, at rest, at work, pleased and waiting">
 </p>
 
 **0.13.0: your limits at the top, a calmer list, permissions explained.** Open the island and the agent at the top of the list shows its five-hour and weekly use with the time to each reset; click it for Usage. Older quiet sessions fold to one line and open when the pointer rests on them. If you turned down control of Terminal or iTerm2 (so a click only brought the app forward, not the session's tab), Niko Island now notices, opens the exact pane in System Settings and docks a short guide beside it until the switch is on; Settings → General lists every permission and how it stands.
@@ -177,7 +190,7 @@ The search picture is a capture of its native window with sample sessions. Other
 - **Tells you when you can go on.** A limit that stopped an agent is remembered with the time it opens again; when it does, the island says so once, with a cue, and to your phone if that is on.
 - **Reaches your phone, if you want that.** A short line through a push service you set up yourself (Bark or ntfy): which agent, which project, what kind of moment. Off until you switch it on, and by default only while the screen is locked.
 - **A list that scales.** As it comes, or under a heading per project or per agent.
-- **One creature per agent, with a mood.** A starfish for Claude Code, a whale for Codex, a crab for ZCode: you can tell sessions apart before reading a word. Each one shows how its session is doing: busy at work, hopping with a "!" when it needs you, pleased when a turn just ended, looking up at you while it waits, asleep after a long quiet, × eyes when something went wrong. Give any agent a different creature if you like.
+- **Every agent's own pet, with a mood.** Each agent appears as its own mascot or mark in pixels: Clawd for Claude Code (drawn from the very glyphs Claude Code draws him with), the ghost for Kiro, the cloud for Codex, the cube for Cursor, the sparkle for Gemini CLI, the face for Copilot, and so on; you can tell sessions apart before reading a word. Each one shows how its session is doing: walking at work, hopping with a "!" when it needs you, arms up or sparkles when a turn just ended, looking around while it waits, eyes shut after a long quiet, a drop of sweat when something went wrong. The marks belong to their owners and are shown only to say which agent a session is.
 - **Chips that orient you.** Every row carries how long, which agent, where it runs (iTerm2, Terminal, Ghostty, WezTerm, VS Code, Cursor, tmux, a desktop app, …) and the git branch its folder is on. The model's name is one switch away.
 - **Back to the right window.** Click a row or a notification and the session's Terminal.app or iTerm2 tab comes forward, tmux panes included; a desktop-app session brings its app forward, and a Codex desktop session opens on that very conversation. A row's menu copies the last reply, shows the folder in Finder, or copies the command that resumes the session.
 - **Usage and limits per agent.** Switch between all agents, Claude Code, Codex and ZCode: the last five hours, today, seven and thirty days, the last 24 hours in quarter hours, four weeks by weekday and hour, and the cache hit rate. Tokens count what went in and came out; context read back from the cache is shown apart, since counted in it makes a day look ten times bigger. The plan's five-hour and weekly limits are shown from whoever knows them: the agent's own files, or, if you switch it on, the provider itself: Anthropic, OpenAI, BigModel / Z.ai, Kimi, MiniMax, GitHub for Copilot's monthly allowances, Google for Gemini CLI's daily quotas, and Cursor for its plan's included usage. Once a provider has answered, it is asked again only while that agent is in use.
@@ -213,28 +226,28 @@ The search picture is a capture of its native window with sample sessions. Other
 <a id="supported-agents"></a>
 ## Supported agents
 
-| Agent | Creature | Status | What you get | What connecting touches |
+| Agent | Pet | Status | What you get | What connecting touches |
 |---|---|---|---|---|
-| **Claude Code** (terminal and desktop app) | starfish | Stable | Live status, approvals, questions, usage, rate limits. Sessions are listed even when not connected | `~/.claude/settings.json` (hook entries + status line wrapper) |
-| Codex (CLI, IDE extension, desktop app) | whale | Beta | Live status, approvals, usage, limits. Sessions are listed even when not connected. Codex asks you to trust new hooks once (`/hooks`) | `~/.codex/hooks.json` |
-| ZCode | crab | Beta | Live status, approvals, usage, plan limits (opt-in). Sessions are listed even when not connected; a session that was open before you connected takes the hooks when it is started again | `~/.zcode/cli/config.json` |
-| Cursor | boat | Beta | Live status | `~/.cursor/hooks.json` |
-| Windsurf | boat | Beta | Live status | `~/.codeium/windsurf/hooks.json` |
-| Gemini CLI | jellyfish | Beta | Live status | `~/.gemini/settings.json` |
-| Trae | octopus | Beta | Live status | `~/.trae/hooks.json`, `~/.trae-cn/hooks.json` |
-| Qwen Code | jellyfish | Beta | Live status | `~/.qwen/settings.json` |
-| CodeBuddy | gull | Beta | Live status | `~/.codebuddy/settings.json` |
-| Factory | pufferfish | Beta | Live status | `~/.factory/settings.json` |
-| Grok CLI | pufferfish | Beta | Live status | `~/.grok/hooks/niko.json` (own file) |
-| OpenCode, MiMoCode | turtle | Experimental | Live status through a small plugin; usage is best effort | `~/.config/opencode/plugins/niko.js`, `~/.config/mimocode/plugins/niko.js` (own files) |
-| Copilot CLI | gull | Beta | Live status | `~/.copilot/hooks/niko.json` (own file) |
-| Qoder, Qoder CN | turtle | Beta | Live status; a permission prompt shows as "needs permission" and is answered in Qoder | `~/.qoder/settings.json`, `~/.qoder-cn/settings.json` |
-| Kimi Code | whale | Beta | Live status; a permission prompt shows as "needs permission" and is answered in Kimi Code | `~/.kimi-code/config.toml` (one marked block at the end) |
-| Devin | crab | Beta | Live status, approvals | `~/.config/devin/config.json` |
-| QwenWork, QoderWork | jellyfish, turtle | Experimental | Live status | `~/.qwenwork/settings.json`, `~/.qoderwork/settings.json` |
-| Kiro (CLI 3 and the IDE) | octopus | Experimental | Live status. Sessions of the Kiro app are listed even when not connected | `~/.kiro/hooks/niko.json` (own file) |
-| MiniMax Code | starfish | Experimental | Live status; permission prompts are answered in MiniMax Code | `~/.minimax/plugins/niko/.claude-plugin/plugin.json` and `hooks/hooks.json` (own plugin) |
-| Amp | pufferfish | Experimental | Live status through a small plugin that only listens (Amp's plugin API is itself experimental) | `~/.config/amp/plugins/niko.ts` (own file) |
+| **Claude Code** (terminal and desktop app) | Clawd | Stable | Live status, approvals, questions, usage, rate limits. Sessions are listed even when not connected | `~/.claude/settings.json` (hook entries + status line wrapper) |
+| Codex (CLI, IDE extension, desktop app) | the Codex cloud | Beta | Live status, approvals, usage, limits. Sessions are listed even when not connected. Codex asks you to trust new hooks once (`/hooks`) | `~/.codex/hooks.json` |
+| ZCode | the Z | Beta | Live status, approvals, usage, plan limits (opt-in). Sessions are listed even when not connected; a session that was open before you connected takes the hooks when it is started again | `~/.zcode/cli/config.json` |
+| Cursor | the cube | Beta | Live status | `~/.cursor/hooks.json` |
+| Windsurf | the W | Beta | Live status | `~/.codeium/windsurf/hooks.json` |
+| Gemini CLI | the sparkle | Beta | Live status | `~/.gemini/settings.json` |
+| Trae | the Trae mark | Beta | Live status | `~/.trae/hooks.json`, `~/.trae-cn/hooks.json` |
+| Qwen Code | the Qwen mark | Beta | Live status | `~/.qwen/settings.json` |
+| CodeBuddy | the cat | Beta | Live status | `~/.codebuddy/settings.json` |
+| Factory | the Factory mark | Beta | Live status | `~/.factory/settings.json` |
+| Grok CLI | the xAI mark | Beta | Live status | `~/.grok/hooks/niko.json` (own file) |
+| OpenCode, MiMoCode | the OpenCode mark, MiMo | Experimental | Live status through a small plugin; usage is best effort | `~/.config/opencode/plugins/niko.js`, `~/.config/mimocode/plugins/niko.js` (own files) |
+| Copilot CLI | the Copilot face | Beta | Live status | `~/.copilot/hooks/niko.json` (own file) |
+| Qoder, Qoder CN | the Qoder mark | Beta | Live status; a permission prompt shows as "needs permission" and is answered in Qoder | `~/.qoder/settings.json`, `~/.qoder-cn/settings.json` |
+| Kimi Code | the K | Beta | Live status; a permission prompt shows as "needs permission" and is answered in Kimi Code | `~/.kimi-code/config.toml` (one marked block at the end) |
+| Devin | the Devin mark | Beta | Live status, approvals | `~/.config/devin/config.json` |
+| QwenWork, QoderWork | the Qwen mark, the Qoder mark | Experimental | Live status | `~/.qwenwork/settings.json`, `~/.qoderwork/settings.json` |
+| Kiro (CLI 3 and the IDE) | the ghost | Experimental | Live status. Sessions of the Kiro app are listed even when not connected; a permission prompt in Kiro shows on the island as "needs permission" (answer it in Kiro); credits spent per turn, and this month's credits (opt-in) | `~/.kiro/hooks/niko.json` (own file) |
+| MiniMax Code | the waveform | Experimental | Live status; permission prompts are answered in MiniMax Code | `~/.minimax/plugins/niko/.claude-plugin/plugin.json` and `hooks/hooks.json` (own plugin) |
+| Amp | the Amp wordmark | Experimental | Live status through a small plugin that only listens (Amp's plugin API is itself experimental) | `~/.config/amp/plugins/niko.ts` (own file) |
 | Mistral Vibe, DeepSeek CLI, Pi / OhMyPi, OpenClaw | — | Planned | — | — |
 
 - **Stable** — wired end to end and covered by tests.
@@ -375,7 +388,7 @@ Short version: **no telemetry, no accounts, all local.** The long version, so yo
 - **Session logs are read, never changed, never copied.** To list sessions and count tokens the app reads the logs Claude Code and Codex keep in your home directory, ZCode's local databases and Kiro's session folders (`~/.kiro/sessions/`), read-only. A session's title and last reply are held in memory while the row is on the island. A task list is read the same way (Claude Code's `~/.claude/tasks/`, the plan in a Codex log, ZCode's todo table), and the branch on a row comes from the `.git/HEAD` file of the session's folder: git itself is never run.
 - **Running agents are detected locally.** To tell you that an agent is running but not connected, the app looks at the names of your running apps and processes. The list goes nowhere.
 - **Local only, owner only.** Agents talk to the app over a unix socket; the app checks the caller's user id on every message. A loopback HTTP port (127.0.0.1, bearer token in an owner-only file) is opened only if you connect an agent that needs a plugin.
-- **A sign-in is read only if you switch on "ask the provider".** With **Ask Anthropic** on, the app reads the sign-in Claude Code keeps in your Keychain (macOS may ask you first), holds it in memory, and sends it to `api.anthropic.com` to ask for your limits. With **Ask BigModel / Z.ai** on, it sends a key you pasted in (kept in your Keychain under Niko Island's own name) to `open.bigmodel.cn` or `api.z.ai`. With **Ask OpenAI** on, it reads the ChatGPT sign-in Codex keeps on this Mac (`~/.codex/auth.json`, or the Keychain if Codex is set to use it) and sends it to `chatgpt.com`. Each goes to that one host and nowhere else, under this app's own name; nothing is renewed, rewritten or copied; only percentages, reset times and a count of saved resets are stored. With **Ask Kimi** or **Ask MiniMax** on, a key you pasted in (kept the same way) goes to `api.kimi.com`, or to `api.minimaxi.com` or `api.minimax.io`. With **Ask GitHub** on, the app reads the sign-in the GitHub CLI (`gh`) keeps (`~/.config/gh/hosts.yml`, or its Keychain item) and sends it to `api.github.com` for Copilot's allowances. With **Ask Google** on, the app reads the sign-in Gemini CLI saved (`~/.gemini/oauth_creds.json`, or its Keychain item) and, only while it has not run out, sends it to `cloudcode-pa.googleapis.com`; it is never renewed here. With **Ask Cursor** on, the app reads the sign-in Cursor's app keeps in its own settings database (`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, opened read-only) and sends it to `cursor.com` for the plan's included usage. With all these switches off, which is how the app ships, no sign-in or key is ever read. ZCode's own stored sign-in is encrypted by ZCode and is never touched.
+- **A sign-in is read only if you switch on "ask the provider".** With **Ask Anthropic** on, the app reads the sign-in Claude Code keeps in your Keychain (macOS may ask you first), holds it in memory, and sends it to `api.anthropic.com` to ask for your limits. With **Ask BigModel / Z.ai** on, it sends a key you pasted in (kept in your Keychain under Niko Island's own name) to `open.bigmodel.cn` or `api.z.ai`. With **Ask OpenAI** on, it reads the ChatGPT sign-in Codex keeps on this Mac (`~/.codex/auth.json`, or the Keychain if Codex is set to use it) and sends it to `chatgpt.com`. Each goes to that one host and nowhere else, under this app's own name; nothing is renewed, rewritten or copied; only percentages, reset times and a count of saved resets are stored. With **Ask Kimi** or **Ask MiniMax** on, a key you pasted in (kept the same way) goes to `api.kimi.com`, or to `api.minimaxi.com` or `api.minimax.io`. With **Ask GitHub** on, the app reads the sign-in the GitHub CLI (`gh`) keeps (`~/.config/gh/hosts.yml`, or its Keychain item) and sends it to `api.github.com` for Copilot's allowances. With **Ask Google** on, the app reads the sign-in Gemini CLI saved (`~/.gemini/oauth_creds.json`, or its Keychain item) and, only while it has not run out, sends it to `cloudcode-pa.googleapis.com`; it is never renewed here. With **Ask Cursor** on, the app reads the sign-in Cursor's app keeps in its own settings database (`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`, opened read-only) and sends it to `cursor.com` for the plan's included usage. With **Ask Kiro** on, the app reads the sign-in Kiro keeps (`~/.aws/sso/cache/kiro-auth-token.json`, and the profile in Kiro's own storage) and, only while it has not run out, sends it to `management.us-east-1.kiro.dev` or `management.eu-central-1.kiro.dev` for this month's credits; it is never renewed here. With all these switches off, which is how the app ships, no sign-in or key is ever read. ZCode's own stored sign-in is encrypted by ZCode and is never touched.
 - **A line to your phone says only what you let it.** With **Send a line to my phone** on, the app sends a title and one short line to the push server you chose (Bark's or ntfy's own, or one of yours; https, or an address on your own network) and to nowhere else. The line names the agent, the project folder and the kind of moment ("Needs your decision", "Finished"). The command being asked for, or the first line of a reply, goes along only if you also switch on *Say what it is about*. The device key or topic is kept in your Keychain. By default lines go out only while the screen is locked or asleep.
 - **Replying types into your terminal, and only there.** With *Reply from the island* on (experimental, off by default), what you type is sent into the tmux pane, iTerm2 session or Terminal tab the agent runs in, as if typed there. Before anything is sent the app checks that the agent is what is waiting at that prompt; if a shell is, nothing is sent. Nothing is typed anywhere else, and macOS asks you before the app may control Terminal or iTerm2.
 - **One program is run on your behalf, and only if you ask.** With *Let Claude Code look* on, the app starts your own `claude` program with `/usage`, in an empty folder of its own, with your settings, hooks and MCP servers left out and nothing saved as a session. What Claude Code then says to Anthropic is its own business, done with its own sign-in. The app reads the answer from `~/.claude.json`.

@@ -60,6 +60,34 @@ final class KiroSessionsTests: XCTestCase {
         XCTAssertEqual(session.activity, Activity(verb: "running", detail: "npm test"))
     }
 
+    /// Kiro asks for permission in its own window and writes the prompt and the answer to the session.
+    func testAPermissionPromptIsShownUntilAnswered() throws {
+        let scratch = Scratch()
+        let options = #""options":[{"optionId":"accept","name":"Allow","kind":"allow_once"},{"optionId":"reject","name":"Deny","kind":"reject_once"}]"#
+        let pending = record("pending_interaction", #""interactionType":"tool_approval","toolCallId":"t-1","question":"remote/web_search",\#(options),"consentRound":1"#)
+        _ = write(scratch, session: "p", records: [
+            record("turn_start"),
+            record("user", #""content":"Look it up""#),
+            pending,
+        ])
+        let kiro = KiroSessions(home: scratch.file("home"))
+        var session = try XCTUnwrap(kiro.snapshots(since: Date().addingTimeInterval(-60)).first)
+        XCTAssertEqual(session.phase, .needsAttention)
+        XCTAssertEqual(session.activity, Activity(verb: "needs permission", detail: "web_search"))
+
+        _ = write(scratch, session: "p", records: [
+            record("turn_start"),
+            record("user", #""content":"Look it up""#),
+            pending,
+            record("interaction_resolved", #""toolCallId":"t-1","outcome":"selected","selectedOption":"accept","consentRound":1"#, ago: 10),
+            record("tool_call", #""toolName":"remote_web_search","kind":"fetch","args":{"query":"swift"},"status":"in_progress""#, ago: 9),
+        ])
+        session = try XCTUnwrap(kiro.snapshots(since: Date().addingTimeInterval(-60)).first)
+        XCTAssertEqual(session.phase, .working, "answered in Kiro: back at work")
+        XCTAssertEqual(KiroSessions.toolLabel("remote/web_search"), "web_search")
+        XCTAssertEqual(KiroSessions.toolLabel("npm test --watch"), "npm test --watch")
+    }
+
     func testOldSessionsAndStrangeFilesAreLeftOut() throws {
         let scratch = Scratch()
         let file = write(scratch, session: "c", records: [record("turn_end")])

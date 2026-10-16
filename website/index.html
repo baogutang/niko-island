@@ -39,7 +39,7 @@
   code, pre, kbd { font-family: var(--mono); }
   button { font: inherit; }
   .wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 0 20px; }
-  .pixel { image-rendering: auto; }
+  .pixel { image-rendering: pixelated; }
 
   /* Nav */
   .nav {
@@ -302,7 +302,7 @@
   .center .sub { margin-left: auto; margin-right: auto; }
 
   /* Creatures */
-  .creatures { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 12px; }
+  .creatures { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 12px; }
   @media (max-width: 900px) { .creatures { grid-template-columns: repeat(5, minmax(0, 1fr)); } }
   @media (max-width: 520px) { .creatures { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
   .creature { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px 8px 14px; text-align: center; min-width: 0; }
@@ -434,8 +434,8 @@
 <main id="top">
   <div class="hero">
     <div class="wrap">
-      <div class="kicker" data-i18n="hero.kicker">0.14.0 · Free · Open source · No telemetry</div>
-      <h1><span data-i18n="hero.pre">Your</span> <span class="rot" id="rot" aria-hidden="true"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt=""><span class="rot-word">Claude Code</span></span><span class="visually-hidden" data-i18n="hero.agents">agents</span> <span data-i18n="hero.post">works.</span> <em data-i18n="hero.em">The island keeps watch.</em></h1>
+      <div class="kicker" data-i18n="hero.kicker">0.15.0 · Free · Open source · No telemetry</div>
+      <h1><span data-i18n="hero.pre">Your</span> <span class="rot" id="rot" aria-hidden="true"><img class="pixel" src="mascots/clawd.gif" width="56" height="56" alt=""><span class="rot-word">Claude Code</span></span><span class="visually-hidden" data-i18n="hero.agents">agents</span> <span data-i18n="hero.post">works.</span> <em data-i18n="hero.em">The island keeps watch.</em></h1>
       <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent on your Mac is doing, moves with the menu bar, opens when one needs you, and lets you approve or answer on the spot.</p>
       <div class="cta">
         <a class="button primary" href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="hero.download">Download for macOS</a>
@@ -472,7 +472,7 @@
           <div class="island" id="island" data-state="working">
             <div class="island-clip" id="clip">
               <div class="st st-working" data-go="sessions">
-                <img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt="">
+                <img class="pixel" src="mascots/clawd.gif" width="22" height="22" alt="">
                 <span class="dim">atlas-api</span><span class="dimmer">·</span>
                 <span class="mint w-edit" data-i18n="demo.editing">editing Retry.swift</span>
                 <span class="mint w-run" data-i18n="demo.running">running swift test</span>
@@ -481,7 +481,7 @@
 
               <div class="st st-attention panel">
                 <div class="req-head">
-                  <img class="pixel" src="mascots/starfish.gif" width="34" height="34" alt="">
+                  <img class="pixel" src="mascots/clawd.gif" width="34" height="34" alt="">
                   <div class="row-main">
                     <div class="row-title"><span class="dim">atlas-api</span> <span class="dimmer">·</span> <b data-i18n="demo.r1">Fix the flaky upload test</b></div>
                     <div class="chips"><span class="c1">Claude Code</span><span>iTerm2</span></div>
@@ -509,7 +509,7 @@
                   </span>
                 </div>
                 <div class="row">
-                  <img class="pixel" src="mascots/starfish.gif" width="30" height="30" alt="">
+                  <img class="pixel" src="mascots/clawd.gif" width="30" height="30" alt="">
                   <div class="row-main">
                     <div class="row-title"><span class="dim">atlas-api</span> <span class="dimmer">·</span> <b data-i18n="demo.r1">Fix the flaky upload test</b></div>
                     <div class="row-act mint"><i class="d"></i><span data-i18n="demo.r1a">Running</span><code>swift test --filter UploadTests</code></div>
@@ -517,7 +517,7 @@
                   <div class="chips"><span>2m</span><span class="c1 opt">Claude Code</span><span class="opt">iTerm2</span></div>
                 </div>
                 <div class="row">
-                  <img class="pixel" src="mascots/whale.gif" width="30" height="30" alt="">
+                  <img class="pixel" src="mascots/codex.gif" width="30" height="30" alt="">
                   <div class="row-main">
                     <div class="row-title"><span class="dim">docs-site</span> <span class="dimmer">·</span> <b data-i18n="demo.r2">Rewrite the install guide</b></div>
                     <div class="row-act amber"><i class="d"></i><span data-i18n="demo.r2a">Finished, waiting for you</span></div>
@@ -525,7 +525,7 @@
                   <div class="chips"><span>14m</span><span class="c2 opt">Codex CLI</span><span class="opt">Ghostty</span></div>
                 </div>
                 <div class="row">
-                  <img class="pixel" src="mascots/turtle.gif" width="30" height="30" alt="">
+                  <img class="pixel" src="mascots/opencode.gif" width="30" height="30" alt="">
                   <div class="row-main">
                     <div class="row-title"><span class="dim">billing</span> <span class="dimmer">·</span> <b data-i18n="demo.r3">Add proration to invoices</b></div>
                     <div class="row-act mint"><i class="d"></i><span data-i18n="demo.r3a">Editing</span><code>Invoice.swift</code></div>
@@ -533,14 +533,14 @@
                   <div class="chips"><span>41s</span><span class="c3 opt">OpenCode</span><span class="opt">VS Code</span></div>
                 </div>
                 <div class="row line">
-                  <img class="pixel" src="mascots/jellyfish.gif" width="18" height="18" alt="" style="margin:0 6px">
+                  <img class="pixel" src="mascots/gemini.gif" width="18" height="18" alt="" style="margin:0 6px">
                   <div class="row-main"><div class="row-title"><span class="dim">blog</span> <span class="dimmer">·</span> <b data-i18n="demo.r4">Draft the release notes</b></div></div>
                   <div class="chips"><span>1h</span><span class="opt">Gemini CLI</span><span class="opt">Terminal</span></div>
                 </div>
               </div>
 
               <div class="st st-done" data-go="sessions">
-                <img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt="">
+                <img class="pixel" src="mascots/clawd.gif" width="22" height="22" alt="">
                 <span class="dim">atlas-api</span><span class="dimmer">·</span>
                 <span class="mint" data-i18n="demo.finished">finished ✓</span>
               </div>
@@ -561,18 +561,29 @@
 
   <section id="creatures">
     <div class="wrap center">
-      <h2 data-i18n="creatures.title">One creature per agent</h2>
-      <p class="sub" data-i18n="creatures.sub">Each agent gets its own creature, drawn in code, so you can tell sessions apart before you read a word. It shows how its session is doing: busy at work, hopping with a “!” when it needs you, pleased when a turn ends, looking up while it waits, asleep after a long quiet. Swap them around in Settings if you like.</p>
+      <h2 data-i18n="creatures.title">Every agent's own pet</h2>
+      <p class="sub" data-i18n="creatures.sub">Each agent appears as its own mascot or mark, in pixels: Clawd for Claude Code, the ghost for Kiro, the cloud for Codex, the cube for Cursor. It shows how its session is doing: walking at work, hopping with a “!” when it needs you, arms up when a turn ends, looking around while it waits, eyes shut after a long quiet. The marks belong to their owners.</p>
       <div class="creatures">
-        <div class="creature"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt="Starfish" data-i18n-alt="cr.starfish"><b data-i18n="cr.starfish">Starfish</b><span>Claude Code · MiniMax Code</span></div>
-        <div class="creature"><img class="pixel" src="mascots/whale.gif" width="56" height="56" alt="Whale" data-i18n-alt="cr.whale"><b data-i18n="cr.whale">Whale</b><span>Codex · Kimi Code</span></div>
-        <div class="creature"><img class="pixel" src="mascots/crab.gif" width="56" height="56" alt="Crab" data-i18n-alt="cr.crab"><b data-i18n="cr.crab">Crab</b><span>ZCode · Devin</span></div>
-        <div class="creature"><img class="pixel" src="mascots/boat.gif" width="56" height="56" alt="Boat" data-i18n-alt="cr.boat"><b data-i18n="cr.boat">Boat</b><span>Cursor · Windsurf</span></div>
-        <div class="creature"><img class="pixel" src="mascots/gull.gif" width="56" height="56" alt="Gull" data-i18n-alt="cr.gull"><b data-i18n="cr.gull">Gull</b><span>Copilot CLI · CodeBuddy</span></div>
-        <div class="creature"><img class="pixel" src="mascots/jellyfish.gif" width="56" height="56" alt="Jellyfish" data-i18n-alt="cr.jellyfish"><b data-i18n="cr.jellyfish">Jellyfish</b><span>Gemini CLI · Qwen Code</span></div>
-        <div class="creature"><img class="pixel" src="mascots/turtle.gif" width="56" height="56" alt="Turtle" data-i18n-alt="cr.turtle"><b data-i18n="cr.turtle">Turtle</b><span>OpenCode · MiMoCode · Qoder</span></div>
-        <div class="creature"><img class="pixel" src="mascots/octopus.gif" width="56" height="56" alt="Octopus" data-i18n-alt="cr.octopus"><b data-i18n="cr.octopus">Octopus</b><span>Trae · Kiro</span></div>
-        <div class="creature"><img class="pixel" src="mascots/puffer.gif" width="56" height="56" alt="Pufferfish" data-i18n-alt="cr.puffer"><b data-i18n="cr.puffer">Pufferfish</b><span>Grok CLI · Factory · Amp</span></div>
+        <div class="creature"><img class="pixel" src="mascots/clawd.gif" width="56" height="56" alt="Clawd"><b>Clawd</b><span>Claude Code</span></div>
+        <div class="creature"><img class="pixel" src="mascots/codex.gif" width="56" height="56" alt="Codex"><b>Codex</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/kiro.gif" width="56" height="56" alt="Kiro"><b>Kiro</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/cursor.gif" width="56" height="56" alt="Cursor"><b>Cursor</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/zcode.gif" width="56" height="56" alt="ZCode"><b>ZCode</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/gemini.gif" width="56" height="56" alt="Gemini CLI"><b>Gemini CLI</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/copilot.gif" width="56" height="56" alt="Copilot CLI"><b>Copilot CLI</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/qwen.gif" width="56" height="56" alt="Qwen Code"><b>Qwen Code</b><span>QwenWork</span></div>
+        <div class="creature"><img class="pixel" src="mascots/trae.gif" width="56" height="56" alt="Trae"><b>Trae</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/windsurf.gif" width="56" height="56" alt="Windsurf"><b>Windsurf</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/opencode.gif" width="56" height="56" alt="OpenCode"><b>OpenCode</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/grok.gif" width="56" height="56" alt="Grok CLI"><b>Grok CLI</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/factory.gif" width="56" height="56" alt="Factory"><b>Factory</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/devin.gif" width="56" height="56" alt="Devin"><b>Devin</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/amp.gif" width="56" height="56" alt="Amp"><b>Amp</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/kimi.gif" width="56" height="56" alt="Kimi Code"><b>Kimi Code</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/minimax.gif" width="56" height="56" alt="MiniMax Code"><b>MiniMax Code</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/qoder.gif" width="56" height="56" alt="Qoder"><b>Qoder</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/codebuddy.gif" width="56" height="56" alt="CodeBuddy"><b>CodeBuddy</b><span></span></div>
+        <div class="creature"><img class="pixel" src="mascots/mimo.gif" width="56" height="56" alt="MiMoCode"><b>MiMoCode</b><span></span></div>
         <div class="creature"><img class="pixel" src="mascots/island.gif" width="56" height="56" alt="Island" data-i18n-alt="cr.island"><b data-i18n="cr.island">Island</b><span data-i18n="cr.other">everything else</span></div>
       </div>
     </div>
@@ -646,28 +657,28 @@
       <h2 data-i18n="agents.title">Works with the agents you run</h2>
       <p class="sub" data-i18n="agents.sub">Claude Code is supported end to end. Codex, ZCode and Devin can be approved from the island too, in beta; the others show their status. Claude Code, Codex and ZCode sessions are listed even before you connect anything.</p>
       <div class="agents">
-        <span class="chip"><img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt=""><span class="dot stable"></span>Claude Code</span>
-        <span class="chip"><img class="pixel" src="mascots/whale.gif" width="22" height="22" alt=""><span class="dot beta"></span>Codex</span>
-        <span class="chip"><img class="pixel" src="mascots/crab.gif" width="22" height="22" alt=""><span class="dot beta"></span>ZCode</span>
-        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot beta"></span>Cursor</span>
-        <span class="chip"><img class="pixel" src="mascots/boat.gif" width="22" height="22" alt=""><span class="dot beta"></span>Windsurf</span>
-        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot beta"></span>Gemini CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/octopus.gif" width="22" height="22" alt=""><span class="dot beta"></span>Trae</span>
-        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot beta"></span>Qwen Code</span>
-        <span class="chip"><img class="pixel" src="mascots/gull.gif" width="22" height="22" alt=""><span class="dot beta"></span>CodeBuddy</span>
-        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot beta"></span>Factory</span>
-        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot beta"></span>Grok CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot experimental"></span>OpenCode</span>
-        <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot experimental"></span>MiMoCode</span>
-        <span class="chip"><img class="pixel" src="mascots/gull.gif" width="22" height="22" alt=""><span class="dot beta"></span>Copilot CLI</span>
-        <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot beta"></span>Qoder</span>
-        <span class="chip"><img class="pixel" src="mascots/whale.gif" width="22" height="22" alt=""><span class="dot beta"></span>Kimi Code</span>
-        <span class="chip"><img class="pixel" src="mascots/crab.gif" width="22" height="22" alt=""><span class="dot beta"></span>Devin</span>
-        <span class="chip"><img class="pixel" src="mascots/jellyfish.gif" width="22" height="22" alt=""><span class="dot experimental"></span>QwenWork</span>
-        <span class="chip"><img class="pixel" src="mascots/turtle.gif" width="22" height="22" alt=""><span class="dot experimental"></span>QoderWork</span>
-        <span class="chip"><img class="pixel" src="mascots/octopus.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Kiro</span>
-        <span class="chip"><img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt=""><span class="dot experimental"></span>MiniMax Code</span>
-        <span class="chip"><img class="pixel" src="mascots/puffer.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Amp</span>
+        <span class="chip"><img class="pixel" src="mascots/clawd.gif" width="22" height="22" alt=""><span class="dot stable"></span>Claude Code</span>
+        <span class="chip"><img class="pixel" src="mascots/codex.gif" width="22" height="22" alt=""><span class="dot beta"></span>Codex</span>
+        <span class="chip"><img class="pixel" src="mascots/zcode.gif" width="22" height="22" alt=""><span class="dot beta"></span>ZCode</span>
+        <span class="chip"><img class="pixel" src="mascots/cursor.gif" width="22" height="22" alt=""><span class="dot beta"></span>Cursor</span>
+        <span class="chip"><img class="pixel" src="mascots/cursor.gif" width="22" height="22" alt=""><span class="dot beta"></span>Windsurf</span>
+        <span class="chip"><img class="pixel" src="mascots/gemini.gif" width="22" height="22" alt=""><span class="dot beta"></span>Gemini CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/kiro.gif" width="22" height="22" alt=""><span class="dot beta"></span>Trae</span>
+        <span class="chip"><img class="pixel" src="mascots/gemini.gif" width="22" height="22" alt=""><span class="dot beta"></span>Qwen Code</span>
+        <span class="chip"><img class="pixel" src="mascots/copilot.gif" width="22" height="22" alt=""><span class="dot beta"></span>CodeBuddy</span>
+        <span class="chip"><img class="pixel" src="mascots/grok.gif" width="22" height="22" alt=""><span class="dot beta"></span>Factory</span>
+        <span class="chip"><img class="pixel" src="mascots/grok.gif" width="22" height="22" alt=""><span class="dot beta"></span>Grok CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/opencode.gif" width="22" height="22" alt=""><span class="dot experimental"></span>OpenCode</span>
+        <span class="chip"><img class="pixel" src="mascots/opencode.gif" width="22" height="22" alt=""><span class="dot experimental"></span>MiMoCode</span>
+        <span class="chip"><img class="pixel" src="mascots/copilot.gif" width="22" height="22" alt=""><span class="dot beta"></span>Copilot CLI</span>
+        <span class="chip"><img class="pixel" src="mascots/opencode.gif" width="22" height="22" alt=""><span class="dot beta"></span>Qoder</span>
+        <span class="chip"><img class="pixel" src="mascots/codex.gif" width="22" height="22" alt=""><span class="dot beta"></span>Kimi Code</span>
+        <span class="chip"><img class="pixel" src="mascots/zcode.gif" width="22" height="22" alt=""><span class="dot beta"></span>Devin</span>
+        <span class="chip"><img class="pixel" src="mascots/gemini.gif" width="22" height="22" alt=""><span class="dot experimental"></span>QwenWork</span>
+        <span class="chip"><img class="pixel" src="mascots/opencode.gif" width="22" height="22" alt=""><span class="dot experimental"></span>QoderWork</span>
+        <span class="chip"><img class="pixel" src="mascots/kiro.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Kiro</span>
+        <span class="chip"><img class="pixel" src="mascots/clawd.gif" width="22" height="22" alt=""><span class="dot experimental"></span>MiniMax Code</span>
+        <span class="chip"><img class="pixel" src="mascots/grok.gif" width="22" height="22" alt=""><span class="dot experimental"></span>Amp</span>
         <span class="chip plain"><span class="dot planned"></span>Mistral Vibe</span>
         <span class="chip plain"><span class="dot planned"></span>DeepSeek CLI</span>
         <span class="chip plain"><span class="dot planned"></span>Pi</span>
@@ -784,7 +795,7 @@ open "dist/Niko Island.app"</pre>
     "search.t": "敲几个字，就能回去",
     "search.d": "⌃⌥S 打开搜索，输入项目、提示词或代理，方向键和回车选择。支持重音字符和中文，输入法候选确认不会误触跳转。遇到待审批请求，会打开对应卡片。",
     "nav.features": "功能", "nav.agents": "代理", "nav.sounds": "音效", "nav.privacy": "隐私", "nav.install": "安装",
-    "hero.kicker": "0.14.0 · 免费 · 开源 · 无遥测",
+    "hero.kicker": "0.15.0 · 免费 · 开源 · 无遥测",
     "hero.pre": "你的", "hero.agents": "代理", "hero.post": "在干活，", "hero.em": "小岛替你盯着。",
     "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示这台 Mac 上每个 AI 编程代理正在做什么，跟着菜单栏一起走，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
@@ -800,8 +811,8 @@ open "dist/Niko Island.app"</pre>
     "demo.allow": "允许一次", "demo.always": "始终允许 Bash", "demo.all": "全部允许", "demo.deny": "拒绝",
     "demo.tab1": "工作中", "demo.tab2": "需要你", "demo.tab3": "全部会话", "demo.tab4": "已完成",
     "demo.caption": "这是岛屿在浏览器里的示意，会话内容是虚构的。点它一下，或者选一个状态。",
-    "creatures.title": "每个代理一只小生物",
-    "creatures.sub": "每个代理都有自己的小生物，全部用代码画成，不用读字就能分清会话。它会表现会话的状态：干活时忙个不停，需要你时带着“!”跳起来，回合结束时开心，等你回复时抬头看你，安静太久就睡着。想换的话，可以在设置里调换。",
+    "creatures.title": "每个代理自己的宠物",
+    "creatures.sub": "每个代理都以它自己的吉祥物或标志出现，像素风：Claude Code 是 Clawd，Kiro 是幽灵，Codex 是那朵云，Cursor 是方块。它会表现会话的状态：干活时走来走去，需要你时带着“!”跳起来，回合结束时举起双手，等你回复时四处张望，安静太久就闭上眼。这些标志归各自的所有者。",
     "cr.starfish": "海星", "cr.whale": "鲸鱼", "cr.crab": "螃蟹", "cr.boat": "小船", "cr.gull": "海鸥", "cr.jellyfish": "水母",
     "cr.turtle": "海龟", "cr.octopus": "章鱼", "cr.puffer": "河豚", "cr.island": "小岛", "cr.other": "其他代理",
     "features.title": "干活时小小一块，需要你时才展开。",
@@ -914,8 +925,8 @@ open "dist/Niko Island.app"</pre>
   });
 
   /* The agent named in the headline */
-  var agents = [["Claude Code", "starfish", "#ffa988"], ["Codex", "whale", "#9bd2ff"], ["Gemini CLI", "jellyfish", "#c6a8ff"],
-    ["Cursor", "boat", "#e9edf5"], ["ZCode", "crab", "#ff8f7a"], ["OpenCode", "turtle", "#94e0b1"], ["Kiro", "octopus", "#d7a6ff"]];
+  var agents = [["Claude Code", "clawd", "#ffa988"], ["Codex", "codex", "#9bd2ff"], ["Gemini CLI", "gemini", "#c6a8ff"],
+    ["Cursor", "cursor", "#e9edf5"], ["ZCode", "zcode", "#ff8f7a"], ["OpenCode", "opencode", "#94e0b1"], ["Kiro", "kiro", "#d7a6ff"]];
   var rot = document.getElementById("rot");
   var stillHero = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (rot && !stillHero) {

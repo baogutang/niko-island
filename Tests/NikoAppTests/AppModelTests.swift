@@ -1549,13 +1549,13 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         model.settings.accent = .violet
         model.settings.islandWidth = .wide
         model.settings.setChip(.host, shown: false)
-        model.settings.setMascot("crab", for: "claude")
+        model.settings.setMascot("kiro", for: "claude")
         model.settings.language = "zh-Hans"
         let saved = NikoSettings.load(paths: model.paths)
         XCTAssertEqual(saved.accent, .violet)
         XCTAssertEqual(saved.islandWidth.points, 720)
         XCTAssertFalse(saved.showsChip(.host))
-        XCTAssertEqual(saved.mascotChoices, ["claude": "crab"])
+        XCTAssertEqual(saved.mascotChoices, ["claude": "kiro"])
         XCTAssertEqual(saved.language, "zh-Hans")
         model.settings.textSize = .large
         model.settings.motion = .brisk
@@ -1564,8 +1564,9 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(look.motion, 0.7)
         XCTAssertEqual(look.chips, [.elapsed, .agent, .branch])
         XCTAssertEqual(look.replyLines, 1)
-        XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "crab")
-        XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "whale")
+        XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "kiro")
+        XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "codex")
+        XCTAssertEqual(Mascots.sprite(for: "claude", choices: ["claude": "starfish"]).name, "clawd", "a creature of an older version is gone: its own pet")
         model.settings.setMascot(nil, for: "claude")
         XCTAssertTrue(model.settings.mascotChoices.isEmpty)
         XCTAssertEqual(NikoSettings(raw: ["language": .string("klingon"), "visibleRows": .int(500)]).language, "system")

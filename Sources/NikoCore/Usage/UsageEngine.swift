@@ -397,6 +397,8 @@ public final class UsageEngine: @unchecked Sendable {
         onSnapshot(makeSnapshot())
     }
 
+    private lazy var kiroCredits = KiroCredits(home: home)
+
     private var claudeCacheStamp: Date?
     private var claudeCached: ProviderLimits?
 
@@ -457,6 +459,7 @@ public final class UsageEngine: @unchecked Sendable {
             let quarterRows = try store.stretches(since: Double((quarterNow - 95) * 900), seconds: 900)
             let hourRows = try store.stretches(since: now.timeIntervalSince1970 - 28 * 86_400, seconds: 3600)
             snapshot.sessions = try store.sessionTotals(since: now.timeIntervalSince1970 - 2 * 86_400)
+            snapshot.topSessions = try store.topSessions(since: now.timeIntervalSince1970 - 7 * 86_400)
 
             func usage(_ id: String) -> UsageSnapshot.AgentUsage {
                 func pick(_ rows: [UsageTotals]) -> [UsageTotals] { id == "all" ? rows : rows.filter { $0.agent == id } }
@@ -493,8 +496,14 @@ public final class UsageEngine: @unchecked Sendable {
                 return agent
             }
             var ids = Set(snapshot.week.map(\.agent)).union(fiveHours.map(\.agent)).union(limits.keys)
+            let credits = kiroCredits.totals(now: now, calendar: calendar)
+            if credits != nil { ids.insert(KiroSessions.source) }
             ids.remove("")
-            let ranked = ids.map(usage).sorted { ($0.week.cost, $0.week.tokens, $1.id) > ($1.week.cost, $1.week.tokens, $0.id) }
+            let ranked = ids.map { id -> UsageSnapshot.AgentUsage in
+                var agent = usage(id)
+                if id == KiroSessions.source { agent.credits = credits }
+                return agent
+            }.sorted { ($0.week.cost, $0.week.tokens, $1.id) > ($1.week.cost, $1.week.tokens, $0.id) }
             snapshot.agents = [usage("all")] + ranked
         } catch {
             recover(from: error)

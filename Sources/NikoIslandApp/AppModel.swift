@@ -763,8 +763,15 @@ public final class AppModel: ObservableObject {
         case .attention(let key):
             // Known only from its transcript: it can be shown and jumped to, not answered here.
             if let session = store[key] {
-                announce(.question, session: session, body: L("Waiting for you in %@", session.host?.name ?? AgentRegistry.displayName(for: key.source)))
+                let place = session.host?.name ?? AgentRegistry.displayName(for: key.source)
+                let body = session.activity.verb == "needs permission", tool = session.activity.detail ?? ""
+                announce(.question, session: session, body: body && !tool.isEmpty ? L("Asks in %@ to use %@", place, tool) : L("Waiting for you in %@", place))
                 push(.question, session: session)
+                // Answered in the agent's own window: open to point there, unless that window is in front.
+                if settings.expandOnAttention, mayOpenByItself(for: key) {
+                    route = .sessions
+                    expand(.attention)
+                }
             }
             play(.attention)
         case .updated(let key):

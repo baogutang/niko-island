@@ -720,6 +720,70 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertTrue(ProviderLimitsClient.hosts.contains("cursor.com"))
     }
 
+    /// The answer Kiro 1.3's own usage panel reads (shape checked live, numbers made up).
+    func testKirosCreditsAreRead() throws {
+        let answer = #"""
+        {"daysUntilReset":null,"limits":null,"nextDateReset":1.7624448E9,"overageConfiguration":{"overageStatus":"DISABLED"},
+         "subscriptionInfo":{"overageCapability":"OVERAGE_INCAPABLE","subscriptionManagementTarget":"MANAGE","subscriptionTitle":"KIRO PRO","type":"Q_DEVELOPER_STANDALONE_PRO","upgradeCapability":"UPGRADE_CAPABLE"},
+         "usageBreakdownList":[{"bonuses":[{"bonusCode":"WELCOME","status":"ACTIVE","currentUsage":50,"usageLimit":500,"expiresAt":1.7630E9}],
+           "currency":"USD","currentOverages":0,"currentUsage":20,"currentUsageWithPrecision":20.4,"displayName":"Credit","displayNamePlural":"Credits",
+           "freeTrialInfo":{"freeTrialStatus":"ACTIVE","currentUsage":10,"usageLimit":100,"freeTrialExpiry":1.7625E9},
+           "nextDateReset":1.7624448E9,"resourceType":"CREDIT","unit":"INVOCATIONS","usageLimit":1000,"usageLimitWithPrecision":1000}],
+         "userInfo":{"email":null,"userId":"u"}}
+        """#
+        let limits = try XCTUnwrap(KiroQuotaAPI.parse(Data(answer.utf8), now: now))
+        XCTAssertEqual(limits.plan, "KIRO PRO")
+        XCTAssertEqual(limits.windows.map(\.id), ["kiro_credits", "kiro_trial", "kiro_bonus"])
+        XCTAssertEqual(limits.windows.map { ($0.usedPercent * 100).rounded() / 100 }, [2.04, 10, 10])
+        XCTAssertEqual(limits.windows.first?.resetsAt, Date(timeIntervalSince1970: 1_762_444_800))
+        XCTAssertNil(KiroQuotaAPI.parse(Data(#"{"usageBreakdownList":[]}"#.utf8)))
+    }
+
+    func testKirosSignInIsReadOnlyWhileGood() throws {
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        XCTAssertEqual(KiroLogin.read(home: home), .missing)
+        scratch.write("home/.aws/sso/cache/kiro-auth-token.json",
+                      #"{"accessToken":"tok","refreshToken":"r","expiresAt":"2099-01-01T00:00:00.000Z","authMethod":"IdC","provider":"Enterprise","region":"us-east-1"}"#)
+        XCTAssertEqual(KiroLogin.read(home: home), .missing, "no profile, nothing to ask about")
+        scratch.write("home/Library/Application Support/Kiro/User/globalStorage/kiro.kiroagent/profile.json",
+                      #"{"arn":"arn:aws:codewhisperer:eu-central-1:123456789012:profile/ABC","name":"x"}"#)
+        guard case .found(let login) = KiroLogin.read(home: home) else { return XCTFail("found") }
+        XCTAssertEqual(login.region, "eu-central-1", "the profile's region picks the service")
+        XCTAssertEqual(login.tokenType, "SSO_OIDC")
+        let request = try XCTUnwrap(KiroQuotaAPI.request(login: login))
+        XCTAssertEqual(request.url?.host, "management.eu-central-1.kiro.dev")
+        XCTAssertTrue(ProviderLimitsClient.hosts.contains(request.url?.host ?? ""))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer tok")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "TokenType"), "SSO_OIDC")
+        XCTAssertTrue(request.url?.query?.contains("origin=AI_EDITOR") ?? false)
+        scratch.write("home/.aws/sso/cache/kiro-auth-token.json",
+                      #"{"accessToken":"tok","expiresAt":"2020-01-01T00:00:00.000Z","authMethod":"IdC"}"#)
+        XCTAssertEqual(KiroLogin.read(home: home), .expired, "never renewed here")
+    }
+
+    func testKirosSpendingIsCountedFromItsSessions() throws {
+        let scratch = Scratch()
+        func iso(_ date: Date) -> String {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter.string(from: date)
+        }
+        let at = Date()
+        let lines = [
+            #"{"id":"1","timestamp":"\#(iso(at.addingTimeInterval(-600)))","payload":{"type":"usage_summary","promptTurnSummaries":[{"unit":"credit","unitPlural":"credits","usage":6.25}],"status":"success"}}"#,
+            #"{"id":"2","timestamp":"\#(iso(at.addingTimeInterval(-3 * 86_400)))","payload":{"type":"usage_summary","promptTurnSummaries":[{"unit":"credit","usage":1.5},{"unit":"credit","usage":0.5}]}}"#,
+            #"{"id":"3","timestamp":"\#(iso(at))","payload":{"type":"assistant","content":"usage_summary is a word here"}}"#,
+        ]
+        scratch.write("home/.kiro/sessions/w/sess_a/messages.jsonl", lines.joined(separator: "\n") + "\n")
+        let credits = try XCTUnwrap(KiroCredits(home: scratch.file("home")).totals(now: at))
+        XCTAssertEqual(credits.fiveHours, 6.25)
+        XCTAssertEqual(credits.week, 8.25)
+        XCTAssertEqual(credits.month, 8.25)
+        XCTAssertEqual(credits.days.count, 7)
+        XCTAssertEqual(credits.days.last, 6.25)
+    }
+
     func testOnlyFourFilesCanReachTheNetwork() throws {
         let sources = repositoryRoot.appendingPathComponent("Sources")
         var offenders: [String] = []

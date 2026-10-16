@@ -256,7 +256,6 @@ struct SessionRowView: View {
                 .font(look.body(12, .medium))
                 .foregroundStyle(Theme.color(for: session.phase, accent: look.accent))
                 .fixedSize()
-                .shimmer(session.phase == .working)
             if let detail = session.activity.detail, !detail.isEmpty {
                 Text(detail)
                     .font(look.mono(11.5, .regular))

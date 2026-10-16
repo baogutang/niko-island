@@ -786,18 +786,18 @@ struct SeaBackdrop: View {
         return GeometryReader { proxy in
             let width = Double(proxy.size.width), height = Double(proxy.size.height)
             let whale = travel(time, period: 44, offset: 0.12)
-            swimmer(Mascots.whale, size: 66 * unit, facesLeft: true, movingRight: true,
+            swimmer(Mascots.sprite(for: "codex"), size: 66 * unit, facesLeft: false, movingRight: true,
                     x: whale * (width + 240 * u) - 120 * u, y: height * 0.752 + sin(time * 0.5) * 8 * u, tilt: 0)
             let boat = travel(time, period: 68, offset: 0.55)
-            swimmer(Mascots.boat, size: 54 * unit, facesLeft: true, movingRight: false,
+            swimmer(Mascots.sprite(for: "claude"), size: 60 * unit, facesLeft: true, movingRight: false,
                     x: (1 - boat) * (width + 240 * u) - 120 * u, y: height * 0.668 + sin(time * 0.9 + 1) * 5 * u, tilt: 0)
             let turtle = travel(time, period: 58, offset: 0.8)
-            swimmer(Mascots.turtle, size: 44 * unit, facesLeft: false, movingRight: true,
+            swimmer(Mascots.sprite(for: "kiro"), size: 44 * unit, facesLeft: false, movingRight: true,
                     x: turtle * (width + 200 * u) - 100 * u, y: height * 0.91 + sin(time * 0.7 + 2) * 9 * u, tilt: 0)
-            swimmer(Mascots.jellyfish, size: 40 * unit, facesLeft: false, movingRight: false,
+            swimmer(Mascots.sprite(for: "gemini"), size: 40 * unit, facesLeft: true, movingRight: false,
                     x: width * 0.86 + sin(time * 0.3) * 26 * u, y: height * 0.90 + cos(time * 0.6) * 14 * u, tilt: 0)
             let gull = travel(time, period: 29, offset: 0.7)
-            swimmer(Mascots.gull, size: 34 * unit, facesLeft: false, movingRight: true,
+            swimmer(Mascots.sprite(for: "copilot"), size: 34 * unit, facesLeft: false, movingRight: true,
                     x: gull * (width + 160 * u) - 80 * u, y: height * 0.19 + sin(time * 1.3) * 12 * u, tilt: 0)
         }
         .allowsHitTesting(false)
@@ -823,18 +823,18 @@ struct SeaBackdrop: View {
             GeometryReader { proxy in
                 let width = Double(proxy.size.width), height = Double(proxy.size.height)
                 let whale = travel(time, period: 44, offset: 0.12)
-                swimmer(Mascots.whale, size: 66 * unit, facesLeft: true, movingRight: true,
+                swimmer(Mascots.sprite(for: "codex"), size: 66 * unit, facesLeft: false, movingRight: true,
                         x: whale * (width + 240 * u) - 120 * u, y: height * 0.752 + sin(time * 0.5) * 8 * u, tilt: sin(time * 0.5 + 1.2) * 4)
                 let boat = travel(time, period: 68, offset: 0.55)
-                swimmer(Mascots.boat, size: 54 * unit, facesLeft: true, movingRight: false,
+                swimmer(Mascots.sprite(for: "claude"), size: 60 * unit, facesLeft: true, movingRight: false,
                         x: (1 - boat) * (width + 240 * u) - 120 * u, y: height * 0.668 + sin(time * 0.9 + 1) * 5 * u, tilt: sin(time * 0.9) * 5)
                 let turtle = travel(time, period: 58, offset: 0.8)
-                swimmer(Mascots.turtle, size: 44 * unit, facesLeft: false, movingRight: true,
+                swimmer(Mascots.sprite(for: "kiro"), size: 44 * unit, facesLeft: false, movingRight: true,
                         x: turtle * (width + 200 * u) - 100 * u, y: height * 0.91 + sin(time * 0.7 + 2) * 9 * u, tilt: sin(time * 0.7) * 3)
-                swimmer(Mascots.jellyfish, size: 40 * unit, facesLeft: false, movingRight: false,
+                swimmer(Mascots.sprite(for: "gemini"), size: 40 * unit, facesLeft: true, movingRight: false,
                         x: width * 0.86 + sin(time * 0.3) * 26 * u, y: height * 0.90 + cos(time * 0.6) * 14 * u, tilt: sin(time * 0.3) * 6)
                 let gull = travel(time, period: 29, offset: 0.7)
-                swimmer(Mascots.gull, size: 34 * unit, facesLeft: false, movingRight: true,
+                swimmer(Mascots.sprite(for: "copilot"), size: 34 * unit, facesLeft: false, movingRight: true,
                         x: gull * (width + 160 * u) - 80 * u, y: height * 0.19 + sin(time * 1.3) * 12 * u, tilt: sin(time * 1.3) * 5)
             }
             .allowsHitTesting(false)

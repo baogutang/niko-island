@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.15.0] - 2026-10-16
+
+### Changed
+- **Every agent's own pet.** The creatures drawn for 0.14.0 are gone: each agent now appears as its own mascot or mark, in pixels. Clawd for Claude Code is built from the glyph tables Claude Code draws him with (body rgb(215,119,87), terminal cells two pixels by four), and acts out moods with his own poses: walking at work, looking left and right while waiting, arms up when he needs you or a turn ends, eyes shut asleep. The others were pixelated from each vendor's official icon or logo: Kiro's ghost, the Codex cloud, the Cursor cube, ZCode's Z, OpenCode, Gemini's sparkle, Copilot's face, Qwen, Trae, Windsurf, the xAI mark for Grok, Factory, Devin, Amp, Kimi, MiniMax, Qoder, CodeBuddy's cat and MiMo. They hop, blink, and show a pixel "!", "…", sparkles, a drop of sweat or a "z". The marks belong to their owners and identify which agent a session is.
+- **No grey halo around the open island.** Its wide soft shadow (34 pt, 32 %) is now a thin contact shadow.
+
+### Added
+- **Kiro's permission prompts reach the island.** Kiro asks in its own window and has no hook for it; it writes the prompt (`pending_interaction`, `tool_approval`) and the answer (`interaction_resolved`) to its session files, which the island now reads: the session shows "needs permission" with the tool, the island glows amber and opens (unless Kiro is in front), a banner and the attention sound follow, and it clears once answered in Kiro. Any agent whose request is read from disk now counts as needing you on the closed island.
+- **Kiro's credits.** What each turn spent, from Kiro's own `usage_summary` records, as 5 hours, today, 7 and 30 days in Kiro's usage tab. With *Ask Kiro* on (off by default), this month's allowance, free-trial and bonus credits and the renewal date, asked of `management.<region>.kiro.dev` with the sign-in Kiro keeps (`~/.aws/sso/cache/kiro-auth-token.json`), only while it is still good, never renewed.
+- **Top sessions of the week** in the usage view.
+- Codex readings name their limit bucket in newer versions: the plan's own (`limit_id` "codex") is preferred.
+
+### Fixed
+- **The open island no longer keeps the processor busy.** The pulsing ring of a working row's status dot was a SwiftUI animation that never ended, and the verb of a working row shimmered every frame: SwiftUI drew the whole island again on every display frame while it was open (35 % CPU with three sessions at work). The ring is now a Core Animation layer and the shimmer is gone: 2.6-4.9 %.
+
+### Verification
+- 449 local automated tests, 5 environment-dependent skips, no failures.
+- On this Mac: a real Kiro permission prompt (Kiro 1.3, open from 15:16:37 to 15:18:48) showed on the island as Kiro's ghost with the amber bell and glow, and went back to work when answered in Kiro. A live *Ask Kiro* lookup answered from `management.us-east-1.kiro.dev` (plan, 2 % of the month's credits). The open island's lower edge has no halo. The pets of real Claude Code, Kiro and ZCode sessions shown in the island.
+
 ## [0.14.0] - 2026-10-16
 
 ### Fixed

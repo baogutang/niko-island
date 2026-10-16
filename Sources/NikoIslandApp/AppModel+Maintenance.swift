@@ -250,7 +250,7 @@ extension AppModel {
                                            minimax: settings.minimaxLimitsLookup,
                                            minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
                                            gemini: settings.geminiLimitsLookup, copilot: settings.copilotLimitsLookup,
-                                           cursor: settings.cursorLimitsLookup)
+                                           cursor: settings.cursorLimitsLookup, kiro: settings.kiroLimitsLookup)
     }
 
     /// Starts, stops or re-aims the lookups after a setting changed. Nothing is

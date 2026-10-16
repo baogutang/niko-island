@@ -7,9 +7,8 @@ import SwiftUI
 /// The creatures were SwiftUI views moved on every frame, which kept the whole
 /// page busy. Here each one is a layer handed a path and a timing once; the
 /// window server moves it at the display's refresh rate with no work from the
-/// app. Sprites are drawn one pixel per cell and enlarged with nearest-neighbour
-/// sampling, so their edges stay hard at any size, and they are never rotated
-/// (a turned pixel creature is a blurred one).
+/// app. The pets are agents' marks: they are never rotated or mirrored (a turned
+/// pixel is a blurred one, and a mirrored logo reads wrong).
 struct CreatureStageView: NSViewRepresentable {
     var stage: BackdropStage
     var unit: CGFloat
@@ -90,15 +89,15 @@ final class CreatureStageNSView: NSView {
     private var swimmers: [Swimmer] {
         let u = unit
         return [
-            Swimmer(sprite: Mascots.whale, size: 66 * u, facesLeft: true, movingRight: true, period: 44, offset: 0.12,
+            Swimmer(sprite: Mascots.sprite(for: "codex"), size: 66 * u, facesLeft: false, movingRight: true, period: 44, offset: 0.12,
                     height: 0.752, bob: 8 * u, bobSpeed: 0.5),
-            Swimmer(sprite: Mascots.boat, size: 54 * u, facesLeft: true, movingRight: false, period: 68, offset: 0.55,
+            Swimmer(sprite: Mascots.sprite(for: "claude"), size: 60 * u, facesLeft: true, movingRight: false, period: 68, offset: 0.55,
                     height: 0.668, bob: 5 * u, bobSpeed: 0.9),
-            Swimmer(sprite: Mascots.turtle, size: 44 * u, facesLeft: false, movingRight: true, period: 58, offset: 0.8,
+            Swimmer(sprite: Mascots.sprite(for: "kiro"), size: 44 * u, facesLeft: false, movingRight: true, period: 58, offset: 0.8,
                     height: 0.91, bob: 9 * u, bobSpeed: 0.7),
-            Swimmer(sprite: Mascots.jellyfish, size: 40 * u, facesLeft: false, movingRight: false, period: nil, offset: 0,
+            Swimmer(sprite: Mascots.sprite(for: "gemini"), size: 40 * u, facesLeft: true, movingRight: false, period: nil, offset: 0,
                     height: 0.90, bob: 14 * u, bobSpeed: 0.6, drift: 26 * u),
-            Swimmer(sprite: Mascots.gull, size: 34 * u, facesLeft: false, movingRight: true, period: 29, offset: 0.7,
+            Swimmer(sprite: Mascots.sprite(for: "copilot"), size: 34 * u, facesLeft: false, movingRight: true, period: 29, offset: 0.7,
                     height: 0.19, bob: 12 * u, bobSpeed: 1.3),
         ]
     }
@@ -111,7 +110,7 @@ final class CreatureStageNSView: NSView {
         let now = CACurrentMediaTime()
         let scale = window?.backingScaleFactor ?? 2
         for swimmer in swimmers {
-            let mood: CreatureMood = swimmer.sprite.name == Mascots.jellyfish.name ? .idle : .working
+            let mood: CreatureMood = swimmer.period == nil ? .idle : .working
             let frames = CreatureFrames.frames(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale)
             guard let first = frames.first else { continue }
             // Travel: an outer layer crosses the screen at an even pace.
@@ -147,6 +146,7 @@ final class CreatureStageNSView: NSView {
             body.frame = lane.bounds
             body.contents = first
             body.contentsGravity = .resizeAspect
+            body.magnificationFilter = .nearest
             body.opacity = 0.92
             if swimmer.facesLeft == swimmer.movingRight { body.transform = CATransform3DMakeScale(-1, 1, 1) }
             let bob = CABasicAnimation(keyPath: "position.y")

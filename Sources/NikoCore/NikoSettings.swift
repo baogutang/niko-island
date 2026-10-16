@@ -456,6 +456,7 @@ public struct NikoSettings: Sendable, Equatable {
         case "gemini": return geminiLimitsLookup
         case "copilot": return copilotLimitsLookup
         case "cursor": return cursorLimitsLookup
+        case "kiro": return kiroLimitsLookup
         default: return false
         }
     }
@@ -479,6 +480,12 @@ public struct NikoSettings: Sendable, Equatable {
             return ["cn", "global"].contains(value) ? value : "cn"
         }
         set { raw["minimaxRegion"] = .string(newValue) }
+    }
+
+    /// Ask Kiro about this month's credits, with the sign-in Kiro keeps.
+    public var kiroLimitsLookup: Bool {
+        get { bool("kiroLimitsLookup", default: false) }
+        set { raw["kiroLimitsLookup"] = .bool(newValue) }
     }
 
     /// Ask Cursor about the plan's included usage this cycle, with the sign-in Cursor's app keeps.

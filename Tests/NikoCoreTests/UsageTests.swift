@@ -621,6 +621,40 @@ final class UsageWindowTests: XCTestCase {
                     session: "s", project: nil, input: input, output: output)
     }
 
+    func testTheSessionsThatSpentMostThisWeek() throws {
+        let scratch = Scratch()
+        let store = try UsageStore(path: scratch.file("u.sqlite").path)
+        let t = Date().timeIntervalSince1970
+        func row(_ id: String, session: String, project: String?, input: Int, at: Double) -> UsageRecord {
+            UsageRecord(identityKey: UsageRecord.identity("claude", id), timestamp: at, agent: "claude", model: "m",
+                        session: session, project: project, input: input, output: 0)
+        }
+        try store.commit(records: [
+            row("1", session: "big", project: "/w/atlas", input: 900, at: t - 3600),
+            row("2", session: "big", project: "/w/atlas", input: 100, at: t - 7200),
+            row("3", session: "small", project: "/w/site", input: 50, at: t - 600),
+            row("4", session: "old", project: "/w/old", input: 99_999, at: t - 9 * 86_400),
+        ], pricing: Pricing(rates: [:], source: "test"), file: nil)
+        let top = try store.topSessions(since: t - 7 * 86_400)
+        XCTAssertEqual(top.map(\.session), ["big", "small"], "a session from last month is not this week's")
+        XCTAssertEqual(top.first?.tokens, 1000)
+        XCTAssertEqual(top.first?.project, "/w/atlas")
+        store.close()
+    }
+
+    /// A newer Codex names the bucket each reading is for: the plan's own is "codex".
+    func testCodexsOwnLimitBucketIsPreferred() throws {
+        func line(_ bucket: String?, used: Double) -> String {
+            let id = bucket.map { #","limit_id":"\#($0)""# } ?? ""
+            return #"{"timestamp":"2026-10-16T06:00:00Z","type":"event_msg","payload":{"type":"token_count","rate_limits":{"primary":{"used_percent":\#(used),"window_minutes":300,"resets_at":4102444800},"plan_type":"plus"\#(id)}}}"#
+        }
+        let mixed = [line("codex", used: 12), line("codex_other", used: 80)].joined(separator: "\n")
+        XCTAssertEqual(CodexLimits.latest(inTail: Data(mixed.utf8))?.windows.first?.usedPercent, 12)
+        XCTAssertEqual(CodexLimits.latest(inTail: Data(line(nil, used: 33).utf8))?.windows.first?.usedPercent, 33, "older Codex names none")
+        XCTAssertEqual(CodexLimits.latest(inTail: Data(line("codex_other", used: 80).utf8))?.windows.first?.usedPercent, 80,
+                       "with nothing else, another bucket is better than nothing")
+    }
+
     func testPerAgentWindowsAndLimitsFromSeveralSources() throws {
         let scratch = Scratch()
         let paths = NikoPaths(root: scratch.file("ni"))

@@ -36,7 +36,8 @@ struct UsageView: View {
     }
 
     private var hasTokens: Bool {
-        !(usage.agents.isEmpty || (current.week.tokens == 0 && current.limits.isEmpty && current.fiveHours.tokens == 0))
+        !(usage.agents.isEmpty || (current.week.tokens == 0 && current.limits.isEmpty && current.fiveHours.tokens == 0
+                                   && (current.credits?.month ?? 0) == 0))
     }
 
     private var hasActivity: Bool { (activity.days[current.id] ?? []).contains { $0.sessions > 0 || $0.weight > 0 } }
@@ -73,6 +74,7 @@ struct UsageView: View {
                     }
                 }
             }
+            if !topSessions.isEmpty { topList }
             if hasActivity { ActivitySection(activity: activity, agent: current.id) }
             footnote
         }
@@ -119,12 +121,33 @@ struct UsageView: View {
 
     // MARK: Tiles
 
+    @ViewBuilder
     private var tiles: some View {
-        HStack(alignment: .top, spacing: 8) {
-            tile(L("5 hours"), current.fiveHours)
-            tile(L("Today"), current.today)
-            tile(L("7 days"), current.week)
-            tile(L("30 days"), current.month)
+        if let credits = current.credits, current.week.tokens == 0 {
+            // Kiro counts in credits, not tokens.
+            HStack(alignment: .top, spacing: 8) {
+                creditTile(L("5 hours"), credits.fiveHours)
+                creditTile(L("Today"), credits.today)
+                creditTile(L("7 days"), credits.week)
+                creditTile(L("30 days"), credits.month)
+            }
+        } else {
+            HStack(alignment: .top, spacing: 8) {
+                tile(L("5 hours"), current.fiveHours)
+                tile(L("Today"), current.today)
+                tile(L("7 days"), current.week)
+                tile(L("30 days"), current.month)
+            }
+        }
+    }
+
+    private func creditTile(_ title: String, _ amount: Double) -> some View {
+        tileFrame {
+            Text(title.uppercased()).font(look.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
+            Text(amount >= 100 ? String(format: "%.0f", amount) : String(format: "%.1f", amount))
+                .contentTransition(.numericText())
+                .font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
+            Text(L("credits")).font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1)
         }
     }
 
@@ -456,6 +479,29 @@ struct UsageView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    private var topSessions: [UsageSnapshot.TopSession] {
+        usage.topSessions.filter { current.id == "all" || $0.agent == current.id }
+    }
+
+    /// The sessions that spent the most this week.
+    private var topList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L("Top sessions, 7 days").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
+            ForEach(topSessions) { row in
+                HStack(spacing: 8) {
+                    MascotView(source: row.agent, size: 16)
+                    Text(row.project.map { ($0 as NSString).lastPathComponent } ?? AgentRegistry.displayName(for: row.agent))
+                        .font(look.body(12.5, .medium)).foregroundStyle(Theme.primary).lineLimit(1)
+                    Text(AgentRegistry.displayName(for: row.agent)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
+                    Spacer(minLength: 6)
+                    Text(tokenText(row.tokens)).font(look.mono(11, .regular)).foregroundStyle(Theme.secondary)
+                    Text(row.cost == 0 ? "—" : costText(row.cost)).font(look.mono(12, .semibold))
+                        .foregroundStyle(row.cost == 0 ? Theme.tertiary : Theme.primary).frame(minWidth: 58, alignment: .trailing)
+                }
+            }
+        }
+    }
+
     private var footnote: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(L("Costs are estimates from public list prices; your plan or invoice may differ. Counted from what the agents wrote on this Mac only."))
@@ -480,6 +526,7 @@ enum ProviderLookupText {
         case ProviderLimitsClient.gemini: return "Google"
         case ProviderLimitsClient.copilot: return "GitHub"
         case ProviderLimitsClient.cursor: return "Cursor"
+        case ProviderLimitsClient.kiro: return "Kiro"
         default: return nil
         }
     }
@@ -501,15 +548,18 @@ enum ProviderLookupText {
     static func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
         let codex = agent == ProviderLimitsClient.codex, gemini = agent == ProviderLimitsClient.gemini
         let copilot = agent == ProviderLimitsClient.copilot, cursor = agent == ProviderLimitsClient.cursor
+        let kiro = agent == ProviderLimitsClient.kiro
         switch state {
         case .ok: return nil
         case .noLogin:
+            if kiro { return L("Kiro has not signed in on this Mac, so there is nothing to ask with.") }
             if cursor { return L("Cursor's app has not signed in on this Mac, so there is nothing to ask with.") }
             if gemini { return L("Gemini CLI has not signed in with a Google account on this Mac, so there is nothing to ask with.") }
             if copilot { return L("The GitHub CLI (gh) has not signed in on this Mac, so there is nothing to ask with.") }
             return codex ? L("Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.")
                 : L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
         case .loginExpired:
+            if kiro { return L("Kiro's sign-in on this Mac has run out. It renews itself while Kiro runs.") }
             if cursor { return L("Cursor's sign-in on this Mac has run out. It renews itself the next time Cursor opens.") }
             if gemini { return L("Gemini CLI's sign-in on this Mac has run out. It renews itself the next time Gemini CLI runs.") }
             if copilot { return L("GitHub did not accept the GitHub CLI's sign-in. Run gh auth login to renew it.") }
@@ -539,6 +589,9 @@ enum LimitWords {
         case "cursor_auto": return L("Auto, this cycle")
         case "cursor_api": return L("Named models, this cycle")
         case "cursor_on_demand": return L("On-demand spending")
+        case "kiro_credits": return L("Credits, this month")
+        case "kiro_trial": return L("Free-trial credits")
+        case "kiro_bonus": return L("Bonus credits")
         case "daily_pro": return L("Pro models, daily")
         case "daily_flash": return L("Flash models, daily")
         case "daily_flash_lite": return L("Flash-Lite models, daily")

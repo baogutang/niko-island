@@ -86,9 +86,9 @@ struct IslandBody: View {
         }
         // Pushed up while open, it gives a little, as if pressed back into the edge.
         .scaleEffect(x: 1, y: model.isExpanded ? 1 - Rubber.band(max(0, -model.pull), limit: 40) / 520 : 1, anchor: .top)
-        // Two shadows, as light has: a soft ambient one far out and a firmer one close in.
-        .shadow(color: .black.opacity(lifted ? 0.32 : 0), radius: 34, y: 18)
-        .shadow(color: .black.opacity(lifted ? 0.28 : 0), radius: 8, y: 4)
+        // Only a thin contact shadow: the edge's hairline already holds the shape, and a wide
+        // soft one reads as a grey halo over a light window.
+        .shadow(color: .black.opacity(lifted ? 0.16 : 0), radius: 4, y: 1.5)
         .environment(\.islandNamespace, isStaticPreview ? nil : space)
         .background(GeometryReader { proxy in
             Color.clear.preference(key: IslandFrameKey.self, value: proxy.frame(in: .named("island-canvas")))
@@ -152,6 +152,13 @@ struct IslandGlance: Equatable {
             text = L("%@ needs you", session.map { AutoNamer.projectName(cwd: $0.cwd) ?? project } ?? project)
             tone = .attention
             count = model.pending.count
+        } else if let asking = model.sessions.first(where: { $0.phase == .needsAttention }) {
+            // Asking in its own window (Kiro, a desktop app): the island points there.
+            source = asking.source
+            key = asking.key
+            text = L("%@ needs you", AutoNamer.projectName(cwd: asking.cwd) ?? AgentRegistry.displayName(for: asking.source))
+            tone = .attention
+            count = model.sessions.filter { $0.phase == .needsAttention }.count
         } else if let working = model.sessions.first(where: { $0.phase == .working }) {
             source = working.source
             key = working.key

@@ -1261,6 +1261,16 @@
         }
       }
     },
+    "Ask Kiro for my credits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Kiro 查询我的积分"
+          }
+        }
+      }
+    },
     "Ask MiniMax for my Coding Plan limits": {
       "localizations": {
         "zh-Hans": {
@@ -1307,6 +1317,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "每天向 GitHub 问一次最新的发布版本。请求里只有本应用的名字和版本号。打开之前不会询问。"
+          }
+        }
+      }
+    },
+    "Asks in %@ to use %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在 %@ 里请求使用 %@"
           }
         }
       }
@@ -1427,6 +1447,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "请求、提问和结束的回合会弹出横幅。"
+          }
+        }
+      }
+    },
+    "Bonus credits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "赠送积分"
           }
         }
       }
@@ -1911,6 +1941,16 @@
         }
       }
     },
+    "Credits, this month": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "积分，本月"
+          }
+        }
+      }
+    },
     "Cues for each moment": {
       "localizations": {
         "zh-Hans": {
@@ -2271,6 +2311,16 @@
         }
       }
     },
+    "Free-trial credits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "试用积分"
+          }
+        }
+      }
+    },
     "Fri": {
       "localizations": {
         "zh-Hans": {
@@ -2541,6 +2591,16 @@
         }
       }
     },
+    "How many of this month's credits are spent, and free-trial or bonus credits. Reads the sign-in Kiro keeps on this Mac (~/.aws/sso/cache/kiro-auth-token.json and Kiro's profile), only while it is still good, and sends it to Kiro (management.us-east-1.kiro.dev or management.eu-central-1.kiro.dev), nowhere else. It is never renewed here. Asked every ten minutes while Kiro is in use. What Kiro spent per turn is counted from its own session files either way.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本月积分用了多少，以及试用积分和赠送积分。读取 Kiro 保存在这台 Mac 上的登录凭据（~/.aws/sso/cache/kiro-auth-token.json 和 Kiro 的账户配置），只在它还没过期时发送给 Kiro（management.us-east-1.kiro.dev 或 management.eu-central-1.kiro.dev），不发往别处，也绝不在这里续期。Kiro 在使用时每十分钟查询一次。无论开不开，每一轮花了多少积分都会从 Kiro 自己的会话文件里统计。"
+          }
+        }
+      }
+    },
     "How much of a plan is used up is known to the provider, not to this Mac (Codex is the exception: it writes its limits into its own session files). Each switch below gets them from one place, with your own sign-in, and keeps nothing but percentages and reset times. All of them are off until you turn them on.": {
       "localizations": {
         "zh-Hans": {
@@ -2711,12 +2771,32 @@
         }
       }
     },
+    "Kiro has not signed in on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kiro 还没有在这台 Mac 上登录，没有可以用来查询的凭据。"
+          }
+        }
+      }
+    },
     "Kiro runs global hook files in its app and from version 3 of its CLI; an older Kiro CLI does not.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Kiro 应用和第 3 版起的 Kiro CLI 会运行全局钩子文件；更早的 Kiro CLI 不会。"
+          }
+        }
+      }
+    },
+    "Kiro's sign-in on this Mac has run out. It renews itself while Kiro runs.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kiro 在这台 Mac 上的登录已过期。Kiro 运行时会自己续期。"
           }
         }
       }
@@ -4791,6 +4871,16 @@
         }
       }
     },
+    "Top sessions, 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "花费最多的会话，7 天"
+          }
+        }
+      }
+    },
     "Tue": {
       "localizations": {
         "zh-Hans": {
@@ -5387,6 +5477,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "上下文 %@"
+          }
+        }
+      }
+    },
+    "credits": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "积分"
           }
         }
       }

@@ -72,6 +72,19 @@ extension UsageStore {
         return out
     }
 
+    /// The sessions that spent the most since a moment: their agent, folder, tokens and cost.
+    public func topSessions(since timestamp: Double, limit: Int = 3) throws -> [UsageSnapshot.TopSession] {
+        try db.query("""
+            SELECT agent, session, MAX(project), SUM(input_tokens + output_tokens + cache_write_tokens), SUM(estimated_cost)
+            FROM events WHERE ts >= ? AND session IS NOT NULL AND session != ''
+            GROUP BY agent, session ORDER BY SUM(estimated_cost) DESC, SUM(input_tokens + output_tokens + cache_write_tokens) DESC LIMIT ?
+            """, [.real(timestamp), .integer(Int64(limit))]).compactMap { row in
+            guard let agent = row[0].stringValue, let session = row[1].stringValue, row[3].intValue > 0 else { return nil }
+            return UsageSnapshot.TopSession(agent: agent, session: session, project: row[2].stringValue, tokens: row[3].intValue,
+                                            cost: row[4].doubleValue)
+        }
+    }
+
     /// Small things worth remembering between runs (a cursor, the last limits seen).
     public func meta(_ key: String) throws -> String? {
         try db.query("SELECT value FROM meta WHERE key = ?", [.text(key)]).first?.first?.stringValue
@@ -170,13 +183,19 @@ public struct ProviderLimits: Sendable, Equatable {
 /// Codex writes its limits next to every token count in a rollout:
 /// `payload.rate_limits.{primary,secondary}.{used_percent, window_minutes, resets_at}`.
 public enum CodexLimits {
-    /// The most recent limits in the tail of a rollout file.
+    /// The most recent limits in the tail of a rollout file. A newer Codex can name the
+    /// bucket a reading is for (`limit_id`): the plan's own, "codex", is the one wanted, and
+    /// a reading without a name (older Codex) is taken as it. Another bucket is the fallback.
     public static func latest(inTail tail: Data) -> ProviderLimits? {
         let needle = Data("\"rate_limits\"".utf8)
+        var fallback: ProviderLimits?
         for line in tail.split(separator: 0x0A, omittingEmptySubsequences: true).reversed() {
             guard line.range(of: needle) != nil,
                   let object = (try? JSONValue.parse(Data(line), skipping: ["info"]))?.objectValue,
                   let limits = object["payload"]?["rate_limits"], limits.objectValue != nil else { continue }
+            let bucket = limits["limit_id"]?.stringValue
+            let other = bucket.map { $0 != "codex" } ?? false
+            if other, fallback != nil { continue }
             var out = ProviderLimits(source: .agentFiles)
             out.capturedAt = ISOTime.flexible(object["timestamp"]).map(Date.init(timeIntervalSince1970:))
             out.plan = limits["plan_type"]?.stringValue
@@ -188,9 +207,10 @@ public enum CodexLimits {
                     resetsAt: ISOTime.flexible(window["resets_at"]).map(Date.init(timeIntervalSince1970:)),
                     windowMinutes: window["window_minutes"]?.intValue))
             }
+            if other { fallback = out; continue }
             return out
         }
-        return nil
+        return fallback
     }
 
     public static func latest(inFile path: String, tailBytes: Int = 256 * 1024) -> ProviderLimits? {

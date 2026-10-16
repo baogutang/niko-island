@@ -94,6 +94,18 @@ public struct UsageSnapshot: Sendable, Equatable {
         public var billable: Int { max(0, tokens - cacheRead) }
     }
 
+    /// Spending in an agent's own unit where it counts no tokens (Kiro's credits).
+    public struct Credits: Sendable, Equatable {
+        public var unit: String
+        public var fiveHours = 0.0
+        public var today = 0.0
+        public var week = 0.0
+        public var month = 0.0
+        /// Seven days, oldest first, ending today.
+        public var days: [Double] = []
+        public init(unit: String) { self.unit = unit }
+    }
+
     /// One agent's usage: the rolling five hours, today, the last seven and
     /// thirty days, and the provider's own limits where they are known.
     public struct AgentUsage: Sendable, Equatable, Identifiable {
@@ -107,6 +119,7 @@ public struct UsageSnapshot: Sendable, Equatable {
         public var days: [Day] = []
         /// The last twelve months, oldest first, ending with this one (ids "YYYY-MM").
         public var months: [Day] = []
+        public var credits: Credits?
         public var limits: [RateLimitWindow] = []
         public var limitsCapturedAt: Date?
         public var limitsSource: LimitsSource?
@@ -138,6 +151,27 @@ public struct UsageSnapshot: Sendable, Equatable {
             return tokens >= 1000 ? "\(tokens / 1000)k" : "\(tokens)"
         }
     }
+
+    /// One of the sessions that spent the most this week.
+    public struct TopSession: Sendable, Equatable, Identifiable {
+        public var agent: String
+        public var session: String
+        public var project: String?
+        /// In and out, without the cache reads.
+        public var tokens: Int
+        public var cost: Double
+        public var id: String { agent + "/" + session }
+        public init(agent: String, session: String, project: String?, tokens: Int, cost: Double) {
+            self.agent = agent
+            self.session = session
+            self.project = project
+            self.tokens = tokens
+            self.cost = cost
+        }
+    }
+
+    /// The sessions that spent the most in the last seven days, most first.
+    public var topSessions: [TopSession] = []
 
     /// Sessions of the last two days, keyed "agent/session id".
     public var sessions: [String: SessionUse] = [:]
@@ -252,6 +286,11 @@ public struct UsageSnapshot: Sendable, Equatable {
                 RateLimitWindow(id: "primary", usedPercent: 22, resetsAt: now.addingTimeInterval(1.6 * 3600), windowMinutes: 300),
                 RateLimitWindow(id: "secondary", usedPercent: 48, resetsAt: now.addingTimeInterval(4.1 * 86_400), windowMinutes: 10080),
             ], source: .agentFiles),
+        ]
+        snapshot.topSessions = [
+            TopSession(agent: "claude", session: "a", project: "/Users/dev/code/atlas-api", tokens: 1_240_000, cost: 18.40),
+            TopSession(agent: "codex", session: "b", project: "/Users/dev/code/storefront", tokens: 860_000, cost: 3.10),
+            TopSession(agent: "claude", session: "c", project: "/Users/dev/code/pixel-kit", tokens: 410_000, cost: 2.75),
         ]
         snapshot.updatedAt = now
         snapshot.pricingSource = "bundled"

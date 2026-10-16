@@ -6,24 +6,37 @@ import XCTest
 /// The pieces of the visual design that can be checked without looking at them.
 @MainActor
 final class DesignTests: XCTestCase {
-    func testSpritesAreWellFormed() {
-        XCTAssertEqual(Set(Mascots.all.map(\.name)).count, Mascots.all.count)
-        for sprite in Mascots.all {
-            XCTAssertEqual(sprite.frames.count, 2, sprite.name)
-            XCTAssertEqual(sprite.frames[0].count, 12, sprite.name)
-            for (index, frame) in sprite.frames.enumerated() {
-                XCTAssertEqual(frame.count, sprite.rows, "\(sprite.name) frame \(index)")
-                for row in frame {
-                    XCTAssertEqual(row.count, 12, "\(sprite.name) frame \(index): \(row)")
+    func testPetsAreWellFormed() {
+        XCTAssertEqual(Set(PixelPets.all.map(\.name)).count, PixelPets.all.count)
+        for pet in PixelPets.all {
+            let width = pet.columns
+            XCTAssertGreaterThan(width, 0, pet.name)
+            XCTAssertLessThanOrEqual(max(width, pet.rows.count), 18, "\(pet.name) stays small enough to read as pixels")
+            for (name, rows) in [("base", pet.rows)] + pet.poses.map({ ($0.key, $0.value) }) {
+                for row in rows {
+                    XCTAssertEqual(row.count, width, "\(pet.name) \(name): \(row)")
                     for character in row where character != "." {
-                        XCTAssertNotNil(sprite.palette[character], "\(sprite.name) uses “\(character)” without a colour")
+                        XCTAssertNotNil(pet.palette[character], "\(pet.name) uses “\(character)” without a colour")
                     }
                 }
+                XCTAssertEqual(rows.count, pet.rows.count, "\(pet.name): every pose has the same size")
             }
-            XCTAssertNotEqual(sprite.frames[0], sprite.frames[1], "\(sprite.name) should move")
-            let filled = sprite.frames[0].joined().filter { $0 != "." }.count
-            XCTAssertGreaterThan(filled, 30, "\(sprite.name) is more than a speck")
+            if let eye = pet.eye { XCTAssertTrue(pet.rows.joined().contains(eye), "\(pet.name) has eyes to close") }
+            XCTAssertGreaterThan(pet.rows.joined().filter { $0 != "." }.count, 20, "\(pet.name) is more than a speck")
         }
+    }
+
+    /// Clawd is drawn from Claude Code's own glyphs: nine cells by three, each cell two pixels by four.
+    func testClawdIsBuiltFromClaudeCodesGlyphs() {
+        let clawd = PixelPets.Clawd.pet
+        XCTAssertEqual(clawd.palette["a"], PixelPets.Clawd.body)
+        XCTAssertEqual(clawd.columns, 17)
+        XCTAssertEqual(clawd.rows.count, 10, "three terminal rows, the feet using the top of theirs")
+        XCTAssertEqual(clawd.rows.filter { $0.contains("e") }.count, 2, "open eyes are two pixels tall")
+        XCTAssertEqual(clawd.poses["closed"]?.filter { $0.contains("e") }.count, 1, "shut, a line")
+        XCTAssertNotEqual(clawd.poses["walk-left"], clawd.poses["walk-right"], "the feet move as he walks")
+        XCTAssertNotEqual(clawd.poses["arms-up"], clawd.rows)
+        XCTAssertEqual(PixelPets.Clawd.quarters("▛").3, false, "the eye is the quarter ▛ leaves out")
     }
 
     func testEveryAgentHasACreatureAndATint() {
@@ -34,9 +47,11 @@ final class DesignTests: XCTestCase {
         // The agents people are most likely to run side by side must be told apart at a glance.
         let common = ["claude", "codex", "cursor", "copilot", "gemini", "opencode"].map { Mascots.sprite(for: $0).name }
         XCTAssertEqual(Set(common).count, common.count)
-        // Recoloured variants really differ from the creature they borrow.
-        XCTAssertNotEqual(Mascots.sprite(for: "qwen").palette["a"], Mascots.sprite(for: "gemini").palette["a"])
-        XCTAssertNotEqual(Mascots.sprite(for: "kiro").palette["a"], Mascots.sprite(for: "trae").palette["a"])
+        // Every agent's pet is its own: no two agents of different vendors share one.
+        let vendors = ["claude", "codex", "kiro", "cursor", "zcode", "gemini", "copilot", "qwen", "trae", "windsurf", "opencode",
+                       "grok", "factory", "devin", "amp", "kimi", "minimax", "qoder", "codebuddy", "mimocode"]
+        XCTAssertEqual(Set(vendors.map { Mascots.sprite(for: $0).name }).count, vendors.count)
+        XCTAssertEqual(Mascots.sprite(for: "claude").name, "clawd")
     }
 
     func testIslandShapeStaysInsideItsFrameAndFlaresAtTheTop() {

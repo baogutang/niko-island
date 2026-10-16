@@ -397,11 +397,13 @@ public actor ProviderLimitsClient {
         public var gemini = false
         public var copilot = false
         public var cursor = false
+        public var kiro = false
 
         public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false,
                     kimi: Bool = false, minimax: Bool = false, minimaxRegion: MiniMaxQuotaAPI.Region = .cn, gemini: Bool = false,
-                    copilot: Bool = false, cursor: Bool = false) {
+                    copilot: Bool = false, cursor: Bool = false, kiro: Bool = false) {
             self.cursor = cursor
+            self.kiro = kiro
             self.claude = claude
             self.glm = glm
             self.glmRegion = glmRegion
@@ -423,6 +425,7 @@ public actor ProviderLimitsClient {
             case ProviderLimitsClient.gemini: return gemini
             case ProviderLimitsClient.copilot: return copilot
             case ProviderLimitsClient.cursor: return cursor
+            case ProviderLimitsClient.kiro: return kiro
             default: return false
             }
         }
@@ -468,6 +471,7 @@ public actor ProviderLimitsClient {
         public var geminiLogin: @Sendable () -> GeminiLogin.Outcome
         public var githubLogin: @Sendable () -> GitHubLogin.Outcome
         public var cursorLogin: @Sendable () -> CursorLogin.Outcome = { .missing }
+        public var kiroLogin: @Sendable () -> KiroLogin.Outcome = { .missing }
 
         public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?,
                     codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing },
@@ -491,6 +495,7 @@ public actor ProviderLimitsClient {
                     geminiLogin: { GeminiLogin.read(home: home) },
                     githubLogin: { GitHubLogin.read(home: home) })
             secrets.cursorLogin = { CursorLogin.read(home: home) }
+            secrets.kiroLogin = { KiroLogin.read(home: home) }
             return secrets
         }
     }
@@ -510,13 +515,15 @@ public actor ProviderLimitsClient {
     public static let gemini = "gemini"
     public static let copilot = "copilot"
     public static let cursor = "cursor"
-    public static let providers = [claude, glm, codex, kimi, minimax, gemini, copilot, cursor]
+    public static let kiro = "kiro"
+    public static let providers = [claude, glm, codex, kimi, minimax, gemini, copilot, cursor, kiro]
     /// The only hosts a request may go to.
     public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
                                             "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host, "api.github.com",
-                                            CursorQuotaAPI.host]
+                                            CursorQuotaAPI.host, KiroQuotaAPI.host(region: "us-east-1"),
+                                            KiroQuotaAPI.host(region: "eu-central-1")]
 
-    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300, copilot: 600, cursor: 600]
+    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300, copilot: 600, cursor: 600, kiro: 600]
     static let forcedInterval: TimeInterval = 30
     /// A provider that has answered once is asked again only while its agent is in use:
     /// heard from in this long. Nobody's numbers change while nobody works.
@@ -531,6 +538,7 @@ public actor ProviderLimitsClient {
         case gemini: return [gemini]
         case copilot: return [copilot]
         case cursor: return [cursor]
+        case kiro: return [kiro]
         default: return nil
         }
     }
@@ -627,6 +635,7 @@ public actor ProviderLimitsClient {
             case Self.gemini: result = await askGemini(now: now)
             case Self.copilot: result = await askCopilot(now: now)
             case Self.cursor: result = await askCursor(now: now)
+            case Self.kiro: result = await askKiro(now: now)
             default: result = await askCodex(now: now)
             }
             asking.remove(provider)
@@ -782,6 +791,23 @@ public actor ProviderLimitsClient {
         var (state, limits) = await ask(CursorQuotaAPI.request(login: login)) { CursorQuotaAPI.parse($0, now: now) }
         if state == .unauthorized {
             refused[Self.cursor] = login.token
+            state = .loginExpired
+        }
+        return Result(limits: limits, state: state, checkedAt: now)
+    }
+
+    private func askKiro(now: Date) async -> Result {
+        let login: KiroLogin.Login
+        switch secrets.kiroLogin() {
+        case .found(let found): login = found
+        case .missing: return Result(state: .noLogin, checkedAt: now)
+        case .expired: return Result(state: .loginExpired, checkedAt: now)
+        }
+        if refused[Self.kiro] == login.token { return Result(state: .loginExpired, checkedAt: now) }
+        guard let request = KiroQuotaAPI.request(login: login) else { return Result(state: .noLogin, checkedAt: now) }
+        var (state, limits) = await ask(request) { KiroQuotaAPI.parse($0, now: now) }
+        if state == .unauthorized {
+            refused[Self.kiro] = login.token
             state = .loginExpired
         }
         return Result(limits: limits, state: state, checkedAt: now)

@@ -34,16 +34,27 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/mascots/starfish.gif" width="40" alt="海星" title="Claude Code · MiniMax Code">&nbsp;
-  <img src="docs/images/mascots/whale.gif" width="40" alt="鲸鱼" title="Codex · Kimi Code">&nbsp;
-  <img src="docs/images/mascots/crab.gif" width="40" alt="螃蟹" title="ZCode · Devin">&nbsp;
-  <img src="docs/images/mascots/boat.gif" width="40" alt="小船" title="Cursor · Windsurf">&nbsp;
-  <img src="docs/images/mascots/gull.gif" width="40" alt="海鸥" title="Copilot CLI · CodeBuddy">&nbsp;
-  <img src="docs/images/mascots/jellyfish.gif" width="40" alt="水母" title="Gemini CLI · Qwen Code">&nbsp;
-  <img src="docs/images/mascots/turtle.gif" width="40" alt="海龟" title="OpenCode · MiMoCode · Qoder">&nbsp;
-  <img src="docs/images/mascots/octopus.gif" width="40" alt="章鱼" title="Trae · Kiro">&nbsp;
-  <img src="docs/images/mascots/puffer.gif" width="40" alt="河豚" title="Grok CLI · Factory · Amp">&nbsp;
-  <img src="docs/images/mascots/island.gif" width="40" alt="小岛" title="其他代理">
+  <img src="docs/images/mascots/clawd.gif" width="36" alt="Clawd" title="Claude Code">&nbsp;
+  <img src="docs/images/mascots/codex.gif" width="36" alt="Codex" title="Codex">&nbsp;
+  <img src="docs/images/mascots/kiro.gif" width="36" alt="Kiro" title="Kiro">&nbsp;
+  <img src="docs/images/mascots/cursor.gif" width="36" alt="Cursor" title="Cursor">&nbsp;
+  <img src="docs/images/mascots/zcode.gif" width="36" alt="ZCode" title="ZCode">&nbsp;
+  <img src="docs/images/mascots/gemini.gif" width="36" alt="Gemini CLI" title="Gemini CLI">&nbsp;
+  <img src="docs/images/mascots/copilot.gif" width="36" alt="Copilot CLI" title="Copilot CLI">&nbsp;
+  <img src="docs/images/mascots/qwen.gif" width="36" alt="Qwen Code" title="Qwen Code · QwenWork">&nbsp;
+  <img src="docs/images/mascots/trae.gif" width="36" alt="Trae" title="Trae">&nbsp;
+  <img src="docs/images/mascots/windsurf.gif" width="36" alt="Windsurf" title="Windsurf">&nbsp;
+  <img src="docs/images/mascots/opencode.gif" width="36" alt="OpenCode" title="OpenCode">&nbsp;
+  <img src="docs/images/mascots/grok.gif" width="36" alt="Grok CLI" title="Grok CLI">&nbsp;
+  <img src="docs/images/mascots/factory.gif" width="36" alt="Factory" title="Factory">&nbsp;
+  <img src="docs/images/mascots/devin.gif" width="36" alt="Devin" title="Devin">&nbsp;
+  <img src="docs/images/mascots/amp.gif" width="36" alt="Amp" title="Amp">&nbsp;
+  <img src="docs/images/mascots/kimi.gif" width="36" alt="Kimi Code" title="Kimi Code">&nbsp;
+  <img src="docs/images/mascots/minimax.gif" width="36" alt="MiniMax Code" title="MiniMax Code">&nbsp;
+  <img src="docs/images/mascots/qoder.gif" width="36" alt="Qoder" title="Qoder">&nbsp;
+  <img src="docs/images/mascots/codebuddy.gif" width="36" alt="CodeBuddy" title="CodeBuddy">&nbsp;
+  <img src="docs/images/mascots/mimo.gif" width="36" alt="MiMoCode" title="MiMoCode">&nbsp;
+  <img src="docs/images/mascots/island.gif" width="36" alt="小岛" title="其他代理">
 </p>
 <p align="center">
   <sub>Claude Code · Codex · ZCode · Cursor · Windsurf · Gemini CLI · Trae · Qwen Code · CodeBuddy · Factory · Grok CLI · OpenCode · MiMoCode · Copilot CLI · Qoder · Kimi Code · Devin · Kiro · MiniMax Code · Amp</sub>
@@ -132,10 +143,12 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 <a id="features"></a>
 ## 功能
 
+**0.15.0：每个代理自己的宠物；Kiro 的权限请求与积分。** 每个代理现在都以它自己的吉祥物或标志出现，像素风：Claude Code 是 Clawd（照 Claude Code 自己画 Clawd 的字符还原，并用它自己的姿势动起来），Kiro 是幽灵，Codex 是那朵云，Cursor 是方块，Gemini 是四角星，Copilot 是那张脸……都由各家官方图标像素化而来。Kiro 里弹出的权限请求现在会到岛上（Kiro 没有对应的钩子，改为读它自己的会话文件），Kiro 每一轮花的积分会被统计，也可以查询本月额度；展开的岛屿去掉了那圈灰色的大阴影。
+
 **0.14.0：有情绪的小生物，每个代理的活动，Cursor 的套餐。** 小生物全部用矢量重画，并且会演出它的代理正在做什么：干活时一边蹦一边做自己的事（鲸鱼喷水、螃蟹夹钳子、章鱼卷触手），需要你决定时带着“!”跳起来，回合结束时眯眼 ^ ^ 笑、冒几颗星星，等你回复时抬头看着你，安静太久就睡着。像素主题仍用像素版。收起的岛屿下面会透出光晕（有人在等你时是琥珀色），代理干活时一道光沿着岛屿底边划过，展开时各行依次落位。用量页新增半年的活动记录，来自每个接入的代理，包括 Cursor 和 Gemini CLI：每天的会话、提示词和工具调用，连续天数，以及这周干活最多的工具。可以查询 Cursor 套餐的已用额度；厂商额度只在对应代理正在使用时才会再查；首页的 token 数不再算入缓存读取。别的工具建出来的 `~/.claude` 文件夹不再被当成 Claude Code，Cursor 执行 Claude Code 的钩子时也会记在 Cursor 名下。
 
 <p align="center">
-  <img src="docs/images/mascots/strip.png" width="640" alt="矢量重画的十只小生物：海星、鲸鱼、水母、海龟、海鸥、小船、章鱼、河豚、螃蟹和小岛，分别在休息、干活、开心和等待">
+  <img src="docs/images/mascots/strip.png" width="640" alt="每个代理自己的吉祥物或标志的像素版：Claude Code 的 Clawd、Codex 的云、Kiro 的幽灵、Cursor 的方块等等，分别在休息、干活、开心和等待">
 </p>
 
 **0.13.0：额度就在最上面，列表更安静，权限讲清楚。** 展开岛屿，列表最上面那个代理的 5 小时和每周额度、离重置还有多久就显示在顶部，点一下进入用量页。较早的空闲会话折叠成一行，指针停一下就展开。如果你拒绝过 Niko Island 控制 Terminal 或 iTerm2（于是点会话只会切到应用、到不了标签页），现在它会发现这件事，直接打开系统设置里对应的位置，并在旁边贴一张步骤卡，直到开关打开；“设置 → 通用”会列出每项权限的状态。
@@ -175,7 +188,7 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 - **能继续了会告诉你。** 额度用完让代理停下时，应用会记住它什么时候恢复；到点了就在岛上说一次，带提示音；开了手机推送的话也发一条。
 - **需要的话，通知到手机。** 通过你自己设置的推送服务（Bark 或 ntfy）发一行短消息：哪个代理、哪个项目、发生了哪一类事。默认关闭；打开后默认也只在屏幕锁定时发送。
 - **会话多了也不乱。** 列表可以不分组，也可以按项目或按代理分到各自的标题下。
-- **每个代理一只有情绪的小生物。** Claude Code 是海星，Codex 是鲸鱼，ZCode 是螃蟹：不用读字就能分清会话。它们会表现会话的状态：干活时忙个不停，需要你时带着“!”跳，回合刚结束时开心，等你回复时抬头看你，安静太久就睡着，出错时眼睛变成 ×。想给哪个代理换一只也可以。
+- **每个代理自己的宠物，带情绪。** 每个代理都以它自己的吉祥物或标志出现，像素风：Claude Code 是 Clawd（照 Claude Code 自己画 Clawd 的字符还原），Kiro 是幽灵，Codex 是那朵云，Cursor 是方块，Gemini CLI 是四角星，Copilot 是那张脸……不用读字就能分清会话。它会表现会话的状态：干活时走来走去，需要你时带着“!”跳，回合刚结束时举手或冒星星，等你回复时四处张望，安静太久就闭眼，出错时冒一滴汗。这些标志归各自的所有者，只用来说明会话属于哪个代理。
 - **帮你定位的小标签。** 每一行都带着时长、代理、它在哪里运行（iTerm2、Terminal、Ghostty、WezTerm、VS Code、Cursor、tmux、桌面端……），以及所在目录的 Git 分支。模型名称可以在设置里打开。
 - **回到正确的窗口。** 点一下会话行或通知，对应的 Terminal.app 或 iTerm2 标签页就会回到前台，tmux 窗格也能定位；桌面端的会话会把对应的应用带到前台，Codex 桌面端的会话会直接打开那一段对话。会话行的右键菜单可以拷贝最后一条回复、在访达里显示文件夹，或者拷贝恢复该会话的命令。
 - **按代理分开的用量与额度。** 在全部、Claude Code、Codex、ZCode 之间切换：最近 5 小时、今天、7 天、30 天，最近 24 小时每 15 分钟的柱状图、最近 4 周按星期和小时的热力图，以及缓存命中率。套餐的 5 小时和每周额度来自真正知道它的地方：代理自己写下的文件，或者（在你打开开关之后）厂商本身：Anthropic、OpenAI、智谱 BigModel / Z.ai、Kimi、MiniMax、GitHub（Copilot 的每月额度），Google（Gemini CLI 的每日配额），以及 Cursor（套餐的已用额度）。厂商回答过一次之后，只在对应代理正在使用时才会再问。token 数只算真正输入和输出的部分，从缓存里读回的上下文单独显示：把它算进去，一天的用量会看起来大十倍。
@@ -213,28 +226,28 @@ Niko Island 在屏幕顶部放了一座黑色的小岛：在 MacBook 上从摄�
 <a id="supported-agents"></a>
 ## 支持的代理
 
-| 代理 | 小生物 | 状态 | 你能得到什么 | 接入时会改动什么 |
+| 代理 | 宠物 | 状态 | 你能得到什么 | 接入时会改动什么 |
 |---|---|---|---|---|
-| **Claude Code**（终端与桌面端） | 海星 | 稳定 | 实时状态、审批、提问、用量、速率限制。未接入时也能列出会话 | `~/.claude/settings.json`（钩子条目 + 状态栏包装） |
-| Codex（CLI、IDE 扩展、桌面端） | 鲸鱼 | 测试版 | 实时状态、审批、用量、额度。未接入时也能列出会话。Codex 会要求你信任一次新钩子（`/hooks`） | `~/.codex/hooks.json` |
-| ZCode | 螃蟹 | 测试版 | 实时状态、审批、用量、套餐额度（需手动开启）。未接入时也能列出会话；接入之前就开着的会话，要重开之后才会用上钩子 | `~/.zcode/cli/config.json` |
-| Cursor | 小船 | 测试版 | 实时状态 | `~/.cursor/hooks.json` |
-| Windsurf | 小船 | 测试版 | 实时状态 | `~/.codeium/windsurf/hooks.json` |
-| Gemini CLI | 水母 | 测试版 | 实时状态 | `~/.gemini/settings.json` |
-| Trae | 章鱼 | 测试版 | 实时状态 | `~/.trae/hooks.json`、`~/.trae-cn/hooks.json` |
-| Qwen Code | 水母 | 测试版 | 实时状态 | `~/.qwen/settings.json` |
-| CodeBuddy | 海鸥 | 测试版 | 实时状态 | `~/.codebuddy/settings.json` |
-| Factory | 河豚 | 测试版 | 实时状态 | `~/.factory/settings.json` |
-| Grok CLI | 河豚 | 测试版 | 实时状态 | `~/.grok/hooks/niko.json`（独立文件） |
-| OpenCode、MiMoCode | 海龟 | 实验性 | 通过一个小插件提供实时状态；用量为尽力而为 | `~/.config/opencode/plugins/niko.js`、`~/.config/mimocode/plugins/niko.js`（独立文件） |
-| Copilot CLI | 海鸥 | 测试版 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
-| Qoder、Qoder CN | 海龟 | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Qoder 里回答 | `~/.qoder/settings.json`、`~/.qoder-cn/settings.json` |
-| Kimi Code | 鲸鱼 | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Kimi Code 里回答 | `~/.kimi-code/config.toml`（文件末尾一段带标记的内容） |
-| Devin | 螃蟹 | 测试版 | 实时状态、审批 | `~/.config/devin/config.json` |
-| QwenWork、QoderWork | 水母、海龟 | 实验性 | 实时状态 | `~/.qwenwork/settings.json`、`~/.qoderwork/settings.json` |
-| Kiro（CLI 3 与 IDE） | 章鱼 | 实验性 | 实时状态。未接入时也能列出 Kiro 应用里的会话 | `~/.kiro/hooks/niko.json`（独立文件） |
-| MiniMax Code | 海星 | 实验性 | 实时状态；权限请求在 MiniMax Code 里回答 | `~/.minimax/plugins/niko/.claude-plugin/plugin.json` 和 `hooks/hooks.json`（独立插件） |
-| Amp | 河豚 | 实验性 | 通过一个只监听的小插件显示实时状态（Amp 的插件接口本身也是实验性的） | `~/.config/amp/plugins/niko.ts`（独立文件） |
+| **Claude Code**（终端与桌面端） | Clawd | 稳定 | 实时状态、审批、提问、用量、速率限制。未接入时也能列出会话 | `~/.claude/settings.json`（钩子条目 + 状态栏包装） |
+| Codex（CLI、IDE 扩展、桌面端） | Codex 的云 | 测试版 | 实时状态、审批、用量、额度。未接入时也能列出会话。Codex 会要求你信任一次新钩子（`/hooks`） | `~/.codex/hooks.json` |
+| ZCode | Z | 测试版 | 实时状态、审批、用量、套餐额度（需手动开启）。未接入时也能列出会话；接入之前就开着的会话，要重开之后才会用上钩子 | `~/.zcode/cli/config.json` |
+| Cursor | 方块 | 测试版 | 实时状态 | `~/.cursor/hooks.json` |
+| Windsurf | W | 测试版 | 实时状态 | `~/.codeium/windsurf/hooks.json` |
+| Gemini CLI | 四角星 | 测试版 | 实时状态 | `~/.gemini/settings.json` |
+| Trae | Trae 标志 | 测试版 | 实时状态 | `~/.trae/hooks.json`、`~/.trae-cn/hooks.json` |
+| Qwen Code | Qwen 标志 | 测试版 | 实时状态 | `~/.qwen/settings.json` |
+| CodeBuddy | 小猫 | 测试版 | 实时状态 | `~/.codebuddy/settings.json` |
+| Factory | Factory 标志 | 测试版 | 实时状态 | `~/.factory/settings.json` |
+| Grok CLI | xAI 标志 | 测试版 | 实时状态 | `~/.grok/hooks/niko.json`（独立文件） |
+| OpenCode、MiMoCode | OpenCode 标志、MiMo | 实验性 | 通过一个小插件提供实时状态；用量为尽力而为 | `~/.config/opencode/plugins/niko.js`、`~/.config/mimocode/plugins/niko.js`（独立文件） |
+| Copilot CLI | Copilot 的脸 | 测试版 | 实时状态 | `~/.copilot/hooks/niko.json`（独立文件） |
+| Qoder、Qoder CN | Qoder 标志 | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Qoder 里回答 | `~/.qoder/settings.json`、`~/.qoder-cn/settings.json` |
+| Kimi Code | K | 测试版 | 实时状态；权限请求显示为“需要权限”，在 Kimi Code 里回答 | `~/.kimi-code/config.toml`（文件末尾一段带标记的内容） |
+| Devin | Devin 标志 | 测试版 | 实时状态、审批 | `~/.config/devin/config.json` |
+| QwenWork、QoderWork | Qwen 标志、Qoder 标志 | 实验性 | 实时状态 | `~/.qwenwork/settings.json`、`~/.qoderwork/settings.json` |
+| Kiro（CLI 3 与 IDE） | 幽灵 | 实验性 | 实时状态。未接入时也能列出 Kiro 应用里的会话；Kiro 里弹出的权限请求会在岛上显示为“需要许可”（在 Kiro 里回答）；每一轮花的积分，以及本月积分（需打开） | `~/.kiro/hooks/niko.json`（独立文件） |
+| MiniMax Code | 声波 | 实验性 | 实时状态；权限请求在 MiniMax Code 里回答 | `~/.minimax/plugins/niko/.claude-plugin/plugin.json` 和 `hooks/hooks.json`（独立插件） |
+| Amp | Amp 字标 | 实验性 | 通过一个只监听的小插件显示实时状态（Amp 的插件接口本身也是实验性的） | `~/.config/amp/plugins/niko.ts`（独立文件） |
 | Mistral Vibe、DeepSeek CLI、Pi / OhMyPi、OpenClaw | — | 计划中 | — | — |
 
 - **稳定** — 端到端打通并有测试覆盖。
@@ -375,7 +388,7 @@ niko-island uninstall                       # 始终移除我们写入的全部�
 - **会话日志只读取，不修改、不复制。** 为了列出会话和统计 token，应用会读取 Claude Code 和 Codex 保存在你主目录里的日志，ZCode 的本地数据库，以及 Kiro 的会话文件夹（`~/.kiro/sessions/`）（只读）。会话的标题和最后一条回复只在该行显示期间留在内存里。任务清单也是这样读的（Claude Code 的 `~/.claude/tasks/`、Codex 日志里的计划、ZCode 的待办表）；行上的分支来自会话目录里的 `.git/HEAD` 文件，从不运行 git 本身。
 - **运行中的代理在本地识别。** 为了告诉你某个代理正在运行但还没接入，应用会查看正在运行的应用和进程的名称。这份列表不会发往任何地方。
 - **仅限本机、仅限本人。** 代理通过 unix 套接字与应用通信，应用会对每条消息核对调用者的用户 ID。只有当你接入需要插件的代理时，才会打开一个回环 HTTP 端口（127.0.0.1，令牌保存在仅本人可读的文件里）。
-- **只有打开“向厂商查询”时才会读取登录凭据。** 打开**向 Anthropic 查询**后，应用会读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只放在内存里，并发送到 `api.anthropic.com` 查询额度。打开**向智谱 BigModel / Z.ai 查询**后，应用会把你粘贴的密钥（以 Niko Island 自己的名义存在钥匙串里）发送到 `open.bigmodel.cn` 或 `api.z.ai`。打开**向 OpenAI 查询**后，应用会读取 Codex 存在这台 Mac 上的 ChatGPT 登录凭据（`~/.codex/auth.json`；如果 Codex 被设置为使用钥匙串，则从钥匙串读取），并发送到 `chatgpt.com`。每项只发往对应的那一个主机，并且以本应用自己的名义发出；不续期、不改写、不复制任何东西；只保存百分比、恢复时间和存下的重置次数。打开**向 Kimi 查询**或**向 MiniMax 查询**后，你粘贴的密钥（同样存在钥匙串里）会发送到 `api.kimi.com`，或 `api.minimaxi.com` / `api.minimax.io`。打开**向 GitHub 查询**后，应用会读取 GitHub CLI（`gh`）保存的登录凭据（`~/.config/gh/hosts.yml`，或它的钥匙串条目），发送到 `api.github.com` 查询 Copilot 额度。打开**向 Google 查询**后，应用会读取 Gemini CLI 保存的登录凭据（`~/.gemini/oauth_creds.json`，或它的钥匙串条目），并且只在它还没过期时发送到 `cloudcode-pa.googleapis.com`；本应用绝不为它续期。打开**向 Cursor 查询**后，应用会读取 Cursor 应用保存在它自己设置数据库里的登录凭据（`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`，只读打开），发送到 `cursor.com` 查询套餐的已用额度。这些开关都关闭时（出厂状态），任何登录凭据或密钥都不会被读取。ZCode 自己保存的登录信息由 ZCode 加密，我们绝不触碰。
+- **只有打开“向厂商查询”时才会读取登录凭据。** 打开**向 Anthropic 查询**后，应用会读取 Claude Code 存在钥匙串里的登录凭据（macOS 可能会先询问你），只放在内存里，并发送到 `api.anthropic.com` 查询额度。打开**向智谱 BigModel / Z.ai 查询**后，应用会把你粘贴的密钥（以 Niko Island 自己的名义存在钥匙串里）发送到 `open.bigmodel.cn` 或 `api.z.ai`。打开**向 OpenAI 查询**后，应用会读取 Codex 存在这台 Mac 上的 ChatGPT 登录凭据（`~/.codex/auth.json`；如果 Codex 被设置为使用钥匙串，则从钥匙串读取），并发送到 `chatgpt.com`。每项只发往对应的那一个主机，并且以本应用自己的名义发出；不续期、不改写、不复制任何东西；只保存百分比、恢复时间和存下的重置次数。打开**向 Kimi 查询**或**向 MiniMax 查询**后，你粘贴的密钥（同样存在钥匙串里）会发送到 `api.kimi.com`，或 `api.minimaxi.com` / `api.minimax.io`。打开**向 GitHub 查询**后，应用会读取 GitHub CLI（`gh`）保存的登录凭据（`~/.config/gh/hosts.yml`，或它的钥匙串条目），发送到 `api.github.com` 查询 Copilot 额度。打开**向 Google 查询**后，应用会读取 Gemini CLI 保存的登录凭据（`~/.gemini/oauth_creds.json`，或它的钥匙串条目），并且只在它还没过期时发送到 `cloudcode-pa.googleapis.com`；本应用绝不为它续期。打开**向 Cursor 查询**后，应用会读取 Cursor 应用保存在它自己设置数据库里的登录凭据（`~/Library/Application Support/Cursor/User/globalStorage/state.vscdb`，只读打开），发送到 `cursor.com` 查询套餐的已用额度。打开**向 Kiro 查询**后，应用会读取 Kiro 保存的登录凭据（`~/.aws/sso/cache/kiro-auth-token.json`，以及 Kiro 自己存储里的账户配置），并且只在它还没过期时发送到 `management.us-east-1.kiro.dev` 或 `management.eu-central-1.kiro.dev` 查询本月积分；本应用绝不为它续期。这些开关都关闭时（出厂状态），任何登录凭据或密钥都不会被读取。ZCode 自己保存的登录信息由 ZCode 加密，我们绝不触碰。
 - **发到手机的那一行，只说你允许它说的。** 打开**给我的手机发消息**后，应用会把一个标题和一行短文字发给你选定的推送服务器（Bark 或 ntfy 自己的，或者你自建的；必须是 https，或者是你自己网络里的地址），不发往别处。内容是代理名、项目文件夹名和事情的类别（“需要你来决定”“已完成”）。只有你另外打开*带上具体内容*，才会附上被请求的命令或回复的第一行。设备 Key 或主题保存在你的钥匙串里。默认只在屏幕锁定或休眠时发送。
 - **回复只会输入到你的终端里。** 打开*从灵动岛回复*（实验性，默认关闭）后，你输入的内容会像亲手输入一样，送进代理所在的 tmux 窗格、iTerm2 会话或“终端”标签页。发送之前应用会先确认等在那个提示符前的确实是代理；如果是 shell，就什么都不发。不会往别的任何地方输入内容；应用要控制“终端”或 iTerm2 之前，macOS 会先征求你的同意。
 - **只会替你运行一个程序，而且要你先打开开关。** 打开*让 Claude Code 自己查*后，应用会在自己的一个空文件夹里启动你自己的 `claude` 程序执行 `/usage`，不加载你的设置、钩子和 MCP 服务器，也不保存成会话。Claude Code 接下来对 Anthropic 说什么，是它自己的事，用的是它自己的登录。应用只从 `~/.claude.json` 里读取结果。

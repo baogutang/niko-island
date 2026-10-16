@@ -408,6 +408,14 @@ public enum NikoCLI {
                 case .denied: print("sign-in: macOS said no")
                 }
             }
+            if which == "kiro" {
+                switch KiroLogin.read(home: home) {
+                case .found(let login):
+                    print("sign-in: found, region \(login.region), token type \(login.tokenType ?? "-"), expires in \(login.expiresAt.map { String(Int($0.timeIntervalSinceNow / 60)) + " min" } ?? "?")")
+                case .missing: print("sign-in: none from Kiro on this Mac")
+                case .expired: print("sign-in: past its date (Kiro renews it the next time it runs)")
+                }
+            }
             if which == "cursor" {
                 switch CursorLogin.read(home: home) {
                 case .found(let login):
@@ -423,7 +431,8 @@ public enum NikoCLI {
                 await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex",
                                              kimi: which == "kimi", minimax: which == "minimax",
                                              minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
-                                             gemini: which == "gemini", copilot: which == "copilot", cursor: which == "cursor"))
+                                             gemini: which == "gemini", copilot: which == "copilot", cursor: which == "cursor",
+                                             kiro: which == "kiro"))
                 await client.refresh(force: true)
                 for (provider, result) in await client.current() {
                     print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")
