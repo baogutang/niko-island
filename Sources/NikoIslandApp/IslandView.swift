@@ -318,7 +318,7 @@ struct ExpandedIsland: View {
             Group {
                 switch model.route {
                 case .sessions: SessionsPane(model: model).transition(.rise)
-                case .usage: UsageView(model: model).transition(.rise)
+                case .usage: CappedScroll(maxHeight: IslandMetrics.contentLimit) { UsageView(model: model) }.transition(.rise)
                 }
             }
             .animation(Motion.smooth(look.motion), value: model.route)
@@ -530,6 +530,29 @@ struct SessionsPane: View {
         .padding(12)
         .background(RoundedRectangle(cornerRadius: look.radius(12), style: .continuous).fill(Theme.amber.opacity(0.12)))
         .padding(.bottom, 10)
+    }
+}
+
+/// Content that may be taller than the island has room for: it keeps its own height
+/// up to `maxHeight`, and scrolls inside beyond that.
+struct CappedScroll<Content: View>: View {
+    var maxHeight: CGFloat
+    @ViewBuilder var content: Content
+    @State private var height: CGFloat = 0
+    @Environment(\.isStaticPreview) private var isStaticPreview
+
+    var body: some View {
+        if isStaticPreview {
+            content
+        } else {
+            ScrollView(.vertical, showsIndicators: false) {
+                content.background(GeometryReader { proxy in
+                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                })
+            }
+            .frame(height: height == 0 ? nil : min(height, maxHeight))
+            .onPreferenceChange(ListHeightKey.self) { height = $0 }
+        }
     }
 }
 

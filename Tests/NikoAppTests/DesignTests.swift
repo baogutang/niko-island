@@ -39,6 +39,15 @@ final class DesignTests: XCTestCase {
         XCTAssertEqual(PixelPets.Clawd.quarters("▛").3, false, "the eye is the quarter ▛ leaves out")
     }
 
+    /// 0.14 and 0.15 lost the island off the top of the screen: an open page taller than
+    /// its window made SwiftUI grow the window upwards. The window's size is ours alone.
+    func testTheIslandNeverResizesItsWindow() {
+        let model = AppModel(paths: NikoPaths(root: FileManager.default.temporaryDirectory.appendingPathComponent("ni-design-\(UUID())")))
+        let host = IslandWindowController.host(IslandView(model: model, metrics: .plain))
+        XCTAssertEqual(host.sizingOptions, [], "the hosting view must not size the island's window")
+        XCTAssertLessThan(IslandMetrics.contentLimit + 100, IslandMetrics.canvas.height, "a page fits with the header and margins")
+    }
+
     func testEveryAgentHasACreatureAndATint() {
         for agent in AgentRegistry.installable {
             XCTAssertNotEqual(Mascots.sprite(for: agent.id).name, "island", "\(agent.id) falls back to the generic sprite")

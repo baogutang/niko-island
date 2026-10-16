@@ -135,13 +135,24 @@ final class IslandWindowController: NSObject {
                 self.model.log.info("island frame x=\(Int(rect.minX)) y=\(Int(rect.minY)) w=\(Int(rect.width)) h=\(Int(rect.height)) expanded=\(self.model.isExpanded)")
             }
         }
-        deskPanel.contentView = NSHostingView(rootView: desk)
+        deskPanel.contentView = IslandWindowController.host(desk)
         let overlay = IslandView(model: model, metrics: metrics) { [weak self] rect in
             guard let self else { return }
             self.overlayRect = rect
             self.pointerMoved()
         }
-        overlayPanel.contentView = NSHostingView(rootView: overlay)
+        overlayPanel.contentView = IslandWindowController.host(overlay)
+    }
+
+    /// The island's view in its window. SwiftUI must never size the window: by default a
+    /// hosting view grows its window to fit content that is too tall, upwards, and since
+    /// the island hangs from the top of the window it went off the top of the screen and
+    /// stayed there (0.14 and 0.15: an open usage page taller than the window). Content
+    /// that is too tall scrolls inside the island instead.
+    static func host(_ view: IslandView) -> NSHostingView<IslandView> {
+        let host = NSHostingView(rootView: view)
+        host.sizingOptions = []
+        return host
     }
 
     private func place() {

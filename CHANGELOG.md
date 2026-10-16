@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.1] - 2026-10-16
+
+### Fixed
+- **The island no longer vanishes after the usage page has been open.** Since 0.14.0 the usage page (activity, then the top sessions) could be taller than the island's window. SwiftUI then grew the window to fit, upwards; the island hangs from the top of its window, so it went off the top of the screen and stayed there after the page was closed. The app was still running, but nothing of it could be seen, so it looked as if it had quit. The island's windows are now never resized by their content, and a page taller than the island scrolls inside it.
+
+### Verification
+- On the owner's Mac, the running 0.15.0 was found with its desktop window 856 points tall instead of 760, the island 96 points above the screen, the process healthy. A 0.15.1 build opened on the usage page with the same data keeps both windows at 780 × 760 and the island on screen, the page scrolling inside it.
+
 ## [0.15.0] - 2026-10-16
 
 ### Changed

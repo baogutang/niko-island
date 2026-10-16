@@ -14,6 +14,9 @@ struct IslandMetrics: Equatable, Sendable {
     static let wing: CGFloat = 46
     /// The transparent window the island is drawn in.
     static let canvas = CGSize(width: 780, height: 760)
+    /// The most a page inside the open island may take: the window less the header band,
+    /// the margins and room for the shadow. Beyond it a page scrolls.
+    static let contentLimit: CGFloat = canvas.height - 130
 
     static let plain = IslandMetrics(hasNotch: false, notchWidth: 0, bandHeight: 28)
     /// A typical notched laptop display, for documentation images.
