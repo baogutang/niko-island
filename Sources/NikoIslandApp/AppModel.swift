@@ -197,6 +197,8 @@ public final class AppModel: ObservableObject {
     @Published public var wantsOnboarding = false
     /// Brings the session's terminal to the front; replaced in tests.
     public var jumpHandler: (Session) -> Void = { TerminalJumper.jump(to: $0) }
+    /// What macOS currently allows the app (notifications, control of terminals).
+    let permissions = PermissionCenter()
 
     private var store = SessionStore()
     private var grants = SessionGrants()

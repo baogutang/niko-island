@@ -250,6 +250,14 @@ struct ExpandedIsland: View {
     var metrics: IslandMetrics
     @Environment(\.isStaticPreview) private var isStaticPreview
 
+    /// Plan limits for the agent at the top of the list (the one that needs you, else the latest), when any source has them.
+    private var glance: QuotaGlance? {
+        guard model.settings.quotaGlance else { return nil }
+        var order: [String] = []
+        for source in model.sessions.map(\.source) where !order.contains(source) { order.append(source) }
+        return QuotaGlance.make(usage: model.usage, recentAgents: order, now: isStaticPreview ? PreviewClock.now : Date())
+    }
+
     private var summary: String {
         if !model.pending.isEmpty { return L("%lld waiting for your decision", model.pending.count) }
         if model.sessions.isEmpty { return L("No sessions") }
@@ -277,7 +285,13 @@ struct ExpandedIsland: View {
     private var header: some View {
         HStack(spacing: 8) {
             MascotView(sprite: Mascots.island, size: 16)
-            Text(NikoVersion.displayName).font(look.body(12, .bold)).foregroundStyle(Theme.primary)
+            if let glance {
+                QuotaGlanceView(glance: glance, active: model.route == .usage) {
+                    withAnimation(Motion.smooth(look.motion)) { model.route = model.route == .usage ? .sessions : .usage }
+                }
+            } else {
+                Text(NikoVersion.displayName).font(look.body(12, .bold)).foregroundStyle(Theme.primary)
+            }
             if !metrics.hasNotch {
                 Text(summary).font(look.body(11.5)).foregroundStyle(model.pending.isEmpty ? Theme.tertiary : Theme.amber)
             }
@@ -378,6 +392,9 @@ struct SessionsPane: View {
 
     private func rowStack(_ rows: [Session], now: Date) -> some View {
         let groups = SessionGroups.make(rows, by: model.settings.sessionGrouping)
+        // A row you are typing a reply into keeps its card.
+        let typing = Set(rows.map(\.key).filter { model.replies[$0] != nil || model.canReply(to: $0) })
+        let full = model.settings.compactOlderRows ? RowTiers.full(rows, alwaysFull: typing, now: now) : Set(rows.map(\.key))
         return VStack(alignment: .leading, spacing: 2) {
             ForEach(groups) { group in
                 if let title = group.title {
@@ -394,6 +411,7 @@ struct SessionsPane: View {
                 }
                 ForEach(group.sessions) { session in
                     SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project,
+                                   compact: !full.contains(session.key),
                                    hovered: isStaticPreview ? nil : $hovered, hoverSpace: isStaticPreview ? nil : hoverSpace)
                         .transition(.row)
                 }
@@ -509,5 +527,46 @@ struct SessionGroups {
             return [only]
         }
         return made
+    }
+}
+
+/// "Claude  5h 31% 2h39m │ 7d 76% 1d" along the top of the open island; a click opens Usage.
+struct QuotaGlanceView: View {
+    var glance: QuotaGlance
+    var active: Bool
+    var action: () -> Void
+    @Environment(\.look) private var look
+    @State private var hovering = false
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 7) {
+                Text(AgentRegistry.displayName(for: glance.agent)).font(look.body(11.5, .semibold)).foregroundStyle(Theme.primary)
+                ForEach(Array(glance.entries.enumerated()), id: \.offset) { index, entry in
+                    if index > 0 { Rectangle().fill(Theme.hairline).frame(width: 1, height: 11) }
+                    HStack(spacing: 4) {
+                        Text(entry.label).foregroundStyle(Theme.tertiary)
+                        Text("\(entry.percent)%").fontWeight(.semibold).foregroundStyle(color(entry.level))
+                        if let left = entry.resetsIn { Text(left).foregroundStyle(Theme.tertiary) }
+                    }
+                    .font(look.mono(11))
+                }
+            }
+            .padding(.horizontal, 8).padding(.vertical, 3)
+            .background(Capsule().fill(Color.white.opacity(active ? 0.12 : hovering ? 0.07 : 0)))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .onHover { inside in withAnimation(Motion.snappy(look.motion)) { hovering = inside } }
+        .help(L("Plan limits of %@: open Usage", AgentRegistry.displayName(for: glance.agent)))
+        .accessibilityLabel(glance.entries.map { L("%@ window %lld percent used", $0.label, $0.percent) }.joined(separator: ", "))
+    }
+
+    private func color(_ level: QuotaGlance.Level) -> Color {
+        switch level {
+        case .calm: return Theme.mint
+        case .warm: return Theme.amber
+        case .hot: return Theme.coral
+        }
     }
 }

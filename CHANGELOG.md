@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0] - 2026-10-16
+
+### Added
+- **Plan limits along the top of the open island.** The agent at the top of the list shows its short and long windows (`Claude Code 5h 37% 2h24m │ 7d 61% 3d`), coloured calm, warm or hot, with the time to each reset. Click it for Usage. Settings → Island can turn it off.
+- **Older quiet sessions on one line.** Sessions at work, waiting on a decision, changed in the last five minutes, or with a reply being typed keep their card; the rest fold to creature, project, headline and chips. Resting the pointer on a line for a moment opens its card. Settings → Island can turn it off.
+- **Permissions, explained.** Settings → General opens with what macOS currently allows: notifications and control of each installed terminal (Terminal, iTerm2), read without ever prompting. A terminal that turns our Apple events down is now noticed (`-1743`) instead of silently bringing only the app forward: the first refusal opens System Settings → Privacy & Security → Automation with a guide docked beside it that watches until the switch is on; later ones say so on the island. "Allow…" asks macOS only while it has not asked yet.
+
+### Changed
+- The website's demo is a small story on an evening desktop: the agent edits, asks to run the tests, a pointer allows it on the island, the tests pass, and the list opens with the new limits line and one-line rows. The headline names a different agent with its creature every few seconds. Rendered docs pictures show the new layout, the permissions card and the guide.
+
+### Verification
+- 433 local automated tests, 5 environment-dependent skips, no failures.
+
 ## [0.12.0] - 2026-10-15
 
 ### Changed

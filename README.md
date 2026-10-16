@@ -132,6 +132,12 @@ Niko Island keeps a small black island at the top of the screen, growing out of 
 <a id="features"></a>
 ## Features
 
+**0.13.0: your limits at the top, a calmer list, permissions explained.** Open the island and the agent at the top of the list shows its five-hour and weekly use with the time to each reset; click it for Usage. Older quiet sessions fold to one line and open when the pointer rests on them. If you turned down control of Terminal or iTerm2 (so a click only brought the app forward, not the session's tab), Niko Island now notices, opens the exact pane in System Settings and docks a short guide beside it until the switch is on; Settings → General lists every permission and how it stands.
+
+<p align="center">
+  <img src="docs/images/island-permission-guide.png" width="460" alt="A guide docked beside System Settings: allow Niko Island to control iTerm2, two steps and a live status">
+</p>
+
 **0.12.0: permissions that survive updates, search in pinyin.** Releases are signed with one fixed certificate, so an update no longer makes macOS ask again for what you already allowed. The quick switcher finds Chinese projects and prompts by pinyin, whole or by initials: `fanyi` or `fy` both find 翻译.
 
 **0.11.0: quieter, with a faster way back.** Press ⌃⌥S, type a project, prompt or agent, move with ↑↓ and press Return. A session with a pending request opens that card instead. Input-method candidate selection keeps its own Return key.

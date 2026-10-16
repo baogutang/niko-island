@@ -293,6 +293,18 @@ public struct NikoSettings: Sendable, Equatable {
         set { raw["remindUnread"] = .bool(newValue) }
     }
 
+    /// Quiet sessions older than a few minutes take one line; hovering one opens it up.
+    public var compactOlderRows: Bool {
+        get { bool("compactOlderRows", default: true) }
+        set { raw["compactOlderRows"] = .bool(newValue) }
+    }
+
+    /// The plan limits of the agent last used, along the top of the open island.
+    public var quotaGlance: Bool {
+        get { bool("quotaGlance", default: true) }
+        set { raw["quotaGlance"] = .bool(newValue) }
+    }
+
     /// A plan window is said to be nearly used up from this share on.
     public static let limitWarningChoices = [70, 80, 90, 95]
 

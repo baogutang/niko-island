@@ -22,7 +22,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
 
     var subtitle: String {
         switch self {
-        case .general: return L("Language, startup, notifications")
+        case .general: return L("Permissions, notifications, startup")
         case .island: return L("How it looks and behaves")
         case .sessions: return L("What is listed, and for how long")
         case .agents: return L("Connections and creatures")
@@ -279,6 +279,7 @@ struct SettingsPageView: View {
 
     private var general: some View {
         VStack(alignment: .leading, spacing: 18) {
+            PermissionsCard(center: model.permissions)
             card(L("Notify me when")) {
                 toggleRow(L("An agent asks for permission"), isOn: Binding(
                     get: { model.settings.notificationsEnabled(for: .permission) },
@@ -548,6 +549,12 @@ struct SettingsPageView: View {
                           selection: settingsBinding(\.rowDensity))
                 choiceRow(L("Sessions before the list scrolls"),
                           options: NikoSettings.visibleRowChoices.map { ($0, "\($0)") }, selection: settingsBinding(\.visibleRows))
+                toggleRow(L("Older quiet sessions on one line"),
+                          L("Sessions at work, waiting on you or changed in the last five minutes keep their card; rest the pointer on a line to open it."),
+                          isOn: settingsBinding(\.compactOlderRows))
+                toggleRow(L("Plan limits along the top"),
+                          L("The five-hour and weekly use of the agent you used last, with the time to each reset. Click it for Usage."),
+                          isOn: settingsBinding(\.quotaGlance))
                 toggleRow(L("Pixel creatures"), L("Off: a plain dot in each agent's colour."), isOn: settingsBinding(\.showMascots))
                 toggleRow(L("Show how long"), isOn: chipBinding(.elapsed))
                 toggleRow(L("Show which agent"), isOn: chipBinding(.agent))

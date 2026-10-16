@@ -4,6 +4,10 @@ import UserNotifications
 
 /// Brings the terminal tab that hosts a session to the front.
 enum TerminalJumper {
+    /// Told (on the main thread) when a terminal refused our Apple events: the user turned
+    /// Automation down for it, so only the app, not the tab, can come forward.
+    @MainActor static var onAutomationDenied: ((AutomationTarget) -> Void)?
+
     static func jump(to session: Session) {
         let target = JumpTarget(terminal: session.terminal, ancestors: session.ancestors)
         let ancestors = session.ancestors
@@ -33,7 +37,11 @@ enum TerminalJumper {
             if let script = TerminalJump.appleScript(for: target, clientTTY: clientTTY) {
                 // osascript keeps the Apple Events round trip off our main thread.
                 // The first use triggers the system's Automation consent prompt.
-                selected = run("/usr/bin/osascript", ["-e", script])?.contains("found") ?? false
+                let result = runScript(script)
+                selected = result.output?.contains("found") ?? false
+                if result.denied, let refused = automationTarget(of: target) {
+                    DispatchQueue.main.async { onAutomationDenied?(refused) }
+                }
             }
             // No tab to select (an IDE, a desktop app, another emulator): bring the app forward.
             guard !selected, let bundleID = target.bundleID ?? session.host?.bundleID else { return }
@@ -86,18 +94,37 @@ enum TerminalJumper {
             }
             return true
         case .iterm(let guid):
-            guard let tty = run("/usr/bin/osascript", ["-e", TerminalReply.itermTTYScript(guid: guid)])?
-                .trimmingCharacters(in: .whitespacesAndNewlines), !tty.isEmpty, waiting(onTTY: tty),
+            let probe = runScript(TerminalReply.itermTTYScript(guid: guid))
+            if probe.denied { DispatchQueue.main.async { onAutomationDenied?(.iterm2) } }
+            guard let tty = probe.output?.trimmingCharacters(in: .whitespacesAndNewlines), !tty.isEmpty, waiting(onTTY: tty),
                   let script = TerminalReply.appleScript(for: channel, text: text) else { return false }
-            return run("/usr/bin/osascript", ["-e", script])?.contains("sent") ?? false
+            return runScript(script).output?.contains("sent") ?? false
         case .terminal(let tty):
             guard waiting(onTTY: tty), let script = TerminalReply.appleScript(for: channel, text: text) else { return false }
-            return run("/usr/bin/osascript", ["-e", script])?.contains("sent") ?? false
+            let result = runScript(script)
+            if result.denied { DispatchQueue.main.async { onAutomationDenied?(.terminal) } }
+            return result.output?.contains("sent") ?? false
         }
     }
 
+    private static func automationTarget(of target: JumpTarget) -> AutomationTarget? {
+        switch target.app {
+        case .iterm2: return .iterm2
+        case .appleTerminal: return .terminal
+        case .other: return nil
+        }
+    }
+
+    /// Runs AppleScript through osascript, keeping its error output to recognise a refusal.
+    private static func runScript(_ script: String) -> (output: String?, denied: Bool) {
+        let errors = Pipe()
+        let output = run("/usr/bin/osascript", ["-e", script], standardError: errors)
+        let text = String(decoding: errors.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
+        return (output, MacPermissions.isAutomationDenial(text))
+    }
+
     private static func run(_ executable: String, _ arguments: [String], environment: [String: String] = [:],
-                            timeout: TimeInterval? = nil) -> String? {
+                            timeout: TimeInterval? = nil, standardError: Pipe? = nil) -> String? {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: executable)
         process.arguments = arguments
@@ -106,7 +133,7 @@ enum TerminalJumper {
         }
         let out = Pipe()
         process.standardOutput = out
-        process.standardError = FileHandle.nullDevice
+        process.standardError = standardError ?? FileHandle.nullDevice
         process.standardInput = FileHandle.nullDevice
         guard (try? process.run()) != nil else { return nil }
         // A terminal's own command line tool that hangs is given up on. (Not osascript: the

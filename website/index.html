@@ -81,7 +81,18 @@
     font: 800 clamp(38px, 7.4vw, 72px)/1.02 var(--round); letter-spacing: -0.035em;
     margin: 0 auto 20px; max-width: 13em;
   }
-  h1 em { font-style: normal; color: var(--mint); }
+  h1 em { font-style: normal; color: var(--mint); display: block; }
+  /* The agent in the headline changes, with its own creature and colour. */
+  .rot {
+    display: inline-flex; align-items: center; gap: 0.16em; vertical-align: bottom; white-space: nowrap;
+    color: var(--agent, #ffa988); transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1), color 0.3s ease;
+  }
+  .rot img { width: 0.78em; height: 0.78em; flex: none; }
+  .rot .rot-word { display: inline-block; transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, filter 0.3s ease; }
+  .rot.out .rot-word, .rot.out img { transform: translateY(-0.35em); opacity: 0; filter: blur(4px); }
+  .rot.in .rot-word, .rot.in img { transform: translateY(0.35em); opacity: 0; filter: blur(4px); transition: none; }
+  .rot img { transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease, filter 0.3s ease; }
+  .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   .lede { color: var(--muted); font-size: clamp(16px, 2.2vw, 19.5px); max-width: 36em; margin: 0 auto 30px; }
   .cta { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; }
   .button {
@@ -101,20 +112,77 @@
   .screen {
     position: relative; margin: 46px auto 0; width: 100%; max-width: 880px; height: 480px;
     border-radius: 20px; overflow: hidden; text-align: left;
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    background: linear-gradient(158deg, #14304a 0%, #1f5a66 44%, #c58a60 100%);
-    box-shadow: 0 50px 140px rgba(0, 0, 0, 0.65);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    /* An evening wallpaper in the app icon's colours: deep blue sky, violet, a warm horizon. */
+    background:
+      radial-gradient(70% 55% at 88% 108%, rgba(255, 168, 112, 0.95), rgba(255, 168, 112, 0) 70%),
+      radial-gradient(60% 60% at 6% 100%, rgba(214, 84, 128, 0.85), rgba(214, 84, 128, 0) 70%),
+      radial-gradient(80% 60% at 55% -12%, rgba(64, 92, 196, 0.85), rgba(64, 92, 196, 0) 70%),
+      linear-gradient(165deg, #121a3a 0%, #2c2a63 38%, #7a3d72 70%, #e48a62 100%);
+    box-shadow: 0 50px 140px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(0, 0, 0, 0.4);
   }
+  /* Soft light ribbons across the wallpaper. */
+  .screen::before {
+    content: ""; position: absolute; inset: -20% -10%; pointer-events: none;
+    background:
+      radial-gradient(48% 26% at 30% 62%, rgba(255, 255, 255, 0.10), transparent 70%),
+      radial-gradient(40% 18% at 72% 40%, rgba(255, 214, 180, 0.12), transparent 70%);
+    transform: rotate(-8deg);
+  }
+  .editor {
+    position: absolute; left: 47%; right: 4%; top: 64px; height: 300px;
+    border-radius: 12px; background: rgba(24, 27, 36, 0.86); border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35); overflow: hidden; opacity: 0.9;
+    -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  }
+  .editor .bar { height: 28px; display: flex; align-items: center; gap: 7px; padding: 0 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+  .editor .bar i { width: 10px; height: 10px; border-radius: 50%; background: #343b49; }
+  .editor .bar span { margin-left: 8px; font: 500 11px var(--mono); color: rgba(255, 255, 255, 0.45); }
+  .editor .code { padding: 12px 14px; display: grid; gap: 9px; }
+  .editor .code i { display: block; height: 7px; border-radius: 4px; background: rgba(255, 255, 255, 0.13); }
+  .editor .code i.k { background: rgba(198, 168, 255, 0.45); }
+  .editor .code i.s { background: rgba(250, 194, 92, 0.42); }
+  .editor .code i.g { background: rgba(92, 214, 184, 0.5); }
+  .dock {
+    position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); z-index: 2;
+    display: flex; gap: 9px; padding: 7px 10px; border-radius: 16px;
+    background: rgba(255, 255, 255, 0.16); border: 1px solid rgba(255, 255, 255, 0.2);
+    -webkit-backdrop-filter: blur(18px) saturate(160%); backdrop-filter: blur(18px) saturate(160%);
+  }
+  .dock i { width: 30px; height: 30px; border-radius: 8px; display: block; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+  .dock i:nth-child(1) { background: linear-gradient(160deg, #3a3f4b, #121419); }
+  .dock i:nth-child(2) { background: linear-gradient(160deg, #6aa8ff, #2b5fd9); }
+  .dock i:nth-child(3) { background: linear-gradient(160deg, #ffb36b, #e2563f); }
+  .dock i:nth-child(4) { background: linear-gradient(160deg, #6ee0bf, #1f8f74); }
+  .dock i:nth-child(5) { background: linear-gradient(160deg, #c9a6ff, #6b47d6); }
+  .cursor {
+    position: absolute; left: 78%; top: 82%; z-index: 6; width: 22px; height: 22px; pointer-events: none; opacity: 0;
+    transition: left 0.9s cubic-bezier(0.45, 0, 0.2, 1), top 0.9s cubic-bezier(0.45, 0, 0.2, 1), opacity 0.25s ease, transform 0.12s ease;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+  }
+  .cursor.on { opacity: 1; }
+  .cursor.click { transform: scale(0.82); }
+  .pill.pressed { transform: scale(0.94); filter: brightness(0.9); }
+  .pill { transition: transform 0.12s ease, filter 0.12s ease, background 0.15s ease; }
+  /* What the terminal shows follows the story: 0 editing, 1 waiting, 2 allowed, 3 done. */
+  .t { display: block; }
+  .screen[data-step="0"] .t-ask, .screen[data-step="0"] .t-wait, .screen[data-step="0"] .t-ok, .screen[data-step="0"] .t-run, .screen[data-step="0"] .t-done,
+  .screen[data-step="1"] .t-ok, .screen[data-step="1"] .t-run, .screen[data-step="1"] .t-done,
+  .screen[data-step="2"] .t-wait, .screen[data-step="2"] .t-done,
+  .screen[data-step="3"] .t-wait, .screen[data-step="3"] .t-run { display: none; }
+  .screen[data-step="0"] .w-run, .screen:not([data-step="0"]) .w-edit { display: none; }
   .menubar {
+    position: relative; z-index: 2;
     height: 26px; display: flex; justify-content: space-between; align-items: center; padding: 0 14px;
-    font: 500 12px var(--sans); color: rgba(255, 255, 255, 0.86); background: rgba(8, 12, 18, 0.36);
+    font: 500 12px var(--sans); color: rgba(255, 255, 255, 0.9); background: rgba(16, 18, 32, 0.28);
+    -webkit-backdrop-filter: blur(20px) saturate(170%); backdrop-filter: blur(20px) saturate(170%);
     white-space: nowrap; overflow: hidden;
   }
   .menubar span { display: flex; gap: 14px; }
   .menubar b { font-weight: 700; }
   .menubar i { font-style: normal; opacity: 0.8; }
   .terminal {
-    position: absolute; left: 7%; right: 7%; top: 86px; bottom: -24px;
+    position: absolute; z-index: 1; left: 5%; right: 30%; top: 96px; bottom: 58px;
     border-radius: 12px; background: rgba(12, 15, 21, 0.94); border: 1px solid rgba(255, 255, 255, 0.1);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.4); overflow: hidden;
   }
@@ -158,6 +226,14 @@
   .panel { padding: 10px 20px 18px; }
   .panel-head { display: flex; align-items: center; justify-content: space-between; height: 26px; margin-bottom: 4px; font-size: 12px; font-weight: 650; }
   .panel-head .icons { display: flex; gap: 10px; color: rgba(255, 255, 255, 0.45); }
+  .glance { display: inline-flex; align-items: center; gap: 6px; font: 600 11.5px var(--mono); color: rgba(255, 255, 255, 0.42); white-space: nowrap; }
+  .glance b { font: 700 12px var(--round); color: #fff; margin-right: 2px; }
+  .glance em { font-style: normal; font-weight: 700; color: var(--mint); }
+  .glance em.warm { color: var(--amber); }
+  .glance s { width: 1px; height: 11px; background: rgba(255, 255, 255, 0.14); text-decoration: none; display: inline-block; }
+  .row.line { align-items: center; padding: 6px 0; }
+  .row.line .row-title b { font-size: 13px; font-weight: 650; color: rgba(255, 255, 255, 0.86); }
+  .row.line .chips { padding-top: 0; opacity: 0.85; }
   .panel-head svg { width: 14px; height: 14px; }
   .row { display: flex; align-items: flex-start; gap: 12px; padding: 9px 0; min-width: 0; }
   .row-main { flex: 1; min-width: 0; }
@@ -187,8 +263,14 @@
   .pill.primary:hover { background: #e8ecf2; }
   .pill.deny { background: rgba(255, 134, 124, 0.18); color: #ff9c93; }
   .pill.deny:hover { background: rgba(255, 134, 124, 0.28); }
+  @media (max-width: 760px) {
+    .editor { display: none; }
+    .terminal { right: 5%; }
+  }
   @media (max-width: 620px) {
     .screen { height: 540px; }
+    .dock { display: none; }
+    .glance i, .glance s { display: none; }
     .chips .opt { display: none; }
     .menubar span { visibility: hidden; }
     .panel { padding: 8px 14px 16px; }
@@ -202,6 +284,13 @@
   }
   .states button:hover { color: var(--text); }
   .states button[aria-pressed="true"] { color: #05070a; background: var(--text); border-color: var(--text); }
+  .states button { position: relative; overflow: hidden; }
+  /* While the story plays, the current state fills like a progress bar. */
+  .states.playing button[aria-pressed="true"]::after {
+    content: ""; position: absolute; left: 0; bottom: 0; height: 2px; width: 100%; background: var(--mint);
+    transform-origin: left; animation: fill var(--dur, 3s) linear forwards;
+  }
+  @keyframes fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
   .caption { color: var(--faint); font-size: 12.5px; margin-top: 12px; }
 
   /* Sections */
@@ -345,8 +434,8 @@
 <main id="top">
   <div class="hero">
     <div class="wrap">
-      <div class="kicker" data-i18n="hero.kicker">0.12.0 · Free · Open source · No telemetry</div>
-      <h1 data-i18n="hero.title">Your agents work. <em>The island keeps watch.</em></h1>
+      <div class="kicker" data-i18n="hero.kicker">0.13.0 · Free · Open source · No telemetry</div>
+      <h1><span data-i18n="hero.pre">Your</span> <span class="rot" id="rot" aria-hidden="true"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt=""><span class="rot-word">Claude Code</span></span><span class="visually-hidden" data-i18n="hero.agents">agents</span> <span data-i18n="hero.post">works.</span> <em data-i18n="hero.em">The island keeps watch.</em></h1>
       <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent on your Mac is doing, moves with the menu bar, opens when one needs you, and lets you approve or answer on the spot.</p>
       <div class="cta">
         <a class="button primary" href="https://github.com/baogutang/niko-island/releases/latest" data-i18n="hero.download">Download for macOS</a>
@@ -354,7 +443,18 @@
       </div>
       <p class="fine" data-i18n="hero.fine">macOS 14 or later · Apple silicon and Intel · MIT license</p>
 
-      <div class="screen" id="demo">
+      <div class="screen" id="demo" data-step="0">
+        <div class="editor" aria-hidden="true">
+          <div class="bar"><i></i><i></i><i></i><span>Retry.swift</span></div>
+          <div class="code">
+            <i class="k" style="width:34%"></i><i style="width:62%"></i><i style="width:48%;margin-left:7%"></i>
+            <i class="s" style="width:40%;margin-left:7%"></i><i style="width:56%;margin-left:14%"></i><i class="g" style="width:30%;margin-left:14%"></i>
+            <i style="width:44%;margin-left:7%"></i><i class="k" style="width:22%"></i><i style="width:58%"></i><i class="s" style="width:36%;margin-left:7%"></i>
+            <i style="width:50%;margin-left:7%"></i><i style="width:26%"></i>
+          </div>
+        </div>
+        <div class="dock" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <svg class="cursor" id="cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 2.5l13.5 12.2-6.3.5 3.7 7.3-2.9 1.4-3.6-7.4-4.4 4.4z" fill="#fff" stroke="#000" stroke-width="1.3" stroke-linejoin="round"/></svg>
         <div class="menubar" aria-hidden="true">
           <span><b>Terminal</b><i>Shell</i><i>Edit</i><i>View</i><i>Window</i></span>
           <span><i>Tue 9:41</i></span>
@@ -366,8 +466,7 @@
 
 <span class="m">●</span> Reading  Tests/UploadTests.swift
 <span class="m">●</span> Editing  Sources/Upload/Retry.swift
-<span class="a">●</span> Wants to run  <b>swift test --filter UploadTests</b>
-  waiting for you…</pre>
+<span class="t t-ask"><span class="a">●</span> Wants to run  <b>swift test --filter UploadTests</b></span><span class="t t-wait">  <span data-i18n="demo.t.wait">waiting for you…</span></span><span class="t t-ok"><span class="m">✓</span> <span data-i18n="demo.t.ok">Allowed from Niko Island</span></span><span class="t t-run"><span class="m">●</span> <span data-i18n="demo.t.run">Running the upload tests…</span></span><span class="t t-done"><span class="m">✓</span> <b data-i18n="demo.t.done">14 tests passed. Done.</b></span></pre>
         </div>
         <div class="island-anchor">
           <div class="island" id="island" data-state="working">
@@ -375,7 +474,8 @@
               <div class="st st-working" data-go="sessions">
                 <img class="pixel" src="mascots/starfish.gif" width="22" height="22" alt="">
                 <span class="dim">atlas-api</span><span class="dimmer">·</span>
-                <span class="mint" data-i18n="demo.running">running swift test</span>
+                <span class="mint w-edit" data-i18n="demo.editing">editing Retry.swift</span>
+                <span class="mint w-run" data-i18n="demo.running">running swift test</span>
                 <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>
               </div>
 
@@ -401,7 +501,7 @@
 
               <div class="st st-sessions panel">
                 <div class="panel-head">
-                  <span class="dim" data-i18n="demo.count">3 sessions</span>
+                  <span class="glance" aria-label="Claude Code plan: five hours 37 percent, week 71 percent"><b>Claude Code</b><i>5h</i><em>37%</em><i>2h24m</i><s></s><i>7d</i><em class="warm">71%</em><i>3d</i></span>
                   <span class="icons" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20V11M10 20V5M15 20v-7M20 20V8"/></svg>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l4 3.5v-11L7 10H4z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/></svg>
@@ -432,6 +532,11 @@
                   </div>
                   <div class="chips"><span>41s</span><span class="c3 opt">OpenCode</span><span class="opt">VS Code</span></div>
                 </div>
+                <div class="row line">
+                  <img class="pixel" src="mascots/jellyfish.gif" width="18" height="18" alt="" style="margin:0 6px">
+                  <div class="row-main"><div class="row-title"><span class="dim">blog</span> <span class="dimmer">·</span> <b data-i18n="demo.r4">Draft the release notes</b></div></div>
+                  <div class="chips"><span>1h</span><span class="opt">Gemini CLI</span><span class="opt">Terminal</span></div>
+                </div>
               </div>
 
               <div class="st st-done" data-go="sessions">
@@ -444,7 +549,7 @@
         </div>
       </div>
 
-      <div class="states" role="group" aria-label="Island states">
+      <div class="states" id="states" role="group" aria-label="Island states">
         <button type="button" data-show="working" aria-pressed="true" data-i18n="demo.tab1">Working</button>
         <button type="button" data-show="attention" aria-pressed="false" data-i18n="demo.tab2">Needs you</button>
         <button type="button" data-show="sessions" aria-pressed="false" data-i18n="demo.tab3">All sessions</button>
@@ -489,12 +594,14 @@
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.2 5.2L20 9l-4.3 3.9L17 19l-5-3-5 3 1.3-6.1L4 9l5.8-.8z"/></svg><h3 data-i18n="f12.t">A welcome that sets things up</h3><p data-i18n="f12.d">A Metal night sea with animated creatures welcomes you, then finds the agents on this Mac and connects the ones you select. Every change is backed up and can be removed.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 10v4h3l4 3.5v-11L7 10H4z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5M17.5 7a7 7 0 0 1 0 10"/></svg><h3 data-i18n="f6.t">Sounds you choose</h3><p data-i18n="f6.d">Five moments, two built-in sets, macOS sounds, your own files or a sound pack. Everything is off until you switch it on.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 20V11M10 20V5M15 20v-7M20 20V8"/></svg><h3 data-i18n="f7.t">Usage and limits per agent</h3><p data-i18n="f7.d">Local usage for five hours, today, seven and thirty days, plus six monthly totals. Plan limits show their reset times and pace; choose a warning threshold from 70, 80, 90 or 95 percent.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 1 1 16 0"/><path d="M12 12l4-3"/><path d="M4 16h16"/></svg><h3 data-i18n="f13.t">Your limits at the top</h3><p data-i18n="f13.d">Open the island and the agent at the top of the list shows its five-hour and weekly use, coloured by how full they are, with the time to each reset. Older quiet sessions fold to one line and open when the pointer rests on them.</p></div>
+        <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="10" width="14" height="10" rx="2.5"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v2.5"/></svg><h3 data-i18n="f14.t">Permissions, explained</h3><p data-i18n="f14.d">Turned down control of iTerm2 or Terminal, or notifications? The island says what that costs, opens the exact place in System Settings and docks a short guide beside it until the switch is on.</p></div>
         <div class="card"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 3v5.5c0 4.4-2.9 7.9-7 9.5-4.1-1.6-7-5.1-7-9.5V6l7-3z"/><path d="M9 12l2.2 2.2L15 10.4"/></svg><h3 data-i18n="f8.t">An installer you can trust</h3><p data-i18n="f8.d">Scan, backup, verify and roll back on failure. The installed app can restore hooks another tool removed, only for agents you connected, with a repair backoff and an opt-out. Deliberately uninstalled agents stay disconnected.</p></div>
       </div>
 
       <div class="show">
         <img src="island-sessions.png" width="1290" height="770" loading="lazy" alt="The island open on six sessions with creatures, titles, activity and chips" data-i18n-alt="show1.alt">
-        <div><h3 data-i18n="show1.t">Every session, one glance</h3><p data-i18n="show1.d">Flat rows, no chrome: the project, what the session is about, what the agent is doing this second, its last reply. The ones waiting for you carry a bell.</p></div>
+        <div><h3 data-i18n="show1.t">Every session, one glance</h3><p data-i18n="show1.d">Flat rows, no chrome: the project, what the session is about, what the agent is doing this second, its last reply. The ones waiting for you carry a bell; older quiet ones fold to a line, and the plan's limits sit along the top.</p></div>
       </div>
       <div class="show flip">
         <img src="island-question.png" width="1290" height="1133" loading="lazy" alt="A question from an agent shown as four option tiles" data-i18n-alt="show2.alt">
@@ -677,12 +784,14 @@ open "dist/Niko Island.app"</pre>
     "search.t": "敲几个字，就能回去",
     "search.d": "⌃⌥S 打开搜索，输入项目、提示词或代理，方向键和回车选择。支持重音字符和中文，输入法候选确认不会误触跳转。遇到待审批请求，会打开对应卡片。",
     "nav.features": "功能", "nav.agents": "代理", "nav.sounds": "音效", "nav.privacy": "隐私", "nav.install": "安装",
-    "hero.kicker": "0.12.0 · 免费 · 开源 · 无遥测",
-    "hero.title": "代理干活，<em>小岛放哨。</em>",
+    "hero.kicker": "0.13.0 · 免费 · 开源 · 无遥测",
+    "hero.pre": "你的", "hero.agents": "代理", "hero.post": "在干活，", "hero.em": "小岛替你盯着。",
     "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示这台 Mac 上每个 AI 编程代理正在做什么，跟着菜单栏一起走，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
     "hero.fine": "macOS 14 及以上 · Apple 芯片与 Intel · MIT 许可",
-    "demo.running": "正在运行 swift test", "demo.finished": "已完成 ✓", "demo.count": "3 个会话",
+    "demo.running": "正在运行 swift test", "demo.editing": "正在编辑 Retry.swift",
+    "demo.t.wait": "等你决定…", "demo.t.ok": "已在 Niko Island 上允许", "demo.t.run": "正在运行上传测试…", "demo.t.done": "14 项测试通过，完成。",
+    "demo.r4": "起草发布说明", "demo.finished": "已完成 ✓", "demo.count": "3 个会话",
     "demo.r1": "修复不稳定的上传测试", "demo.r1a": "正在运行",
     "demo.r2": "重写安装指南", "demo.r2a": "已完成，等待你的指示",
     "demo.r3": "为账单加上按比例计费", "demo.r3a": "正在编辑",
@@ -708,9 +817,11 @@ open "dist/Niko Island.app"</pre>
     "f10.t": "自己找到你的会话", "f10.d": "直接从代理本来就写在磁盘上的记录里列出 Claude Code、Codex 和 ZCode 的会话：桌面端、早就开着的会话、还没接入的代理。",
     "f11.t": "按你的习惯来", "f11.d": "主题、强调色、宽度、文字、行距、显示器、语言与动效都可调整。可按目录或提示词隐藏会话、提醒未读的完成回合；⌃⌥I 打开岛屿，⌃⌥S 搜索会话。",
     "f12.t": "替你把事情配好的欢迎引导", "f12.d": "Metal 绘制的夜海和游动的小生物迎接你，再找出这台 Mac 上的代理，接入你勾选的那些。每一处配置改动都有备份，也能撤回。",
+    "f13.t": "额度就在最上面", "f13.d": "展开岛屿，列表最上面那个代理的 5 小时和每周额度就显示在顶部，按用量着色，并写着离重置还有多久。较早的空闲会话折叠成一行，指针停一下就展开。",
+    "f14.t": "权限，讲清楚", "f14.d": "拒绝了 iTerm2、Terminal 的控制或通知权限？岛屿会告诉你少了什么，直接打开系统设置里对应的位置，并在旁边贴一张步骤卡，直到开关打开为止。",
     "f8.t": "可以放心的安装器", "f8.d": "先扫描、备份、写后校验，失败回滚。已安装的应用可恢复被其他工具移除的钩子，仅针对你曾接入的代理，有恢复间隔并可关闭；主动卸载的代理不会重新接入。",
     "show1.alt": "展开的岛屿上有六个会话，带小生物、标题、当前动作和小标签",
-    "show1.t": "所有会话，一眼看全", "show1.d": "扁平的行，没有多余装饰：项目、会话在做什么事、代理这一秒在干什么、它的最后一条回复。等你处理的那几个带着铃铛。",
+    "show1.t": "所有会话，一眼看全", "show1.d": "扁平的行，没有多余装饰：项目、会话在做什么事、代理这一秒在干什么、它的最后一条回复。等你处理的那几个带着铃铛；较早的空闲会话折叠成一行，套餐额度就在顶部。",
     "show2.alt": "代理的提问以四张选项卡片呈现",
     "show2.t": "不用回去也能回答", "show2.d": "请求会一直留在岛屿上，直到你做出决定或代理自己撤回。点击别处只会把岛屿收起，绝不会替你作答。",
     "show3.alt": "岛屿上某一个代理的用量：5 小时、今天、7 天和 30 天，套餐的额度和各个模型",
@@ -802,6 +913,35 @@ open "dist/Niko Island.app"</pre>
     apply(current);
   });
 
+  /* The agent named in the headline */
+  var agents = [["Claude Code", "starfish", "#ffa988"], ["Codex", "whale", "#9bd2ff"], ["Gemini CLI", "jellyfish", "#c6a8ff"],
+    ["Cursor", "boat", "#e9edf5"], ["ZCode", "crab", "#ff8f7a"], ["OpenCode", "turtle", "#94e0b1"], ["Kiro", "octopus", "#d7a6ff"]];
+  var rot = document.getElementById("rot");
+  var stillHero = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (rot && !stillHero) {
+    var word = rot.querySelector(".rot-word"), face = rot.querySelector("img"), agentIndex = 0;
+    var measure = function (text) {
+      var probe = word.cloneNode(true); probe.textContent = text;
+      probe.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap";
+      rot.appendChild(probe); var width = probe.getBoundingClientRect().width; rot.removeChild(probe);
+      return width + face.getBoundingClientRect().width + parseFloat(getComputedStyle(rot).columnGap || 0);
+    };
+    rot.style.width = measure(word.textContent) + "px";
+    setInterval(function () {
+      agentIndex = (agentIndex + 1) % agents.length;
+      var next = agents[agentIndex];
+      rot.classList.add("out");
+      setTimeout(function () {
+        word.textContent = next[0]; face.src = "mascots/" + next[1] + ".gif";
+        rot.style.setProperty("--agent", next[2]);
+        rot.style.width = measure(next[0]) + "px";
+        rot.classList.remove("out"); rot.classList.add("in");
+        void rot.offsetWidth;
+        rot.classList.remove("in");
+      }, 320);
+    }, 2400);
+  }
+
   /* The island in the hero */
   var island = document.getElementById("island");
   var clip = document.getElementById("clip");
@@ -829,21 +969,60 @@ open "dist/Niko Island.app"</pre>
     settle = setTimeout(function () { clip.style.width = ""; clip.style.height = ""; }, 620);
   }
 
-  function stopTour() { clearInterval(tour); tour = null; }
+  var screen = document.getElementById("demo");
+  var cursor = document.getElementById("cursor");
+  var statesBar = document.getElementById("states");
+  var timers = [];
+  function later(ms, fn) { timers.push(setTimeout(fn, ms)); }
+  function setStep(step) { screen.setAttribute("data-step", String(step)); }
+  // Clicking a state by hand shows the terminal as it would be at that point of the story.
+  var stepFor = { working: 0, attention: 1, done: 3, sessions: 3 };
+  function stopTour() {
+    timers.forEach(clearTimeout); timers = []; tour = null;
+    statesBar.classList.remove("playing");
+    cursor.classList.remove("on", "click");
+  }
+  // The story: the agent edits, asks to run the tests, a click allows it on the island, the tests pass.
+  var story = [["working", 0, 2600], ["attention", 1, 2400], ["working", 2, 2300], ["done", 3, 2400], ["sessions", 3, 3800]];
+  function play(index) {
+    var scene = story[index % story.length];
+    tour = true;
+    show(scene[0]); setStep(scene[1]);
+    statesBar.style.setProperty("--dur", scene[2] + "ms");
+    statesBar.classList.remove("playing"); void statesBar.offsetWidth; statesBar.classList.add("playing");
+    if (scene[0] === "attention") {
+      cursor.style.left = "78%"; cursor.style.top = "82%";
+      later(700, function () {
+        var allow = island.querySelector(".st-attention .pill.primary");
+        if (!allow) return;
+        var a = allow.getBoundingClientRect(), b = screen.getBoundingClientRect();
+        cursor.classList.add("on");
+        cursor.style.left = (a.left - b.left + a.width * 0.55) + "px";
+        cursor.style.top = (a.top - b.top + a.height * 0.45) + "px";
+        later(1250, function () { cursor.classList.add("click"); allow.classList.add("pressed"); });
+        later(1450, function () { cursor.classList.remove("click"); allow.classList.remove("pressed"); });
+      });
+      later(scene[2] - 120, function () { cursor.classList.remove("on"); });
+    }
+    later(scene[2], function () { play(index + 1); });
+  }
   tabs.forEach(function (tab) {
-    tab.addEventListener("click", function () { stopTour(); show(tab.getAttribute("data-show")); });
+    tab.addEventListener("click", function () { stopTour(); var next = tab.getAttribute("data-show"); show(next); setStep(stepFor[next]); });
   });
   island.addEventListener("click", function (event) {
     var target = event.target.closest ? event.target.closest("[data-go]") : null;
     if (!target) return;
     stopTour();
-    show(target.getAttribute("data-go"));
+    var next = target.getAttribute("data-go");
+    // Allowing from the island is the story's own next step.
+    setStep(state === "attention" && next === "working" ? 2 : stepFor[next]);
+    show(next);
   });
   if (!still) {
-    tour = setInterval(function () { show(order[(order.indexOf(state) + 1) % order.length]); }, 3800);
-    document.getElementById("demo").addEventListener("pointerenter", stopTour);
+    play(0);
+    screen.addEventListener("pointerenter", stopTour);
   } else {
-    show("sessions");
+    show("sessions"); setStep(3);
   }
 
   /* Sound previews: the same notes and waveforms the app generates, computed here. */

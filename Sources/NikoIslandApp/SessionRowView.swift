@@ -66,10 +66,14 @@ struct SessionRowView: View {
     var now: Date
     /// Off under a heading that already names the project.
     var showsProject = true
+    /// One line instead of the card, for a quiet session; resting the pointer on it opens the card.
+    var compact = false
     /// The row the pointer is over. One highlight serves the whole list and slides to it.
     var hovered: Binding<SessionKey?>? = nil
     var hoverSpace: Namespace.ID? = nil
     @State private var hovering = false
+    @State private var opened = false
+    @State private var dwell: Task<Void, Never>?
     @Environment(\.look) private var look
     @Environment(\.islandNamespace) private var islandSpace
 
@@ -79,7 +83,9 @@ struct SessionRowView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            summary
+            Group {
+                if compact && !opened { line } else { summary }
+            }
                 .contentShape(Rectangle())
                 .onTapGesture {
                     // A row that is waiting on you opens its request; any other row takes you to its terminal.
@@ -92,7 +98,7 @@ struct SessionRowView: View {
                 ReplyField(model: model, key: session.key).padding(.leading, 43)
             }
         }
-        .padding(.vertical, look.compact ? 5 : 9)
+        .padding(.vertical, compact && !opened ? 4 : (look.compact ? 5 : 9))
         .padding(.horizontal, 10)
         .background {
             if let hovered, let hoverSpace {
@@ -107,6 +113,19 @@ struct SessionRowView: View {
         .padding(.horizontal, -10)
         .onHover { inside in
             hovering = inside
+            // A one-line row opens after the pointer rests on it, so sweeping across the list stays calm.
+            dwell?.cancel()
+            if compact {
+                if inside {
+                    dwell = Task { @MainActor in
+                        try? await Task.sleep(nanoseconds: 350_000_000)
+                        guard !Task.isCancelled else { return }
+                        withAnimation(Motion.smooth(look.motion)) { opened = true }
+                    }
+                } else if opened {
+                    withAnimation(Motion.smooth(look.motion)) { opened = false }
+                }
+            }
             // Entering a row takes the highlight; the list itself lets it go when the pointer leaves it.
             if inside, let hovered { withAnimation(Motion.snappy(look.motion)) { hovered.wrappedValue = session.key } }
         }
@@ -199,6 +218,33 @@ struct SessionRowView: View {
             }
             .padding(.top, 1)
         }
+    }
+
+    /// The one-line form: creature, project and headline, then the chips that tell rows apart.
+    private var line: some View {
+        HStack(spacing: 10) {
+            MascotView(source: session.source, size: 18)
+                .travels("creature/" + session.key.description, in: islandSpace)
+                .frame(width: 30)
+            HStack(spacing: 6) {
+                if showsProject {
+                    Text(session.projectName).font(look.body(12, .medium)).foregroundStyle(Theme.secondary).lineLimit(1).fixedSize()
+                    Text("·").font(look.body(12)).foregroundStyle(Theme.tertiary)
+                }
+                Text(session.headline).font(look.body(13, .medium)).foregroundStyle(Theme.primary.opacity(0.86))
+                    .lineLimit(1).truncationMode(.tail)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            HStack(spacing: 6) {
+                if look.chips.contains(.elapsed) { Chip(text: elapsedText(since: session.phaseSince, now: now)) }
+                if look.chips.contains(.agent) {
+                    Chip(text: AgentRegistry.displayName(for: session.source), tint: AgentTint.color(for: session.source))
+                }
+                if look.chips.contains(.host), let host = session.hostLabel { Chip(text: host) }
+            }
+            .opacity(0.85)
+        }
+        .frame(minHeight: 26)
     }
 
     private var activityLine: some View {

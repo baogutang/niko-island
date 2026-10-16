@@ -61,6 +61,16 @@
         }
       }
     },
+    "%@ tabs need Automation: Settings → General": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 标签页需要“自动化”权限：设置 → 通用"
+          }
+        }
+      }
+    },
     "%@ tokens": {
       "localizations": {
         "zh-Hans": {
@@ -147,6 +157,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 被限流拒绝了"
+          }
+        }
+      }
+    },
+    "%@ window %lld percent used": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 窗口已用 %lld%%"
           }
         }
       }
@@ -791,6 +811,16 @@
         }
       }
     },
+    "Allow Niko Island to control %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许 Niko Island 控制 %@"
+          }
+        }
+      }
+    },
     "Allow all": {
       "localizations": {
         "zh-Hans": {
@@ -807,6 +837,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "本次会话后续的所有请求都允许"
+          }
+        }
+      }
+    },
+    "Allow notifications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许通知"
           }
         }
       }
@@ -837,6 +877,36 @@
           "stringUnit": {
             "state": "translated",
             "value": "用 %@ 允许，用 %@ 拒绝"
+          }
+        }
+      }
+    },
+    "Allowed": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已允许"
+          }
+        }
+      }
+    },
+    "Allowed. You are set.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已允许，可以用了。"
+          }
+        }
+      }
+    },
+    "Allow…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "允许…"
           }
         }
       }
@@ -1221,6 +1291,16 @@
         }
       }
     },
+    "Banners for requests, questions and finished turns.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "请求、提问和结束的回合会弹出横幅。"
+          }
+        }
+      }
+    },
     "Brisk": {
       "localizations": {
         "zh-Hans": {
@@ -1297,6 +1377,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "立即查询"
+          }
+        }
+      }
+    },
+    "Checked while %@ is open.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 打开时才能检查。"
+          }
+        }
+      }
+    },
+    "Choose Alerts: a permission request can then be answered on the banner": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "样式选“提醒”：权限请求就能直接在横幅上回答"
           }
         }
       }
@@ -1421,12 +1521,32 @@
         }
       }
     },
+    "Clicking a session brings its own %@ tab to the front.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "点击会话会把它自己的 %@ 标签页带到前面。"
+          }
+        }
+      }
+    },
     "Clicking a session brings its terminal tab forward where the terminal allows it (Terminal, iTerm2, tmux, WezTerm, and kitty with remote control on); elsewhere its app. A rule here opens a link instead, for sessions of one agent or in one app. {cwd}, {project}, {session} and {agent} are filled in.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "点击会话时，终端支持的话会切到它所在的标签页（终端、iTerm2、tmux、WezTerm，以及开启了远程控制的 kitty），否则切到它所在的应用。这里的规则会改为打开一个链接，可按代理或应用设置。{cwd}、{project}、{session}、{agent} 会被自动填入。"
+          }
+        }
+      }
+    },
+    "Close": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "关闭"
           }
         }
       }
@@ -1607,6 +1727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "继续"
+          }
+        }
+      }
+    },
+    "Control %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "控制 %@"
           }
         }
       }
@@ -1811,6 +1941,16 @@
         }
       }
     },
+    "Find Niko Island in the Automation list": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "在“自动化”列表里找到 Niko Island"
+          }
+        }
+      }
+    },
     "Find a Session…": {
       "localizations": {
         "zh-Hans": {
@@ -1877,6 +2017,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "已完成，正在等你"
+          }
+        }
+      }
+    },
+    "Fix…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "去修复…"
           }
         }
       }
@@ -2391,16 +2541,6 @@
         }
       }
     },
-    "Language, startup, notifications": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "语言、启动与通知"
-          }
-        }
-      }
-    },
     "Large": {
       "localizations": {
         "zh-Hans": {
@@ -2911,6 +3051,16 @@
         }
       }
     },
+    "Notifications": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
     "Notify me when": {
       "localizations": {
         "zh-Hans": {
@@ -2981,6 +3131,16 @@
         }
       }
     },
+    "Older quiet sessions on one line": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "较早的空闲会话显示为一行"
+          }
+        }
+      }
+    },
     "Once per window and cycle, on the island and to your phone if that is on. A warning also comes when the recent pace would use a window up before it resets.": {
       "localizations": {
         "zh-Hans": {
@@ -3021,6 +3181,16 @@
         }
       }
     },
+    "Only the installed app can show notifications.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "只有安装好的应用才能发送通知。"
+          }
+        }
+      }
+    },
     "Only while the screen is locked or asleep": {
       "localizations": {
         "zh-Hans": {
@@ -3047,6 +3217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "打开发布页面"
+          }
+        }
+      }
+    },
+    "Open Settings": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开设置"
           }
         }
       }
@@ -3161,6 +3341,36 @@
         }
       }
     },
+    "Permission guide": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "权限引导"
+          }
+        }
+      }
+    },
+    "Permissions": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "权限"
+          }
+        }
+      }
+    },
+    "Permissions, notifications, startup": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "权限、通知与启动"
+          }
+        }
+      }
+    },
     "Pixel": {
       "localizations": {
         "zh-Hans": {
@@ -3177,6 +3387,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "像素小生物"
+          }
+        }
+      }
+    },
+    "Plan limits along the top": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "顶部显示套餐额度"
+          }
+        }
+      }
+    },
+    "Plan limits of %@: open Usage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的套餐额度：点击打开用量"
           }
         }
       }
@@ -3661,6 +3891,16 @@
         }
       }
     },
+    "Sessions at work, waiting on you or changed in the last five minutes keep their card; rest the pointer on a line to open it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正在工作、等你处理或最近五分钟有变化的会话保留完整卡片；指针在一行上停一下就会展开。"
+          }
+        }
+      }
+    },
     "Sessions before the list scrolls": {
       "localizations": {
         "zh-Hans": {
@@ -4071,6 +4311,16 @@
         }
       }
     },
+    "The five-hour and weekly use of the agent you used last, with the time to each reset. Click it for Usage.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近使用的代理的 5 小时与每周额度用量，以及离重置还有多久。点击打开用量。"
+          }
+        }
+      }
+    },
     "The gear on the island opens Settings. This welcome is under About, if you want to see it again.": {
       "localizations": {
         "zh-Hans": {
@@ -4341,12 +4591,52 @@
         }
       }
     },
+    "Turn on %@ underneath it": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "打开它下面的 %@ 开关"
+          }
+        }
+      }
+    },
+    "Turn on Allow notifications for Niko Island": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "为 Niko Island 打开“允许通知”"
+          }
+        }
+      }
+    },
     "Turn sounds on": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "打开音效"
+          }
+        }
+      }
+    },
+    "Turned down: a session only brings %@ forward, not its tab.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已拒绝：点击会话只会切到 %@，到不了对应的标签页。"
+          }
+        }
+      }
+    },
+    "Turned off in System Settings, so no banner appears.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在系统设置中关闭，不会弹出横幅。"
           }
         }
       }
@@ -4447,6 +4737,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "音量"
+          }
+        }
+      }
+    },
+    "Waiting for the switch…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等待打开开关…"
           }
         }
       }
@@ -4677,6 +4977,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "配合上面的提醒：你不在时完成的回合会再响一次提示音，直到你打开小岛或跳转到该会话。"
+          }
+        }
+      }
+    },
+    "Without it, a session only brings %@ forward, not its own tab.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有这个权限，点击会话只会切到 %@，到不了它自己的标签页。"
           }
         }
       }
@@ -5017,6 +5327,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "macOS"
+          }
+        }
+      }
+    },
+    "macOS asks the first time a banner is due.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第一次需要弹出横幅时，macOS 会询问。"
+          }
+        }
+      }
+    },
+    "macOS asks the first time you go to a session in %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "第一次回到 %@ 里的会话时，macOS 会询问。"
           }
         }
       }

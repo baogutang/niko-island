@@ -31,6 +31,24 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         self.notifier = notifier
         model.notifier = notifier
 
+        // A terminal that refused our Apple events costs the jump to its tab: the first refusal
+        // of each terminal opens the guide; later ones only say so on the island.
+        PermissionGuideController.shared.center = model.permissions
+        TerminalJumper.onAutomationDenied = { [weak model] target in
+            guard let model else { return }
+            let first = !model.permissions.refusals.contains(target)
+            model.permissions.recordRefusal(target)
+            if first {
+                PermissionGuideController.shared.present(.automation(target),
+                    reason: L("Without it, a session only brings %@ forward, not its own tab.", target.displayName))
+            } else {
+                model.notify(AppModel.Toast(key: SessionKey(source: "", sessionID: ""),
+                                            title: L("%@ tabs need Automation: Settings → General", target.displayName),
+                                            kind: .notice), for: 8)
+            }
+        }
+        Task { await model.permissions.refresh() }
+
         let sounds = SoundPlayer(model: model)
         self.sounds = sounds
         model.soundPlayer = sounds

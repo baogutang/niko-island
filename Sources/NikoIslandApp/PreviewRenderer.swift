@@ -15,10 +15,12 @@ enum PreviewRenderer {
         case settingsSounds = "settings-sounds"
         case settingsAgents = "settings-agents"
         case settingsIsland = "settings-island"
+        case settingsGeneral = "settings-general"
+        case permissionGuide = "permission-guide"
         case onboarding
         case onboardingAgents = "onboarding-agents"
 
-        var isSettings: Bool { self == .settingsSounds || self == .settingsAgents || self == .settingsIsland }
+        var isSettings: Bool { self == .settingsSounds || self == .settingsAgents || self == .settingsIsland || self == .settingsGeneral }
         var isOnboarding: Bool { self == .onboarding || self == .onboardingAgents }
     }
 
@@ -188,6 +190,7 @@ enum PreviewRenderer {
         case .sessions:
             fleet()
             transcripts()
+            model.usage = UsageSnapshot.demo(now: now)
             send("claude", "Notification", session: "a", project: "atlas-api", ago: 14,
                  extra: ["notification_type": "permission_prompt", "message": "Claude needs your permission to use Bash"])
         case .usage:
@@ -204,6 +207,11 @@ enum PreviewRenderer {
             model.runningAgents = ["claude", "codex"]
         case .settingsIsland:
             model.settingsPage = SettingsPage.island.rawValue
+        case .settingsGeneral:
+            model.settingsPage = SettingsPage.general.rawValue
+            model.permissions.showForPreview(notifications: .granted, automation: [.terminal: .granted, .iterm2: .denied])
+        case .permissionGuide:
+            break
         case .onboarding:
             break
         case .onboardingAgents:
@@ -277,6 +285,14 @@ enum PreviewRenderer {
             return AnyView(framed
                 .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                 .environment(\.isStaticPreview, true))
+        }
+        if scene == .permissionGuide {
+            let guide = PermissionGuideModel()
+            guide.permission = .automation(.iterm2)
+            guide.reason = L("Without it, a session only brings %@ forward, not its own tab.", AutomationTarget.iterm2.displayName)
+            guide.consent = .denied
+            return AnyView(PermissionGuideView(model: guide, close: {}, reopen: {})
+                .padding(24).environment(\.colorScheme, .dark).environment(\.isStaticPreview, true))
         }
         if scene.isOnboarding {
             return AnyView(OnboardingView(model: model, metrics: .plain, onFinish: {}, step: scene == .onboarding ? .welcome : .agents)
@@ -408,6 +424,14 @@ enum IconRenderer {
             .clipShape(RoundedRectangle(cornerRadius: 186, style: .continuous))
             .frame(width: 1024, height: 1024)
         }
+    }
+
+    /// The icon at `points` (and twice that in pixels), for views shown outside the installed app.
+    static func image(points: CGFloat) -> NSImage? {
+        let renderer = ImageRenderer(content: IconView())
+        renderer.scale = points * 2 / 1024
+        guard let cgImage = renderer.cgImage else { return nil }
+        return NSImage(cgImage: cgImage, size: CGSize(width: points, height: points))
     }
 
     /// Writes a complete `.iconset` directory (for `iconutil -c icns`).

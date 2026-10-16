@@ -119,6 +119,13 @@ to what turned up when somebody did.
 | The last 24 hours, four weeks by weekday and hour, cache hits | Built; seen with real transcripts in a development build |
 | Copilot's allowances | Built and covered by tests with a recorded shape; the endpoint was checked through `gh` (field names only), the app's own lookup was not run (it would read gh's Keychain item) |
 
+## Released: 0.13.0
+
+| Area | State |
+|---|---|
+| Plan limits along the top; older quiet sessions on one line, opening on hover | Built, covered by tests of the selection rules, judged from rendered images. Hover-to-open has not been tried by hand |
+| Permissions card, Automation refusal detection and the docked System Settings guide | Built and covered by tests with stand-ins for macOS; the guide and card were judged from rendered images. A real refusal in iTerm2 has not been watched |
+
 ## Released: 0.12.0
 
 | Area | State |
