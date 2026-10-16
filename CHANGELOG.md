@@ -7,6 +7,7 @@
 
 ### Verification
 - On the owner's Mac, the running 0.15.0 was found with its desktop window 856 points tall instead of 760, the island 96 points above the screen, the process healthy. A 0.15.1 build opened on the usage page with the same data keeps both windows at 780 × 760 and the island on screen, the page scrolling inside it.
+- 450 local automated tests, 5 environment-dependent skips, no failures; CI on `main` green. The signed nightly of this code (apple-silicon): run with notifications on, banner delivered, no crash report; opened on the usage page with the owner's data, both windows 780 × 760, 0.8-2 % CPU.
 
 ## [0.15.0] - 2026-10-16
 
