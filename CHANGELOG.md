@@ -16,7 +16,8 @@
 - **The open island no longer keeps the processor busy.** The pulsing ring of a working row's status dot was a SwiftUI animation that never ended, and the verb of a working row shimmered every frame: SwiftUI drew the whole island again on every display frame while it was open (35 % CPU with three sessions at work). The ring is now a Core Animation layer and the shimmer is gone: 2.6-4.9 %.
 
 ### Verification
-- 449 local automated tests, 5 environment-dependent skips, no failures.
+- 449 local automated tests, 5 environment-dependent skips, no failures; CI on `main` green.
+- The signed nightly of this code (apple-silicon) run with notifications on against a throwaway home: three Claude Code turns, a Codex turn and a SessionEnd, banner delivered, still running, no crash report; 1.6-2.8 % CPU with an agent at work and the island closed.
 - On this Mac: a real Kiro permission prompt (Kiro 1.3, open from 15:16:37 to 15:18:48) showed on the island as Kiro's ghost with the amber bell and glow, and went back to work when answered in Kiro. A live *Ask Kiro* lookup answered from `management.us-east-1.kiro.dev` (plan, 2 % of the month's credits). The open island's lower edge has no halo. The pets of real Claude Code, Kiro and ZCode sessions shown in the island.
 
 ## [0.14.0] - 2026-10-16
