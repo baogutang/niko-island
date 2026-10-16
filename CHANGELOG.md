@@ -21,7 +21,10 @@
 - The limits line at the top follows the agent picked in the usage view.
 
 ### Verification
-- See the release log for the test count and the live checks.
+- 442 local automated tests, 5 environment-dependent skips, no failures; CI on `main` green.
+- The signed nightly of this code (apple-silicon) run with notifications on against a throwaway home: three Claude Code turns, a Codex turn and a SessionEnd, banners delivered, still running, no crash report. With agents working and the island closed it used 0.8-1.8 % CPU (the build before the Core Animation change used 11-13 %).
+- On a real desktop: the closed island's edge light and glow, the request card with the asking creature, the moods of finished and working rows. A live Cursor lookup answered from `cursor.com` in the expected shape.
+- Not checked: notch layouts of the glow on another Mac, 120 Hz, the Intel build beyond CI's launch under Rosetta, Claude Code's own run of Cursor's third-party hooks (the attribution follows Cursor's documentation and process tree).
 
 ## [0.13.0] - 2026-10-16
 
