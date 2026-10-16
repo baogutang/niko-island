@@ -15,10 +15,31 @@ struct UsageView: View {
 
     private var usage: UsageSnapshot { model.usage }
 
+    private var activity: ActivitySnapshot { model.activity }
+
+    /// Agents to pick from: those with tokens or limits, then those only heard from
+    /// through their hooks (Cursor, Gemini CLI and the like write no token log).
+    private var agentIDs: [String] {
+        var ids = usage.agents.map(\.id)
+        if ids.isEmpty, !activity.isEmpty { ids = ["all"] }
+        for agent in activity.agents where !ids.contains(agent.id) { ids.append(agent.id) }
+        return ids
+    }
+
     /// The agent being shown; falls back to "all" when the chosen one has nothing.
     private var current: UsageSnapshot.AgentUsage {
-        usage.agent(model.usageAgent) ?? usage.agent("all") ?? UsageSnapshot.AgentUsage(id: "all")
+        if let agent = usage.agent(model.usageAgent) { return agent }
+        if model.usageAgent != "all", activity.agents.contains(where: { $0.id == model.usageAgent }) {
+            return UsageSnapshot.AgentUsage(id: model.usageAgent)
+        }
+        return usage.agent("all") ?? UsageSnapshot.AgentUsage(id: "all")
     }
+
+    private var hasTokens: Bool {
+        !(usage.agents.isEmpty || (current.week.tokens == 0 && current.limits.isEmpty && current.fiveHours.tokens == 0))
+    }
+
+    private var hasActivity: Bool { (activity.days[current.id] ?? []).contains { $0.sessions > 0 || $0.weight > 0 } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -26,9 +47,11 @@ struct UsageView: View {
                 Text(L("Usage tracking is unavailable: %@", failure))
                     .font(look.body(12)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
             }
-            if usage.agents.count > 2 { switcher }
-            if usage.agents.isEmpty || (current.week.tokens == 0 && current.limits.isEmpty && current.fiveHours.tokens == 0) {
-                if usage.failure == nil {
+            if agentIDs.count > 2 { switcher }
+            if !hasTokens {
+                if hasActivity {
+                    if current.id != "all" { limits(current) }
+                } else if usage.failure == nil {
                     Text(usage.indexing ? L("Reading your local transcripts…")
                          : L("No usage found yet. Numbers appear after an agent has written a transcript on this Mac."))
                         .font(look.body(12.5)).foregroundStyle(Theme.secondary)
@@ -50,6 +73,7 @@ struct UsageView: View {
                     }
                 }
             }
+            if hasActivity { ActivitySection(activity: activity, agent: current.id) }
             footnote
         }
     }
@@ -58,7 +82,7 @@ struct UsageView: View {
 
     @ViewBuilder
     private var switcher: some View {
-        if isStaticPreview || usage.agents.count <= 5 {
+        if isStaticPreview || agentIDs.count <= 5 {
             pills
         } else {
             ScrollView(.horizontal, showsIndicators: false) { pills }
@@ -68,20 +92,26 @@ struct UsageView: View {
     private var pills: some View {
         Group {
             HStack(spacing: 6) {
-                ForEach(usage.agents) { agent in
-                    let selected = agent.id == current.id
-                    Button { model.usageAgent = agent.id } label: {
+                ForEach(agentIDs, id: \.self) { id in
+                    let selected = id == current.id
+                    Button { withAnimation(Motion.snappy(look.motion)) { model.usageAgent = id } } label: {
                         HStack(spacing: 6) {
-                            if agent.id != "all" { MascotView(source: agent.id, size: 15) }
-                            Text(agent.id == "all" ? L("All") : AgentRegistry.displayName(for: agent.id))
+                            if id != "all" { MascotView(source: id, size: 15, mood: selected ? .happy : .idle) }
+                            Text(id == "all" ? L("All") : AgentRegistry.displayName(for: id))
                                 .font(look.body(12, .semibold))
                         }
                         .padding(.horizontal, 11).padding(.vertical, 6)
                         .foregroundStyle(selected ? Color.black : Theme.primary.opacity(0.85))
-                        .background(Capsule().fill(selected ? Color.white : Color.white.opacity(0.10)))
+                        .background {
+                            if selected {
+                                Capsule().fill(Color.white).matchedGeometryEffect(id: "agent-pill", in: spanSpace)
+                            } else {
+                                Capsule().fill(Color.white.opacity(0.10))
+                            }
+                        }
                         .contentShape(Capsule())
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(PressStyle(pressed: 0.95))
                 }
             }
         }
@@ -102,7 +132,7 @@ struct UsageView: View {
         let shape = RoundedRectangle(cornerRadius: look.radius(14), style: .continuous)
         return VStack(alignment: .leading, spacing: 2) { content() }
             .padding(.horizontal, 11).padding(.vertical, 9)
-            .frame(maxWidth: .infinity, minHeight: 72, maxHeight: 72, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 84, maxHeight: 84, alignment: .topLeading)
             .background(shape.fill(Theme.field))
             .overlay(shape.strokeBorder(Theme.hairline))
     }
@@ -112,12 +142,16 @@ struct UsageView: View {
         let unpriced = window.cost == 0 && window.tokens > 0
         return tileFrame {
             Text(title.uppercased()).font(look.mono(9.5, .semibold)).foregroundStyle(Theme.tertiary)
-            Text(unpriced ? tokenText(window.tokens) : costText(window.cost))
+            Text(unpriced ? tokenText(window.billable) : costText(window.cost))
                 .contentTransition(.numericText())
                 .animation(Motion.smooth(look.motion), value: window.cost)
                 .font(look.title(20)).foregroundStyle(Theme.primary).lineLimit(1).minimumScaleFactor(0.7)
-            Text(unpriced ? L("tokens, no list price") : L("%@ tokens", tokenText(window.tokens)))
+            Text(unpriced ? L("tokens, no list price") : L("%@ tokens", tokenText(window.billable)))
                 .font(look.body(11)).foregroundStyle(Theme.secondary).lineLimit(1).minimumScaleFactor(0.8)
+            if window.cacheRead > 0 {
+                Text(L("+ %@ read from cache", tokenText(window.cacheRead)))
+                    .font(look.body(10)).foregroundStyle(Theme.tertiary).lineLimit(1).minimumScaleFactor(0.7)
+            }
         }
     }
 
@@ -408,7 +442,8 @@ struct UsageView: View {
                     MascotView(source: row.agent, size: 16)
                     Text(row.model).font(look.mono(12)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.middle)
                     Spacer(minLength: 6)
-                    Text(tokenText(row.tokens)).font(look.mono(11, .regular)).foregroundStyle(Theme.secondary)
+                    Text(tokenText(row.billable)).font(look.mono(11, .regular)).foregroundStyle(Theme.secondary)
+                        .help(L("%@ tokens in and out, %@ more read from the cache", tokenText(row.billable), tokenText(row.cacheRead)))
                     Text(row.cost == 0 && row.tokens > 0 ? "—" : costText(row.cost)).font(look.mono(12, .semibold))
                         .foregroundStyle(row.cost == 0 ? Theme.tertiary : Theme.primary)
                         .frame(minWidth: 58, alignment: .trailing)
@@ -444,6 +479,7 @@ enum ProviderLookupText {
         case ProviderLimitsClient.minimax: return "MiniMax"
         case ProviderLimitsClient.gemini: return "Google"
         case ProviderLimitsClient.copilot: return "GitHub"
+        case ProviderLimitsClient.cursor: return "Cursor"
         default: return nil
         }
     }
@@ -464,15 +500,17 @@ enum ProviderLookupText {
 
     static func problem(_ state: ProviderLimitsClient.State, agent: String) -> String? {
         let codex = agent == ProviderLimitsClient.codex, gemini = agent == ProviderLimitsClient.gemini
-        let copilot = agent == ProviderLimitsClient.copilot
+        let copilot = agent == ProviderLimitsClient.copilot, cursor = agent == ProviderLimitsClient.cursor
         switch state {
         case .ok: return nil
         case .noLogin:
+            if cursor { return L("Cursor's app has not signed in on this Mac, so there is nothing to ask with.") }
             if gemini { return L("Gemini CLI has not signed in with a Google account on this Mac, so there is nothing to ask with.") }
             if copilot { return L("The GitHub CLI (gh) has not signed in on this Mac, so there is nothing to ask with.") }
             return codex ? L("Codex has not signed in with a ChatGPT plan on this Mac, so there is nothing to ask with.")
                 : L("Claude Code has not signed in on this Mac, so there is nothing to ask with.")
         case .loginExpired:
+            if cursor { return L("Cursor's sign-in on this Mac has run out. It renews itself the next time Cursor opens.") }
             if gemini { return L("Gemini CLI's sign-in on this Mac has run out. It renews itself the next time Gemini CLI runs.") }
             if copilot { return L("GitHub did not accept the GitHub CLI's sign-in. Run gh auth login to renew it.") }
             return codex ? L("Codex's sign-in on this Mac has run out. It renews itself the next time Codex runs.")
@@ -497,6 +535,10 @@ enum LimitWords {
         case "copilot_premium": return L("Premium requests, monthly")
         case "copilot_chat": return L("Chat, monthly")
         case "copilot_completions": return L("Completions, monthly")
+        case "cursor_total": return L("Included usage, this cycle")
+        case "cursor_auto": return L("Auto, this cycle")
+        case "cursor_api": return L("Named models, this cycle")
+        case "cursor_on_demand": return L("On-demand spending")
         case "daily_pro": return L("Pro models, daily")
         case "daily_flash": return L("Flash models, daily")
         case "daily_flash_lite": return L("Flash-Lite models, daily")

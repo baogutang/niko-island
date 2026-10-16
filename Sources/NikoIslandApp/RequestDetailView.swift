@@ -38,12 +38,13 @@ struct RequestDetailView: View {
 
     private var header: some View {
         HStack(alignment: .center, spacing: 13) {
-            MascotView(source: request.event.source, size: 36)
+            MascotView(source: request.event.source, size: 36, animated: true, mood: .attention, seed: request.sessionKey.description)
                 .overlay(alignment: .topTrailing) {
                     Image(systemName: "bell.fill")
                         .font(.system(size: 10, weight: .bold))
                         .foregroundStyle(Theme.amber)
                         .offset(x: 7, y: -6)
+                        .opacity(look.style == .pixel ? 1 : 0)
                 }
             VStack(alignment: .leading, spacing: 5) {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {

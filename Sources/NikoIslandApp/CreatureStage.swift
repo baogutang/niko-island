@@ -109,8 +109,10 @@ final class CreatureStageNSView: NSView {
         let reduced = NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         creatures.speed = reduced ? 0.25 : 1
         let now = CACurrentMediaTime()
+        let scale = window?.backingScaleFactor ?? 2
         for swimmer in swimmers {
-            let frames = [0, 1].compactMap { MascotImage.make(swimmer.sprite, frame: $0) }
+            let mood: CreatureMood = swimmer.sprite.name == Mascots.jellyfish.name ? .idle : .working
+            let frames = MascotImage.vector(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale)
             guard let first = frames.first else { continue }
             // Travel: an outer layer crosses the screen at an even pace.
             let lane = CALayer()
@@ -144,8 +146,7 @@ final class CreatureStageNSView: NSView {
             let body = CALayer()
             body.frame = lane.bounds
             body.contents = first
-            body.magnificationFilter = .nearest
-            body.minificationFilter = .nearest
+            body.contentsGravity = .resizeAspect
             body.opacity = 0.92
             if swimmer.facesLeft == swimmer.movingRight { body.transform = CATransform3DMakeScale(-1, 1, 1) }
             let bob = CABasicAnimation(keyPath: "position.y")
@@ -157,12 +158,13 @@ final class CreatureStageNSView: NSView {
             bob.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             bob.timeOffset = Double.random(in: 0...bob.duration)
             body.add(bob, forKey: "bob")
-            if frames.count == 2 {
+            if frames.count > 1 {
                 let paddle = CAKeyframeAnimation(keyPath: "contents")
                 paddle.values = frames
                 paddle.calculationMode = .discrete
-                paddle.duration = 1.1
+                paddle.duration = MascotImage.loop
                 paddle.repeatCount = .infinity
+                paddle.timeOffset = Double.random(in: 0...MascotImage.loop)
                 body.add(paddle, forKey: "paddle")
             }
             lane.addSublayer(body)
@@ -211,9 +213,27 @@ final class CreatureStageNSView: NSView {
     }
 }
 
-/// Pixel sprites as images: one image pixel per sprite cell, so enlarging them is exact.
+/// Creatures as images: pixel sprites one image pixel per cell, so enlarging them is
+/// exact, and vector creatures as a loop of frames for Core Animation to flip through.
 enum MascotImage {
     @MainActor private static var cache: [String: CGImage] = [:]
+    @MainActor private static var loops: [String: [CGImage]] = [:]
+    /// Seconds in a loop of vector frames: three bounces of a creature at work.
+    static let loop = 2.52
+
+    @MainActor static func vector(_ sprite: MascotSprite, mood: CreatureMood, points: CGFloat, scale: CGFloat, count: Int = 30) -> [CGImage] {
+        let key = "\(sprite.name)/\(mood.rawValue)/\(Int(points * scale))"
+        if let hit = loops[key] { return hit }
+        let frames: [CGImage] = (0..<count).compactMap { index in
+            let renderer = ImageRenderer(content: CreatureCanvas(sprite: sprite, mood: mood, lively: false, seed: MascotView.seed(sprite.name),
+                                                                 moment: loop * Double(index) / Double(count), size: points)
+                .frame(width: points, height: points))
+            renderer.scale = scale
+            return renderer.cgImage
+        }
+        loops[key] = frames
+        return frames
+    }
 
     @MainActor static func make(_ sprite: MascotSprite, frame: Int) -> CGImage? {
         let key = "\(sprite.name)/\(frame)/\(sprite.palette.keys.sorted().map { "\($0)" }.joined())"

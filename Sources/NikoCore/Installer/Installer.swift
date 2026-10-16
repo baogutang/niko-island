@@ -14,6 +14,9 @@ public struct InstallOptions: Sendable {
     public var appExecutable: String?
     /// Uninstall only: also delete our runtime directory and config backups.
     public var purge = false
+    /// Install only: leave out agents that only look installed (`ScanReport.isInstalled`),
+    /// for the "everything detected" choices; an agent named on its own is always done.
+    public var detectedOnly = false
     public var now = Date()
     /// Test seams.
     public var failAfterWrites: Int?
@@ -192,7 +195,10 @@ public struct Installer: Sendable {
                 plan.outcomes.append(.init(id: agent.id, status: .skipped("~/\(agent.directory) is not an accessible directory")))
                 continue
             case .present:
-                break
+                if action == .install, options.detectedOnly, !scan.isInstalled(agent) {
+                    plan.outcomes.append(.init(id: agent.id, status: .notDetected))
+                    continue
+                }
             }
             let before = plan.changes.count
             var skip: String?

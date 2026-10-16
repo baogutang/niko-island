@@ -39,7 +39,7 @@
   code, pre, kbd { font-family: var(--mono); }
   button { font: inherit; }
   .wrap { width: 100%; max-width: var(--wrap); margin: 0 auto; padding: 0 20px; }
-  .pixel { image-rendering: pixelated; }
+  .pixel { image-rendering: auto; }
 
   /* Nav */
   .nav {
@@ -434,7 +434,7 @@
 <main id="top">
   <div class="hero">
     <div class="wrap">
-      <div class="kicker" data-i18n="hero.kicker">0.13.0 · Free · Open source · No telemetry</div>
+      <div class="kicker" data-i18n="hero.kicker">0.14.0 · Free · Open source · No telemetry</div>
       <h1><span data-i18n="hero.pre">Your</span> <span class="rot" id="rot" aria-hidden="true"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt=""><span class="rot-word">Claude Code</span></span><span class="visually-hidden" data-i18n="hero.agents">agents</span> <span data-i18n="hero.post">works.</span> <em data-i18n="hero.em">The island keeps watch.</em></h1>
       <p class="lede" data-i18n="hero.lede">Niko Island hangs a small black island from the top of your Mac's screen. It shows what every AI coding agent on your Mac is doing, moves with the menu bar, opens when one needs you, and lets you approve or answer on the spot.</p>
       <div class="cta">
@@ -562,7 +562,7 @@
   <section id="creatures">
     <div class="wrap center">
       <h2 data-i18n="creatures.title">One creature per agent</h2>
-      <p class="sub" data-i18n="creatures.sub">Each agent gets its own pixel creature, drawn in code, so you can tell sessions apart before you read a word. Swap them around in Settings if you like.</p>
+      <p class="sub" data-i18n="creatures.sub">Each agent gets its own creature, drawn in code, so you can tell sessions apart before you read a word. It shows how its session is doing: busy at work, hopping with a “!” when it needs you, pleased when a turn ends, looking up while it waits, asleep after a long quiet. Swap them around in Settings if you like.</p>
       <div class="creatures">
         <div class="creature"><img class="pixel" src="mascots/starfish.gif" width="56" height="56" alt="Starfish" data-i18n-alt="cr.starfish"><b data-i18n="cr.starfish">Starfish</b><span>Claude Code · MiniMax Code</span></div>
         <div class="creature"><img class="pixel" src="mascots/whale.gif" width="56" height="56" alt="Whale" data-i18n-alt="cr.whale"><b data-i18n="cr.whale">Whale</b><span>Codex · Kimi Code</span></div>
@@ -784,7 +784,7 @@ open "dist/Niko Island.app"</pre>
     "search.t": "敲几个字，就能回去",
     "search.d": "⌃⌥S 打开搜索，输入项目、提示词或代理，方向键和回车选择。支持重音字符和中文，输入法候选确认不会误触跳转。遇到待审批请求，会打开对应卡片。",
     "nav.features": "功能", "nav.agents": "代理", "nav.sounds": "音效", "nav.privacy": "隐私", "nav.install": "安装",
-    "hero.kicker": "0.13.0 · 免费 · 开源 · 无遥测",
+    "hero.kicker": "0.14.0 · 免费 · 开源 · 无遥测",
     "hero.pre": "你的", "hero.agents": "代理", "hero.post": "在干活，", "hero.em": "小岛替你盯着。",
     "hero.lede": "Niko Island 在 Mac 屏幕顶部挂一座黑色的小岛。它显示这台 Mac 上每个 AI 编程代理正在做什么，跟着菜单栏一起走，有代理需要你时自动展开，让你当场批准或回答。",
     "hero.download": "下载 macOS 版", "hero.github": "在 GitHub 上查看",
@@ -801,7 +801,7 @@ open "dist/Niko Island.app"</pre>
     "demo.tab1": "工作中", "demo.tab2": "需要你", "demo.tab3": "全部会话", "demo.tab4": "已完成",
     "demo.caption": "这是岛屿在浏览器里的示意，会话内容是虚构的。点它一下，或者选一个状态。",
     "creatures.title": "每个代理一只小生物",
-    "creatures.sub": "每个代理都有自己的像素小生物，全部用代码画成，不用读字就能分清会话。想换的话，可以在设置里调换。",
+    "creatures.sub": "每个代理都有自己的小生物，全部用代码画成，不用读字就能分清会话。它会表现会话的状态：干活时忙个不停，需要你时带着“!”跳起来，回合结束时开心，等你回复时抬头看你，安静太久就睡着。想换的话，可以在设置里调换。",
     "cr.starfish": "海星", "cr.whale": "鲸鱼", "cr.crab": "螃蟹", "cr.boat": "小船", "cr.gull": "海鸥", "cr.jellyfish": "水母",
     "cr.turtle": "海龟", "cr.octopus": "章鱼", "cr.puffer": "河豚", "cr.island": "小岛", "cr.other": "其他代理",
     "features.title": "干活时小小一块，需要你时才展开。",

@@ -361,6 +361,43 @@ final class AgentAdapterTests: XCTestCase {
         XCTAssertTrue(BorrowedHooks.ownHooksInstalled(devin, home: home.path))
     }
 
+    /// Cursor runs the hooks in ~/.claude/settings.json unless told not to: on a Mac
+    /// without Claude Code its sessions must not turn up as Claude Code's.
+    func testCursorRunningClaudeCodesHooksIsCursor() throws {
+        typealias A = BorrowedHooks.Ancestor
+        let none: (pid_t) -> [String] = { _ in [] }
+        let apps: (String) -> String? = { path in
+            ["/Applications/Cursor.app": "com.todesktop.230313mzl4w4u92", "/Applications/Claude.app": "com.anthropic.claudefordesktop",
+             "/Applications/iTerm.app": "com.googlecode.iterm2"][path]
+        }
+        let helper = "/Applications/Cursor.app/Contents/Frameworks/Cursor Helper (Plugin).app/Contents/MacOS/Cursor Helper (Plugin)"
+        let cursor = try XCTUnwrap(BorrowedHooks.borrower(in: [A(pid: 9, path: "/bin/sh"), A(pid: 8, path: helper)],
+                                                          arguments: none, bundleID: apps))
+        XCTAssertEqual(cursor.agent, "cursor")
+        XCTAssertTrue(cursor.observeOnly, "the island never answers for an agent it only overhears")
+        XCTAssertEqual(BorrowedHooks.borrower(in: [], payload: ["cursor_version": .string("2.6.11")], arguments: none, bundleID: apps)?.agent,
+                       "cursor", "the payload says so before the process tree is looked at")
+        XCTAssertEqual(BorrowedHooks.borrower(in: [A(pid: 9, path: "/bin/sh"), A(pid: 8, path: "/usr/local/bin/cursor-agent")],
+                                              arguments: none, bundleID: apps)?.agent, "cursor")
+
+        // Claude Code started in Cursor's terminal is Claude Code, whichever way it was installed.
+        for claude in ["/Users/a/.local/share/claude/versions/2.1.295", "/Users/a/.local/bin/claude",
+                       "/Users/a/.cursor/extensions/anthropic.claude-code-2.1.3/resources/native-binary/claude"] {
+            XCTAssertNil(BorrowedHooks.borrower(in: [A(pid: 9, path: "/bin/sh"), A(pid: 8, path: claude), A(pid: 7, path: "/bin/zsh"),
+                                                     A(pid: 6, path: helper)], arguments: none, bundleID: apps), claude)
+        }
+        // The desktop app's Code tab, and a terminal app above an unrecognised parent.
+        XCTAssertNil(BorrowedHooks.borrower(in: [A(pid: 9, path: "/bin/sh"), A(pid: 8, path: "/Applications/Claude.app/Contents/MacOS/Claude")],
+                                            arguments: none, bundleID: apps))
+        XCTAssertNil(BorrowedHooks.borrower(in: [A(pid: 9, path: "/bin/zsh"), A(pid: 8, path: "/Applications/iTerm.app/Contents/MacOS/iTerm2"),
+                                                 A(pid: 7, path: helper)], arguments: none, bundleID: apps))
+
+        // Cursor's own hooks of ours in place: the copy that came through Claude Code's goes.
+        XCTAssertFalse(BorrowedHooks.ownHooksInstalled(cursor, home: home.path))
+        scratch.write("home/.cursor/hooks.json", #"{"version":1,"hooks":{"stop":[{"command":"niko-bridge --source cursor"}]}}"#)
+        XCTAssertTrue(BorrowedHooks.ownHooksInstalled(cursor, home: home.path))
+    }
+
     func testProcessArgumentsAreReadWithoutTheEnvironment() {
         let arguments = ProcessInspector.arguments(of: getpid())
         XCTAssertEqual(arguments.first.map { ($0 as NSString).lastPathComponent }, (CommandLine.arguments[0] as NSString).lastPathComponent)

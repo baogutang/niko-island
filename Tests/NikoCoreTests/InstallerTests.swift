@@ -95,6 +95,43 @@ final class InstallerTests: XCTestCase {
 
     // MARK: Claude Code wiring
 
+    /// A ~/.claude that holds only skills (Cursor and skill installers make one) is not Claude Code.
+    func testClaudeDirectoryAloneIsNotClaudeCode() throws {
+        let claude = try XCTUnwrap(AgentRegistry.descriptor("claude"))
+        scratch.write("home/.claude/skills/review/SKILL.md", "# review")
+        var report = try ScanProbe.run(home: home, agents: [claude])
+        XCTAssertEqual(report.agents["claude"]?.directory, .present)
+        // This Mac may well have `claude` on its PATH; the scan of a Mac without it has no binary.
+        report.agents["claude"]?.binary = nil
+        XCTAssertFalse(report.isInstalled(claude))
+        XCTAssertTrue(report.isInstalled(claude, apps: ["com.anthropic.claudefordesktop"]), "the desktop app has Claude Code in it")
+        let scanned = report
+        let skipped = run(.install, agents: ["claude"]) { $0.detectedOnly = true; $0.dryRun = true; $0.scanOverride = { scanned } }
+        XCTAssertEqual(skipped.plan.outcomes.first?.status, .notDetected)
+        XCTAssertTrue(skipped.plan.changes.isEmpty)
+        XCTAssertFalse(run(.install, agents: ["claude"]) { $0.dryRun = true; $0.scanOverride = { scanned } }.plan.changes.isEmpty,
+                       "an agent asked for by name is still connected")
+        report.agents["claude"]?.binary = "/usr/local/bin/claude"
+        XCTAssertTrue(report.isInstalled(claude), "its command on the PATH counts")
+
+        for marker in [".claude.json", ".claude/projects/-w/1.jsonl", ".local/share/claude/versions/2.1.3"] {
+            let other = Scratch()
+            other.write("home/.claude/skills/x/SKILL.md", "x")
+            other.write("home/" + marker, "{}")
+            report = try ScanProbe.run(home: other.file("home"), agents: [claude])
+            XCTAssertTrue(report.isInstalled(claude), marker)
+        }
+        // Agents without markers keep the plain rule.
+        let codex = try XCTUnwrap(AgentRegistry.descriptor("codex"))
+        scratch.write("home/.codex/config.toml", "")
+        XCTAssertTrue(try ScanProbe.run(home: home, agents: [codex]).isInstalled(codex))
+    }
+
+    func testNativeClaudeCodeIsKnownByItsPath() {
+        XCTAssertEqual(AgentPresence.alias(forPath: "/Users/a/.local/share/claude/versions/2.1.295"), "claude")
+        XCTAssertNil(AgentPresence.alias(forPath: "/usr/local/bin/2to3"))
+    }
+
     func testDryRunChangesNothing() throws {
         scratch.write(settingsPath, claudeFixture)
         let result = run(.install) { $0.dryRun = true }

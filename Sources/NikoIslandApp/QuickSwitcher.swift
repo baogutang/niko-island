@@ -260,7 +260,8 @@ struct SwitcherView: View {
         let waiting = model.pending.contains { $0.sessionKey == session.key }
         return Button { choose(session.key) } label: {
             HStack(spacing: 12) {
-                MascotView(source: session.source, size: 24, animated: session.phase == .working)
+                MascotView(source: session.source, size: 24, animated: session.phase != .waiting,
+                           mood: CreatureMood.of(session, now: Date()), seed: session.key.description)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(session.headline).font(look.body(13.5, .semibold)).foregroundStyle(Theme.primary).lineLimit(1)
                     Text([session.projectName, AgentRegistry.displayName(for: session.source), session.hostLabel]

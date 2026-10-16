@@ -555,7 +555,11 @@ struct SettingsPageView: View {
                 toggleRow(L("Plan limits along the top"),
                           L("The five-hour and weekly use of the agent you used last, with the time to each reset. Click it for Usage."),
                           isOn: settingsBinding(\.quotaGlance))
-                toggleRow(L("Pixel creatures"), L("Off: a plain dot in each agent's colour."), isOn: settingsBinding(\.showMascots))
+                toggleRow(L("Glow around the island"),
+                          L("Amber beneath the closed island while someone waits on you, your accent while agents work, and a light along its edge."),
+                          isOn: settingsBinding(\.islandGlow))
+                toggleRow(L("Creatures"), L("Off: a plain dot in each agent's colour. The Pixel style draws them in pixels."),
+                          isOn: settingsBinding(\.showMascots))
                 toggleRow(L("Show how long"), isOn: chipBinding(.elapsed))
                 toggleRow(L("Show which agent"), isOn: chipBinding(.agent))
                 toggleRow(L("Show which terminal or app"), isOn: chipBinding(.host))
@@ -876,7 +880,11 @@ struct SettingsPageView: View {
                             .font(Theme.body(11.5)).foregroundStyle(Theme.amber)
                             .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
                     }
-                    if agent.wired, let followUp = agent.followUp {
+                    if agent.wired, !agent.installed {
+                        Text(L("%@ is not on this Mac, but its hooks are connected. Other agents run them too (Cursor does, unless told not to); their sessions are shown as theirs. Remove them if you do not use %@.", agent.name, agent.name))
+                            .font(Theme.body(11.5)).foregroundStyle(Theme.tertiary)
+                            .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
+                    } else if agent.wired, let followUp = agent.followUp {
                         Text(L(followUp)).font(Theme.body(11.5)).foregroundStyle(Theme.amber)
                             .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
                     }
@@ -1079,8 +1087,12 @@ struct SettingsPageView: View {
                 if let note = lookupNote(ProviderLimitsClient.gemini) { lookupStatus(note, divider: true) }
                 toggleRow(L("Ask GitHub for my Copilot allowances"),
                           L("Premium requests, chat and completions for the month. Reads the sign-in the GitHub CLI (gh) keeps on this Mac (in ~/.config/gh, or your Keychain: macOS may ask you first) and sends it to api.github.com, nowhere else. Asked every ten minutes."),
-                          divider: lookupNote(ProviderLimitsClient.copilot) != nil, isOn: settingsBinding(\.copilotLimitsLookup))
-                if let note = lookupNote(ProviderLimitsClient.copilot) { lookupStatus(note, divider: false) }
+                          divider: true, isOn: settingsBinding(\.copilotLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.copilot) { lookupStatus(note, divider: true) }
+                toggleRow(L("Ask Cursor for my plan's usage"),
+                          L("How much of the included usage this billing cycle is spent, for Auto and for the named models, and on-demand spending if it is on. Reads the sign-in Cursor's app keeps on this Mac (its own settings database, read only) and sends it to cursor.com, nowhere else. Asked every ten minutes while Cursor is in use."),
+                          divider: lookupNote(ProviderLimitsClient.cursor) != nil, isOn: settingsBinding(\.cursorLimitsLookup))
+                if let note = lookupNote(ProviderLimitsClient.cursor) { lookupStatus(note, divider: false) }
             }
             card(L("Warnings")) {
                 choiceRow(L("Warn me when a plan window reaches"),
@@ -1174,7 +1186,7 @@ struct SettingsPageView: View {
     private var about: some View {
         VStack(alignment: .leading, spacing: 18) {
             HStack(spacing: 16) {
-                MascotView(sprite: Mascots.island, size: 64, animated: true)
+                MascotView(sprite: Mascots.island, size: 64, animated: true, mood: .idle)
                 VStack(alignment: .leading, spacing: 3) {
                     Text(NikoVersion.displayName).font(Theme.title(22)).foregroundStyle(Theme.primary)
                     Text(L("Version %@ · no telemetry, no account, MIT licensed", NikoVersion.current))

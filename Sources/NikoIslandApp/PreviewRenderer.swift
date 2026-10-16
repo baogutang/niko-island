@@ -196,6 +196,7 @@ enum PreviewRenderer {
         case .usage:
             fleet()
             model.usage = UsageSnapshot.demo(now: now)
+            model.activity = ActivitySnapshot.demo(now: now)
             model.usageAgent = "claude"
             model.route = .usage
         case .settingsSounds:
@@ -361,21 +362,61 @@ enum PreviewRenderer {
         return writeGIF(frames: frames, to: url)
     }
 
+    /// Every creature in every mood, and at the sizes the island uses: for looking at, not for the docs.
+    static func renderCreatureSheet(to url: URL) -> Bool {
+        let moods = CreatureMood.allCases
+        let sheet = AnyView(VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Text("").frame(width: 70)
+                ForEach(moods, id: \.self) { mood in
+                    Text(mood.rawValue).font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.7)).frame(width: 96)
+                }
+                Text("17 / 30 pt").font(.system(size: 12, weight: .semibold)).foregroundStyle(.white.opacity(0.7))
+            }
+            ForEach(Mascots.all, id: \.name) { sprite in
+                HStack(spacing: 8) {
+                    Text(sprite.name).font(.system(size: 12, weight: .medium)).foregroundStyle(.white.opacity(0.7)).frame(width: 70, alignment: .leading)
+                    ForEach(Array(moods.enumerated()), id: \.offset) { index, mood in
+                        MascotView(sprite: sprite, size: 96, mood: mood, frame: index % 2)
+                    }
+                    HStack(spacing: 10) {
+                        MascotView(sprite: sprite, size: 17, mood: .idle, frame: 0)
+                        MascotView(sprite: sprite, size: 17, mood: .working, frame: 1)
+                        MascotView(sprite: sprite, size: 30, mood: .idle, frame: 0)
+                        MascotView(sprite: sprite, size: 30, mood: .attention, frame: 0)
+                    }
+                }
+            }
+        }
+        .padding(20)
+        .background(Color.black))
+        guard let image = cgImage(of: sheet, scale: 2) else { return false }
+        return writePNG(image, to: url)
+    }
+
     /// One PNG and one two-frame GIF per creature, plus a strip with all of them.
     static func renderMascots(to directory: URL) -> Bool {
         var ok = true
         for sprite in Mascots.all {
-            let frames: [(CGImage, Double)] = (0..<2).compactMap { index in
-                let view = AnyView(MascotView(sprite: sprite, size: 72, frame: index).padding(12)
+            // A loop of the creature at work, and a still of it at rest.
+            let count = 24
+            let frames: [(CGImage, Double)] = (0..<count).compactMap { index in
+                let view = AnyView(CreatureCanvas(sprite: sprite, mood: .working, lively: false, seed: 0.3,
+                                                  moment: MascotImage.loop * Double(index) / Double(count), size: 72)
+                    .frame(width: 72, height: 72).padding(12)
                     .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black)))
-                return cgImage(of: view, scale: 1).map { ($0, 0.55) }
+                return cgImage(of: view, scale: 2).map { ($0, MascotImage.loop / Double(count)) }
             }
-            guard frames.count == 2 else { return false }
+            let still = AnyView(MascotView(sprite: sprite, size: 72, mood: .idle).padding(12)
+                .background(RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color.black)))
+            guard frames.count == count, let picture = cgImage(of: still, scale: 2) else { return false }
             ok = writeGIF(frames: frames, to: directory.appendingPathComponent("\(sprite.name).gif")) && ok
-            ok = writePNG(frames[0].0, to: directory.appendingPathComponent("\(sprite.name).png")) && ok
+            ok = writePNG(picture, to: directory.appendingPathComponent("\(sprite.name).png")) && ok
         }
         let strip = AnyView(HStack(spacing: 14) {
-            ForEach(Array(Mascots.all.enumerated()), id: \.offset) { _, sprite in MascotView(sprite: sprite, size: 56, frame: 0) }
+            ForEach(Array(Mascots.all.enumerated()), id: \.offset) { index, sprite in
+                MascotView(sprite: sprite, size: 56, mood: [.idle, .working, .happy, .waiting][index % 4])
+            }
         }
         .padding(.horizontal, 26).padding(.vertical, 18)
         .background(Capsule().fill(Color.black)))

@@ -183,7 +183,7 @@ struct OnboardingView: View {
             HStack(spacing: 15 * u) {
                 ForEach(Array(Mascots.all.enumerated()), id: \.offset) { index, sprite in
                     Bobbing(delay: Double(index) * 0.11, travel: 6 * u) {
-                        MascotView(sprite: sprite, size: 48 * u, animated: true)
+                        MascotView(sprite: sprite, size: 48 * u, animated: true, mood: .idle, seed: sprite.name)
                     }
                     // Up from below, never scaled: a pixel creature drawn small and enlarged is a blurred one.
                     .opacity(shown ? 1 : 0)
@@ -306,7 +306,8 @@ struct OnboardingView: View {
             toggle(row.id)
         } label: {
             HStack(spacing: 12 * u) {
-                MascotView(source: row.id, size: 40 * u, animated: running || (row.wired && connectedNow.contains(row.id)))
+                MascotView(source: row.id, size: 40 * u, animated: running || (row.wired && connectedNow.contains(row.id)),
+                           mood: row.wired && connectedNow.contains(row.id) ? .happy : .idle)
                 VStack(alignment: .leading, spacing: 4 * u) {
                     HStack(spacing: 6 * u) {
                         Text(row.name).font(rounded(16, .bold, u)).foregroundStyle(Theme.primary).lineLimit(1).fixedSize()
@@ -460,7 +461,7 @@ struct OnboardingView: View {
                 ForEach(Array(Mascots.all.enumerated()), id: \.offset) { index, sprite in
                     let centre = sprite.name == Mascots.island.name
                     Bobbing(delay: Double(index) * 0.09, travel: (centre ? 5 : 12) * u, period: centre ? 1.5 : 0.62) {
-                        MascotView(sprite: sprite, size: (centre ? 84 : 40) * u, animated: true)
+                        MascotView(sprite: sprite, size: (centre ? 84 : 40) * u, animated: true, mood: .happy, seed: sprite.name)
                     }
                 }
             }
@@ -672,7 +673,7 @@ struct DemoIsland: View {
         HStack(spacing: 7) {
             switch act {
             case .hello:
-                MascotView(sprite: Mascots.island, size: 17, animated: true)
+                MascotView(sprite: Mascots.island, size: 17, animated: true, mood: .happy)
                 Text(L("Hello")).foregroundStyle(Theme.primary)
             case .idle:
                 MascotView(sprite: Mascots.island, size: 17)
@@ -682,7 +683,7 @@ struct DemoIsland: View {
                 Text(L("running") + " swift test").foregroundStyle(Theme.primary.opacity(0.9))
                 Circle().fill(look.accent).frame(width: 6, height: 6)
             case .finished:
-                MascotView(source: "claude", size: 17)
+                MascotView(source: "claude", size: 17, animated: true, mood: .happy)
                 Text(L("Finished")).foregroundStyle(look.accent)
                 Image(systemName: "checkmark").font(.system(size: 9, weight: .heavy)).foregroundStyle(look.accent)
             case .asking:
@@ -698,7 +699,7 @@ struct DemoIsland: View {
     private var asking: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 10) {
-                MascotView(source: "claude", size: 30)
+                MascotView(source: "claude", size: 30, animated: true, mood: .attention)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(L("%@ wants to run a command", "Claude Code")).font(Theme.title(15)).foregroundStyle(Theme.primary)
                     Text(L("Nothing happens until you decide. The agent is waiting.")).font(Theme.body(11.5)).foregroundStyle(Theme.secondary)
@@ -855,7 +856,7 @@ struct SeaBackdrop: View {
     /// A creature in the scene, mirrored when it would otherwise swim backwards.
     private func swimmer(_ sprite: MascotSprite, size: CGFloat, facesLeft: Bool, movingRight: Bool, x: Double, y: Double, tilt: Double) -> some View {
         let mirrored = facesLeft == movingRight
-        return MascotView(sprite: sprite, size: size, animated: true)
+        return MascotView(sprite: sprite, size: size, animated: true, mood: .idle, seed: sprite.name)
             .scaleEffect(x: mirrored ? -1 : 1, y: 1)
             .rotationEffect(.degrees(tilt))
             .opacity(0.92)

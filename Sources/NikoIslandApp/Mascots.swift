@@ -361,32 +361,41 @@ enum Mascots {
     }
 }
 
-/// Draws a sprite on a pixel grid. Animated only while `animated` is true, so
-/// idle rows cost nothing.
+/// An agent's creature. In vector by default: soft shading, a face that shows
+/// the mood, the species' own movement; the Pixel style keeps the pixel sprites.
+/// Animated only while `animated` is true, so idle rows cost nothing.
 struct MascotView: View {
     /// Set when the view stands for an agent: the user's choice of creature applies.
     var source: String?
     private var fixed: MascotSprite
     var size: CGFloat = 30
     var animated = false
+    /// How it feels; by default at work while animated, at rest otherwise.
+    var mood: CreatureMood?
+    /// Keeps creatures of different sessions out of step.
+    var seed: String?
     /// Fixed frame for documentation images.
     var frame: Int?
     @Environment(\.isStaticPreview) private var isStaticPreview
     @Environment(\.mascotFrame) private var mascotFrame
     @Environment(\.look) private var look
 
-    init(source: String, size: CGFloat = 30, animated: Bool = false, frame: Int? = nil) {
+    init(source: String, size: CGFloat = 30, animated: Bool = false, mood: CreatureMood? = nil, seed: String? = nil, frame: Int? = nil) {
         self.source = source
         self.fixed = Mascots.sprite(for: source)
         self.size = size
         self.animated = animated
+        self.mood = mood
+        self.seed = seed
         self.frame = frame
     }
 
-    init(sprite: MascotSprite, size: CGFloat = 30, animated: Bool = false, frame: Int? = nil) {
+    init(sprite: MascotSprite, size: CGFloat = 30, animated: Bool = false, mood: CreatureMood? = nil, seed: String? = nil, frame: Int? = nil) {
         self.fixed = sprite
         self.size = size
         self.animated = animated
+        self.mood = mood
+        self.seed = seed
         self.frame = frame
     }
 
@@ -394,22 +403,42 @@ struct MascotView: View {
         source.map { Mascots.sprite(for: $0, choices: look.mascots) } ?? fixed
     }
 
+    private var feeling: CreatureMood { mood ?? (animated ? .working : .idle) }
+
     var body: some View {
         Group {
             if let source, !look.showMascots {
                 // Creatures switched off: a plain dot in the agent's colour.
                 Circle().fill(AgentTint.color(for: source)).frame(width: size * 0.42, height: size * 0.42)
-            } else if animated, frame == nil, !isStaticPreview {
-                TimelineView(.periodic(from: .now, by: 0.55)) { context in
-                    canvas(frame: Int(context.date.timeIntervalSinceReferenceDate / 0.55) % 2)
-                }
+            } else if look.style == .pixel {
+                pixels
             } else {
-                // Documentation images pick the frame; creatures that would not be moving stay on the first.
-                canvas(frame: frame ?? (animated ? mascotFrame : 0))
+                // Documentation images pick the moment; creatures that would not be moving stay still.
+                let picture = frame ?? (isStaticPreview ? (animated ? mascotFrame : nil) : nil)
+                CreatureCanvas(sprite: sprite, mood: feeling, lively: animated && !isStaticPreview, seed: Self.seed(seed ?? source ?? sprite.name),
+                               moment: picture.map { 0.18 + Double($0) * 0.31 }, size: size)
             }
         }
         .frame(width: size, height: size)
         .accessibilityHidden(true)
+    }
+
+    /// 0…1 from any text, the same on every run.
+    static func seed(_ text: String) -> Double {
+        var hash: UInt64 = 1_469_598_103_934_665_603
+        for byte in text.utf8 { hash = (hash ^ UInt64(byte)) &* 1_099_511_628_211 }
+        return Double(hash % 10_000) / 10_000
+    }
+
+    @ViewBuilder
+    private var pixels: some View {
+        if animated, frame == nil, !isStaticPreview {
+            TimelineView(.periodic(from: .now, by: 0.55)) { context in
+                canvas(frame: Int(context.date.timeIntervalSinceReferenceDate / 0.55) % 2)
+            }
+        } else {
+            canvas(frame: frame ?? (animated ? mascotFrame : 0))
+        }
     }
 
     private func canvas(frame index: Int) -> some View {

@@ -155,7 +155,8 @@ struct SessionRowView: View {
 
     private var summary: some View {
         HStack(alignment: .top, spacing: 13) {
-            MascotView(source: session.source, size: 30, animated: session.phase == .working)
+            MascotView(source: session.source, size: 30, animated: CreatureMood.moves(session, now: now),
+                       mood: CreatureMood.of(session, now: now), seed: session.key.description)
                 .travels("creature/" + session.key.description, in: islandSpace)
                 .padding(.top, 2)
 
@@ -223,7 +224,7 @@ struct SessionRowView: View {
     /// The one-line form: creature, project and headline, then the chips that tell rows apart.
     private var line: some View {
         HStack(spacing: 10) {
-            MascotView(source: session.source, size: 18)
+            MascotView(source: session.source, size: 18, mood: CreatureMood.of(session, now: now), seed: session.key.description)
                 .travels("creature/" + session.key.description, in: islandSpace)
                 .frame(width: 30)
             HStack(spacing: 6) {
@@ -249,12 +250,13 @@ struct SessionRowView: View {
 
     private var activityLine: some View {
         HStack(spacing: 5) {
-            Circle().fill(Theme.color(for: session.phase, accent: look.accent)).frame(width: 6, height: 6)
+            PulseDot(color: Theme.color(for: session.phase, accent: look.accent), pulsing: session.phase != .waiting)
                 .animation(Motion.smooth(look.motion), value: session.phase)
             Text(session.activity.localizedVerb)
                 .font(look.body(12, .medium))
                 .foregroundStyle(Theme.color(for: session.phase, accent: look.accent))
                 .fixedSize()
+                .shimmer(session.phase == .working)
             if let detail = session.activity.detail, !detail.isEmpty {
                 Text(detail)
                     .font(look.mono(11.5, .regular))

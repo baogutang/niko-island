@@ -119,9 +119,11 @@ public enum NikoCLI {
             options.agentIDs = ids
         } else if all, action == .install {
             options.agentIDs = AgentRegistry.installable.map(\.id)
+            options.detectedOnly = true
         } else if recommended, action == .install {
             // Everything the app would offer on first launch; agents that are not installed are skipped by the scan.
             options.agentIDs = AgentRegistry.recommendedIDs
+            options.detectedOnly = true
         }
         if rejectLeftovers(args) { return 64 }
         if options.purge, action == .install {
@@ -406,6 +408,13 @@ public enum NikoCLI {
                 case .denied: print("sign-in: macOS said no")
                 }
             }
+            if which == "cursor" {
+                switch CursorLogin.read(home: home) {
+                case .found(let login):
+                    print("sign-in: found, expires in \(login.expiresAt.map { String(Int($0.timeIntervalSinceNow / 3600)) + " h" } ?? "?")")
+                case .missing: print("sign-in: none from Cursor's app on this Mac")
+                }
+            }
             let done = DispatchSemaphore(value: 0)
             let region = GLMQuotaAPI.regionZCodeUses(home: home) ?? .bigmodel
             Task.detached {
@@ -414,7 +423,7 @@ public enum NikoCLI {
                 await client.configure(.init(claude: which == "claude", glm: which == "glm", glmRegion: region, codex: which == "codex",
                                              kimi: which == "kimi", minimax: which == "minimax",
                                              minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
-                                             gemini: which == "gemini", copilot: which == "copilot"))
+                                             gemini: which == "gemini", copilot: which == "copilot", cursor: which == "cursor"))
                 await client.refresh(force: true)
                 for (provider, result) in await client.current() {
                     print("\(provider): \(result.state) plan=\(result.limits?.plan ?? "-") resetsLeft=\(result.limits?.resetsLeft.map(String.init) ?? "-")")
@@ -514,6 +523,14 @@ public enum NikoCLI {
             }
             return MainActor.assumeIsolated {
                 IconRenderer.writeIconset(to: URL(fileURLWithPath: directory)) ? 0 : 1
+            }
+        case "render-creatures":
+            guard let file = args.positional() else {
+                fail("usage: niko-island internal render-creatures <sheet.png>")
+                return 64
+            }
+            return MainActor.assumeIsolated {
+                PreviewRenderer.renderCreatureSheet(to: URL(fileURLWithPath: file)) ? 0 : 1
             }
         case "render-preview":
             guard let directory = args.positional() else {

@@ -396,10 +396,12 @@ public actor ProviderLimitsClient {
         public var minimaxRegion = MiniMaxQuotaAPI.Region.cn
         public var gemini = false
         public var copilot = false
+        public var cursor = false
 
         public init(claude: Bool = false, glm: Bool = false, glmRegion: GLMQuotaAPI.Region = .bigmodel, codex: Bool = false,
                     kimi: Bool = false, minimax: Bool = false, minimaxRegion: MiniMaxQuotaAPI.Region = .cn, gemini: Bool = false,
-                    copilot: Bool = false) {
+                    copilot: Bool = false, cursor: Bool = false) {
+            self.cursor = cursor
             self.claude = claude
             self.glm = glm
             self.glmRegion = glmRegion
@@ -420,6 +422,7 @@ public actor ProviderLimitsClient {
             case ProviderLimitsClient.minimax: return minimax
             case ProviderLimitsClient.gemini: return gemini
             case ProviderLimitsClient.copilot: return copilot
+            case ProviderLimitsClient.cursor: return cursor
             default: return false
             }
         }
@@ -464,6 +467,7 @@ public actor ProviderLimitsClient {
         public var minimaxKey: @Sendable () -> String?
         public var geminiLogin: @Sendable () -> GeminiLogin.Outcome
         public var githubLogin: @Sendable () -> GitHubLogin.Outcome
+        public var cursorLogin: @Sendable () -> CursorLogin.Outcome = { .missing }
 
         public init(claudeLogin: @escaping @Sendable () -> ClaudeCodeLogin.Outcome, glmKey: @escaping @Sendable () -> String?,
                     codexLogin: @escaping @Sendable () -> CodexLogin.Outcome = { .missing },
@@ -480,12 +484,14 @@ public actor ProviderLimitsClient {
         }
 
         public static func system(home: URL) -> Secrets {
-            Secrets(claudeLogin: { ClaudeCodeLogin.read(home: home) }, glmKey: { ProviderKeychain.read(ProviderLimitsClient.glmAccount) },
+            var secrets = Secrets(claudeLogin: { ClaudeCodeLogin.read(home: home) }, glmKey: { ProviderKeychain.read(ProviderLimitsClient.glmAccount) },
                     codexLogin: { CodexLogin.read(home: home) },
                     kimiKey: { ProviderKeychain.read(ProviderLimitsClient.kimiAccount) },
                     minimaxKey: { ProviderKeychain.read(ProviderLimitsClient.minimaxAccount) },
                     geminiLogin: { GeminiLogin.read(home: home) },
                     githubLogin: { GitHubLogin.read(home: home) })
+            secrets.cursorLogin = { CursorLogin.read(home: home) }
+            return secrets
         }
     }
 
@@ -503,13 +509,31 @@ public actor ProviderLimitsClient {
     public static let minimaxAccount = "minimax-coding-plan"
     public static let gemini = "gemini"
     public static let copilot = "copilot"
-    public static let providers = [claude, glm, codex, kimi, minimax, gemini, copilot]
+    public static let cursor = "cursor"
+    public static let providers = [claude, glm, codex, kimi, minimax, gemini, copilot, cursor]
     /// The only hosts a request may go to.
     public static let hosts: Set<String> = ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
-                                            "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host, "api.github.com"]
+                                            "api.minimaxi.com", "api.minimax.io", GeminiQuotaAPI.host, "api.github.com",
+                                            CursorQuotaAPI.host]
 
-    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300, copilot: 600]
+    static let interval: [String: TimeInterval] = [claude: 300, glm: 180, codex: 300, kimi: 180, minimax: 180, gemini: 300, copilot: 600, cursor: 600]
     static let forcedInterval: TimeInterval = 30
+    /// A provider that has answered once is asked again only while its agent is in use:
+    /// heard from in this long. Nobody's numbers change while nobody works.
+    public static let activeWindow: TimeInterval = 2 * 3600
+
+    /// The agents whose work spends a provider's plan; nil for plans any agent may
+    /// spend (GLM, Kimi and MiniMax plans also run Claude Code and others).
+    static func agents(of provider: String) -> Set<String>? {
+        switch provider {
+        case claude: return [claude]
+        case codex: return [codex]
+        case gemini: return [gemini]
+        case copilot: return [copilot]
+        case cursor: return [cursor]
+        default: return nil
+        }
+    }
 
     private let cacheFile: URL
     private let transport: Transport
@@ -524,6 +548,23 @@ public actor ProviderLimitsClient {
     private var loop: Task<Void, Never>?
     /// Providers being asked right now: a second caller does not ask again.
     private var asking: Set<String> = []
+    /// When each agent was last heard from; nil until the app first says.
+    private var heard: [String: Date]?
+
+    /// The app's word on who has been at work lately.
+    public func noteActivity(_ latest: [String: Date]) {
+        var merged = heard ?? [:]
+        for (agent, date) in latest where merged[agent].map({ $0 < date }) ?? true { merged[agent] = date }
+        heard = merged
+    }
+
+    /// Whether a provider's agent has worked lately (always, until the app has said anything).
+    func inUse(_ provider: String, now: Date) -> Bool {
+        guard let heard else { return true }
+        let recent = heard.filter { now.timeIntervalSince($0.value) < Self.activeWindow }.keys
+        guard let agents = Self.agents(of: provider) else { return !recent.isEmpty }
+        return recent.contains(where: agents.contains)
+    }
 
     public init(paths: NikoPaths, secrets: Secrets, transport: Transport? = nil, clock: @escaping @Sendable () -> Date = { Date() },
                 onChange: @escaping @Sendable ([String: Result]) -> Void) {
@@ -572,6 +613,8 @@ public actor ProviderLimitsClient {
             guard config.asks(provider) else { continue }
             let wait = force ? Self.forcedInterval : (Self.interval[provider] ?? 300)
             if let last = results[provider]?.checkedAt, now.timeIntervalSince(last) < wait { continue }
+            // Once there is an answer, only an agent at work makes it worth asking again.
+            if !force, results[provider] != nil, !inUse(provider, now: now) { continue }
             // A "no" at the Keychain stands until the user asks again.
             if !force, results[provider]?.state == .denied { continue }
             guard asking.insert(provider).inserted else { continue }
@@ -583,6 +626,7 @@ public actor ProviderLimitsClient {
             case Self.minimax: result = await askMiniMax(now: now)
             case Self.gemini: result = await askGemini(now: now)
             case Self.copilot: result = await askCopilot(now: now)
+            case Self.cursor: result = await askCursor(now: now)
             default: result = await askCodex(now: now)
             }
             asking.remove(provider)
@@ -725,6 +769,19 @@ public actor ProviderLimitsClient {
         var (state, limits) = await ask(CopilotQuotaAPI.request(token: token)) { CopilotQuotaAPI.parse($0, now: now) }
         if state == .unauthorized {
             refused[Self.copilot] = token
+            state = .loginExpired
+        }
+        return Result(limits: limits, state: state, checkedAt: now)
+    }
+
+    private func askCursor(now: Date) async -> Result {
+        guard case .found(let login) = secrets.cursorLogin() else { return Result(state: .noLogin, checkedAt: now) }
+        if let expiry = login.expiresAt, expiry <= now { return Result(state: .loginExpired, checkedAt: now) }
+        // A sign-in Cursor turned down is not offered again until Cursor replaces it.
+        if refused[Self.cursor] == login.token { return Result(state: .loginExpired, checkedAt: now) }
+        var (state, limits) = await ask(CursorQuotaAPI.request(login: login)) { CursorQuotaAPI.parse($0, now: now) }
+        if state == .unauthorized {
+            refused[Self.cursor] = login.token
             state = .loginExpired
         }
         return Result(limits: limits, state: state, checkedAt: now)

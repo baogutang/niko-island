@@ -158,10 +158,10 @@ public enum BridgeRunner {
         var invocation = invocation
         let chain = ancestry()
         let context = terminalContext(environment: configuration.environment, chain: chain)
-        // Devin and Copilot CLI also run the hooks in Claude Code's settings. An
-        // event that comes in as Claude Code's from inside one of them is theirs;
+        // Devin, Copilot CLI and Cursor also run the hooks in Claude Code's settings.
+        // An event that comes in as Claude Code's from inside one of them is theirs;
         // when their own hooks of ours are in place it is a copy, and goes.
-        if invocation.source == "claude", let borrower = BorrowedHooks.borrower(in: chain) {
+        if invocation.source == "claude", let borrower = BorrowedHooks.borrower(in: chain, payload: object) {
             if BorrowedHooks.ownHooksInstalled(borrower, home: configuration.environment["HOME"] ?? NikoPaths.userHome().path) {
                 return .silentSuccess
             }
@@ -487,7 +487,10 @@ public enum BridgeRunner {
 }
 
 /// Agents that run the hooks in Claude Code's settings as well as their own:
-/// Devin does by default, and Copilot CLI reads them too.
+/// Devin does by default, Copilot CLI reads them too, and so does Cursor
+/// ("third-party hooks", on unless switched off). An event that reaches us as
+/// Claude Code's from one of them would otherwise put a Claude Code session on
+/// the island of someone who never installed Claude Code.
 public enum BorrowedHooks {
     public struct Ancestor: Sendable, Equatable {
         public var pid: pid_t
@@ -505,40 +508,84 @@ public enum BorrowedHooks {
         var names: Set<String>
         /// For one run by a script host (node, bun): what its script path contains.
         var scriptHints: [String]
-        /// The file of ours that means its own hooks are in place.
-        var ownHooks: String
+        /// The files of ours that mean its own hooks are in place.
+        var ownHooks: [String]
         var reply: BridgeInvocation.ReplyMode
         var observeOnly: Bool
     }
 
+    /// The ones whose way of answering is known.
     static let borrowers: [Borrower] = [
-        Borrower(agent: "devin", names: ["devin"], scriptHints: [], ownHooks: ".config/devin/config.json",
+        Borrower(agent: "devin", names: ["devin"], scriptHints: [], ownHooks: [".config/devin/config.json"],
                  reply: .devin, observeOnly: false),
-        Borrower(agent: "copilot", names: ["copilot"], scriptHints: ["@github/copilot"], ownHooks: ".copilot/hooks/niko.json",
+        Borrower(agent: "copilot", names: ["copilot"], scriptHints: ["@github/copilot"], ownHooks: [".copilot/hooks/niko.json"],
                  reply: .json, observeOnly: true),
     ]
     static let scriptHosts: Set<String> = ["node", "bun", "deno"]
-    static let claudeHints = ["@anthropic-ai/claude-code"]
+    static let claudeHints = ["@anthropic-ai/claude-code", "@anthropic-ai/claude-agent-sdk"]
 
-    /// The agent that ran the hook, looking up from the bridge until Claude Code itself turns up.
-    static func borrower(in chain: [Ancestor], arguments: (pid_t) -> [String] = ProcessInspector.arguments(of:)) -> Borrower? {
+    /// Any other agent we know: it is told apart and only watched, never answered for.
+    static func borrower(for agent: AgentDescriptor) -> Borrower {
+        if let known = borrowers.first(where: { $0.agent == agent.id }) { return known }
+        return Borrower(agent: agent.id, names: Set(agent.processes + [agent.binary].compactMap { $0 }), scriptHints: [],
+                        ownHooks: agent.activeFiles, reply: .json, observeOnly: true)
+    }
+
+    /// Claude Code itself: the `claude` command, the desktop app's copy (also named `claude`),
+    /// or the native installer's binary, which is named after its version
+    /// (`~/.local/share/claude/versions/2.1.3`).
+    static func isClaudeCode(_ path: String) -> Bool {
+        (path as NSString).lastPathComponent == "claude" || path.contains("/claude/versions/")
+    }
+
+    /// The outermost app bundle a path lies in (`/Applications/Cursor.app` for one of its helpers).
+    static func appBundle(of path: String) -> String? {
+        guard let range = path.range(of: ".app/") else { return nil }
+        return String(path[..<range.lowerBound]) + ".app"
+    }
+
+    static func bundleIdentifier(at appPath: String) -> String? {
+        Bundle(path: appPath)?.bundleIdentifier
+    }
+
+    /// The agent that ran a Claude-format hook, looking up from the bridge until
+    /// Claude Code itself turns up. The payload can say it outright: Cursor's carries
+    /// `cursor_version`. The first app bundle up the chain ends the search: an agent
+    /// app is the agent, any other app (a terminal) is where Claude Code was started.
+    static func borrower(in chain: [Ancestor], payload: JSONObject? = nil,
+                         arguments: (pid_t) -> [String] = ProcessInspector.arguments(of:),
+                         bundleID: (String) -> String? = bundleIdentifier(at:)) -> Borrower? {
+        if let payload, payload["cursor_version"] != nil || (payload["conversation_id"] != nil && payload["generation_id"] != nil),
+           let cursor = AgentRegistry.descriptor("cursor") {
+            return borrower(for: cursor)
+        }
+        let others = AgentRegistry.all.filter { $0.id != "claude" && $0.stability != .planned }
         for ancestor in chain {
+            if isClaudeCode(ancestor.path) { return nil }
             let name = ancestor.name
-            if name == "claude" { return nil }
             if let found = borrowers.first(where: { $0.names.contains(name) }) { return found }
-            guard scriptHosts.contains(name) else { continue }
-            let script = arguments(ancestor.pid).dropFirst().prefix(3).joined(separator: " ")
-            if claudeHints.contains(where: script.contains) { return nil }
-            if let found = borrowers.first(where: { $0.scriptHints.contains(where: script.contains) }) { return found }
+            if scriptHosts.contains(name) {
+                let script = arguments(ancestor.pid).dropFirst().prefix(3).joined(separator: " ")
+                if claudeHints.contains(where: script.contains) { return nil }
+                if let found = borrowers.first(where: { $0.scriptHints.contains(where: script.contains) }) { return found }
+                continue
+            }
+            if let agent = others.first(where: { $0.processes.contains(name) }) { return borrower(for: agent) }
+            if let app = appBundle(of: ancestor.path) {
+                guard let id = bundleID(app), let agent = AgentRegistry.agent(forApp: id), agent.id != "claude" else { return nil }
+                return borrower(for: agent)
+            }
         }
         return nil
     }
 
     static func ownHooksInstalled(_ borrower: Borrower, home: String) -> Bool {
-        guard let data = FileManager.default.contents(atPath: home + "/" + borrower.ownHooks), data.count <= ScanProbe.sizeCap else {
-            return false
+        borrower.ownHooks.contains { file in
+            guard let data = FileManager.default.contents(atPath: home + "/" + file), data.count <= ScanProbe.sizeCap else {
+                return false
+            }
+            return HookMerge.isOurs(command: String(decoding: data, as: UTF8.self))
         }
-        return HookMerge.isOurs(command: String(decoding: data, as: UTF8.self))
     }
 }
 

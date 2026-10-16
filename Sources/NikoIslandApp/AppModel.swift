@@ -104,7 +104,9 @@ public final class AppModel: ObservableObject {
     /// closed island, up (negative) on the open one's top band. Drawn with rubber-band resistance.
     @Published public var pull: CGFloat = 0
     @Published public private(set) var expandReason: ExpandReason = .click
-    @Published public var route: Route = .sessions
+    @Published public var route: Route = .sessions {
+        didSet { if route == .usage { refreshActivity(force: true) } }
+    }
     @Published public private(set) var toast: Toast?
     /// The card for a turn that has just finished; nil most of the time.
     @Published public private(set) var completion: Completion?
@@ -148,6 +150,10 @@ public final class AppModel: ObservableObject {
     @Published public internal(set) var usage = UsageSnapshot() {
         didSet { noteRateLimits(previous: oldValue) }
     }
+    /// Sessions, prompts and tool calls per agent and day, from the hook events.
+    @Published public internal(set) var activity = ActivitySnapshot()
+    var activityLedger: ActivityLedger?
+    var activityReadAt = Date.distantPast
     @Published public internal(set) var maintenance = MaintenanceState()
 
     /// The island wants to be shown (a request arrived).
@@ -388,6 +394,14 @@ public final class AppModel: ObservableObject {
         restoreRemovedHooks()
         askClaudeCode()
         noteLimitResets()
+        refreshActivity()
+        if let client = limitsClient {
+            var latest = lastHeard
+            for session in sessions where latest[session.source].map({ $0 < session.lastEventAt }) ?? true {
+                latest[session.source] = session.lastEventAt
+            }
+            Task { await client.noteActivity(latest) }
+        }
         let apps = Set(NSWorkspace.shared.runningApplications.compactMap(\.bundleIdentifier))
         Task.detached(priority: .utility) {
             let running = AgentPresence.running(apps: apps, processes: AgentPresence.runningProcessNames())
@@ -515,6 +529,8 @@ public final class AppModel: ObservableObject {
         toastTask?.cancel()
         usageEngine?.stop()
         usageEngine = nil
+        activityLedger?.flush()
+        activityLedger = nil
         if let client = limitsClient {
             limitsClient = nil
             Task { await client.configure(ProviderLimitsClient.Config()) }
@@ -633,6 +649,7 @@ public final class AppModel: ObservableObject {
 
         // A hidden session goes on being followed, but nothing is said about it.
         guard !silenced else { return }
+        activityLedger?.record(event)
         // Some agents hand over their closing words with the event itself.
         let carried = (event.raw["last_assistant_message"] ?? event.raw["lastAssistantMessage"])?.stringValue
         react(to: change, replyIsIn: carried.map { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } ?? false)

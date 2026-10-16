@@ -271,8 +271,11 @@ final class DocsTests: XCTestCase {
         XCTAssertFalse(NikoSettings().glmLimitsLookup)
         XCTAssertFalse(NikoSettings().codexLimitsLookup)
         XCTAssertEqual(ProviderLimitsClient.hosts, ["api.anthropic.com", "open.bigmodel.cn", "api.z.ai", "chatgpt.com", "api.kimi.com",
-                                                    "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com", "api.github.com"])
+                                                    "api.minimaxi.com", "api.minimax.io", "cloudcode-pa.googleapis.com", "api.github.com",
+                                                    "cursor.com"])
         XCTAssertFalse(NikoSettings().kimiLimitsLookup || NikoSettings().minimaxLimitsLookup || NikoSettings().geminiLimitsLookup)
+        XCTAssertFalse(NikoSettings().cursorLimitsLookup || NikoSettings().copilotLimitsLookup)
+        XCTAssertEqual(CursorQuotaAPI.request(login: .init(token: "t", userID: "u")).value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"), true)
         XCTAssertFalse(NikoSettings().updateChecks, "the pages say the version check is off until switched on")
         XCTAssertEqual(UpdateCheck.latest.host, "api.github.com")
         XCTAssertEqual(CodexUsageAPI.request(CodexUsageAPI.usage, login: .init(token: "t")).value(forHTTPHeaderField: "User-Agent")?.hasPrefix("niko-island/"),

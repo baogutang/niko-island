@@ -71,18 +71,27 @@ public struct UsageSnapshot: Sendable, Equatable {
         public var tokens = 0
         public var cost = 0.0
         public var messages = 0
+        /// The part of `tokens` that was context read back from the cache.
+        public var cacheRead = 0
 
-        public init(tokens: Int = 0, cost: Double = 0, messages: Int = 0) {
+        public init(tokens: Int = 0, cost: Double = 0, messages: Int = 0, cacheRead: Int = 0) {
             self.tokens = tokens
             self.cost = cost
             self.messages = messages
+            self.cacheRead = cacheRead
         }
 
         public init(_ rows: [UsageTotals]) {
             tokens = rows.reduce(0) { $0 + $1.tokens }
             cost = rows.reduce(0) { $0 + $1.cost }
             messages = rows.reduce(0) { $0 + $1.messages }
+            cacheRead = rows.reduce(0) { $0 + $1.cacheRead }
         }
+
+        /// What was written into the model and what came out: new input, cache writes and
+        /// output. Cache reads are the same context read again every turn; counted in, they
+        /// make a day look ten times bigger than it was.
+        public var billable: Int { max(0, tokens - cacheRead) }
     }
 
     /// One agent's usage: the rolling five hours, today, the last seven and

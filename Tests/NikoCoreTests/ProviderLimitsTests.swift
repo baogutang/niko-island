@@ -338,6 +338,38 @@ final class ProviderLimitsTests: XCTestCase {
         XCTAssertEqual(wire.requests.count, 2)
     }
 
+    /// Once a provider has answered, it is asked again only while its agent is at work.
+    func testAnAnsweredProviderWaitsForItsAgentToWork() async throws {
+        let scratch = Scratch()
+        let paths = NikoPaths(root: scratch.file("ni"))
+        try FileManager.default.createDirectory(at: paths.cache, withIntermediateDirectories: true)
+        let wire = Wire(), clock = Clock(now)
+        let fresh = ClaudeCodeLogin.Login(token: "t", expiresAt: now.addingTimeInterval(86_400), plan: "pro")
+        let asker = client(paths: paths, wire: wire, clock: clock, login: .found(fresh))
+        await asker.noteActivity(["codex": now])
+        wire.queue(claudeAnswer)
+        await asker.configure(.init(claude: true))
+        await asker.refresh(force: true)
+        await settle(asker, "claude")
+        XCTAssertEqual(wire.requests.count, 1, "with no answer yet it asks, whoever is at work")
+
+        clock.advance(600)
+        await asker.refresh()
+        XCTAssertEqual(wire.requests.count, 1, "Claude Code has not been heard from: its numbers cannot have moved")
+        await asker.refresh(force: true)
+        XCTAssertEqual(wire.requests.count, 2, "Check now always asks")
+
+        wire.queue(claudeAnswer)
+        clock.advance(600)
+        await asker.noteActivity(["claude": clock.now])
+        await asker.refresh()
+        XCTAssertEqual(wire.requests.count, 3)
+        // Two hours later without a word from it, it stops again.
+        clock.advance(ProviderLimitsClient.activeWindow + 1)
+        await asker.refresh()
+        XCTAssertEqual(wire.requests.count, 3)
+    }
+
     func testASignInPastItsDateIsOfferedOnceAndNeverRenewed() async throws {
         let scratch = Scratch()
         let paths = NikoPaths(root: scratch.file("ni"))
@@ -640,6 +672,54 @@ final class ProviderLimitsTests: XCTestCase {
     }
 
     /// SPEC §5: the network is the price list and, when switched on, the providers and the update check. Nothing else.
+    func testCursorsSpendingPageIsRead() throws {
+        let answer = #"""
+        {"billingCycleStart":"2026-08-18T08:09:13.000Z","billingCycleEnd":"2026-09-18T08:09:13.000Z","membershipType":"pro",
+         "limitType":"user","isUnlimited":false,
+         "individualUsage":{"plan":{"enabled":true,"used":1516,"limit":2000,"remaining":484,
+           "breakdown":{"included":1516,"bonus":0,"total":1516},"autoPercentUsed":3.3,"apiPercentUsed":0.71,"totalPercentUsed":3.06},
+           "onDemand":{"enabled":true,"used":500,"limit":2000,"remaining":1500}},"teamUsage":{}}
+        """#
+        let limits = try XCTUnwrap(CursorQuotaAPI.parse(Data(answer.utf8), now: now))
+        XCTAssertEqual(limits.plan, "pro")
+        XCTAssertEqual(limits.windows.map(\.id), ["cursor_total", "cursor_auto", "cursor_api", "cursor_on_demand"])
+        XCTAssertEqual(limits.windows.map { Int($0.usedPercent.rounded()) }, [3, 3, 1, 25])
+        XCTAssertEqual(limits.windows.first?.windowMinutes, 44_640)
+        XCTAssertEqual(limits.windows.first?.resetsAt, ISOTime.flexible(.string("2026-09-18T08:09:13.000Z")).map(Date.init(timeIntervalSince1970:)))
+        XCTAssertNil(CursorQuotaAPI.parse(Data(#"{"isUnlimited":true}"#.utf8)), "an unlimited plan has nothing to show")
+        // No percentages: the dollars used of the limit say it.
+        let plain = try XCTUnwrap(CursorQuotaAPI.parse(Data(#"{"individualUsage":{"plan":{"enabled":true,"used":500,"limit":2000}}}"#.utf8)))
+        XCTAssertEqual(plain.windows.first?.usedPercent, 25)
+    }
+
+    func testCursorsSignInIsReadFromItsOwnDatabase() throws {
+        func token(_ claims: String) -> String {
+            let body = Data(claims.utf8).base64EncodedString().replacingOccurrences(of: "=", with: "")
+                .replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            return "eyJhbGciOiJIUzI1NiJ9.\(body).c2ln"
+        }
+        let login = try XCTUnwrap(CursorLogin.login(token: token(#"{"sub":"auth0|user_01ABC","exp":4102444800}"#)))
+        XCTAssertEqual(login.userID, "user_01ABC")
+        XCTAssertEqual(login.expiresAt, Date(timeIntervalSince1970: 4_102_444_800))
+        XCTAssertEqual(CursorQuotaAPI.request(login: login).value(forHTTPHeaderField: "Cookie"),
+                       "WorkosCursorSessionToken=user_01ABC%3A%3A" + login.token)
+        XCTAssertNil(CursorLogin.login(token: "not-a-token"))
+        XCTAssertNil(CursorLogin.login(token: token(#"{"sub":"auth0|user;evil=1"}"#)), "only a plain id goes into the cookie")
+
+        let scratch = Scratch()
+        let home = scratch.file("home")
+        let path = CursorLogin.databasePath(home: home)
+        try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        XCTAssertEqual(CursorLogin.read(home: home), .missing)
+        let db = try SQLiteDB(path: path)
+        try db.execute("CREATE TABLE ItemTable (key TEXT UNIQUE ON CONFLICT REPLACE, value BLOB)")
+        try db.run("INSERT INTO ItemTable VALUES ('cursorAuth/accessToken', ?)", [.text(token(#"{"sub":"github|user_9"}"#))])
+        db.close()
+        guard case .found(let found) = CursorLogin.read(home: home) else { return XCTFail("the sign-in is found") }
+        XCTAssertEqual(found.userID, "user_9")
+        XCTAssertTrue(ProviderLimitsClient.hosts.contains("cursor.com"))
+    }
+
     func testOnlyFourFilesCanReachTheNetwork() throws {
         let sources = repositoryRoot.appendingPathComponent("Sources")
         var offenders: [String] = []

@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.14.0] - 2026-10-16
+
+### Fixed
+- **Claude Code on a Mac without it.** Cursor runs the hooks in `~/.claude/settings.json` by default ("third-party hooks"), so on a Mac where Claude Code had been connected but is not installed, Cursor's sessions appeared as Claude Code's. The bridge now tells who ran a Claude-format hook: the payload (`cursor_version`), the app bundle up the process chain, or a known agent's command; such an event is shown as that agent's, and dropped as a copy when that agent's own hooks of ours are in place. Claude Code itself is recognised however it was installed, including the native installer's binary that is named after its version.
+- **A `~/.claude` folder is not Claude Code.** Skill installers and Cursor create one. Claude Code now counts as installed only with its command, `~/.claude.json`, its transcripts, its native install or the desktop app; connected agents that are not installed stay listed with a note so their hooks can be removed. `install --recommended` and `--all` skip them.
+- The native Claude Code CLI counts as running (its process is named after its version).
+
+### Added
+- **Creatures with moods, drawn in vector.** Ten species redrawn with shading and faces, each with its own movement at work (the whale spouts, the jellyfish pulses, the crab snaps, the gull flaps, the puffer puffs up, the boat rocks on the swell). Moods follow the session: at work, asking for you (a hop and a "!"), pleased just after a turn (^ ^ and sparkles), waiting (looking up, a speech bubble), asleep after half an hour (z), failed (× eyes, a drop of sweat). Each creature blinks on its own clock. The Pixel style keeps the pixel sprites; the welcome's swimmers, the docs and the site use the new ones.
+- **A glow around the closed island**: amber and breathing while someone waits on you, the accent while agents work, a flash when a turn ends; and a light running along its lower edge while agents work. Settings → Island can turn it off.
+- **Motion in the list**: rows arrive one after another when the island opens, the status dot of a working or waiting row sends out a ring, and the verb of a working row shimmers.
+- **Every agent's activity, half a year of it.** Counted from the hooks of every connected agent (sessions, prompts, tool calls and which tools), into `~/.niko-island/data/usage/activity.sqlite`; counts and tool names only. The usage view shows 26 weeks as a heatmap, the last week's totals, a streak, the busiest agents and the most used tools. Agents without a token log (Cursor, Gemini CLI, Kiro…) get a usage tab of their own.
+- **Cursor's plan** (off until switched on): the included usage of the billing cycle, Auto and the named models apart, and on-demand spending, asked of `cursor.com` with the sign-in Cursor's app keeps (read-only from its settings database).
+
+### Changed
+- Provider lookups that have answered once are asked again only while their agent has been heard from in the last two hours (GLM, Kimi and MiniMax: any agent). "Check now" always asks.
+- Token counts on the usage tiles and per model no longer include cache reads; they are shown apart ("+ 33.9M read from cache").
+- The limits line at the top follows the agent picked in the usage view.
+
+### Verification
+- See the release log for the test count and the live checks.
+
 ## [0.13.0] - 2026-10-16
 
 ### Added

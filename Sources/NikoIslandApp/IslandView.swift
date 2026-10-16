@@ -45,6 +45,8 @@ struct IslandBody: View {
         // so the island is out of the way the moment it is not wanted.
         let spring = model.isExpanded || showsCard ? Motion.open(look.motion) : Motion.close(look.motion)
         let lifted = model.isExpanded || showsCard
+        let tone = IslandGlance(model: model).tone
+        let closed = !model.isExpanded && !showsCard && model.settings.islandGlow
         return VStack(spacing: 0) {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
@@ -71,8 +73,17 @@ struct IslandBody: View {
                              lineWidth: 1.5)
             }
         }
+        .overlay(alignment: .bottom) {
+            if closed, tone == .working, !isStaticPreview { ActivitySheen(color: look.accent) }
+        }
         .clipShape(shape)
         .contentShape(shape)
+        .background {
+            if closed, let glow = Self.glow(tone, accent: look.accent) {
+                IslandGlow(shape: shape, color: glow.color, breathing: glow.breathing, strength: glow.strength)
+                    .id(tone)
+            }
+        }
         // Pushed up while open, it gives a little, as if pressed back into the edge.
         .scaleEffect(x: 1, y: model.isExpanded ? 1 - Rubber.band(max(0, -model.pull), limit: 40) / 520 : 1, anchor: .top)
         // Two shadows, as light has: a soft ambient one far out and a firmer one close in.
@@ -87,6 +98,20 @@ struct IslandBody: View {
         .animation(isStaticPreview ? nil : Motion.land(look.motion), value: model.completion)
         .animation(isStaticPreview ? nil : Motion.land(look.motion), value: model.recap)
         .animation(isStaticPreview ? nil : spring, value: model.badge)
+    }
+}
+
+extension IslandBody {
+    /// The colour beneath the closed island for what it is saying, if any.
+    static func glow(_ tone: IslandGlance.Tone, accent: Color) -> (color: Color, breathing: Bool, strength: Double)? {
+        switch tone {
+        case .attention: return (Theme.amber, true, 0.9)
+        case .working: return (accent, false, 0.3)
+        case .done: return (accent, false, 0.6)
+        case .failed: return (Theme.coral, false, 0.6)
+        case .warning: return (Theme.amber, false, 0.45)
+        case .idle, .waiting: return nil
+        }
     }
 }
 
@@ -148,6 +173,18 @@ struct IslandGlance: Equatable {
         }
     }
 
+    /// How the creature on the closed island feels.
+    var mood: CreatureMood {
+        switch tone {
+        case .idle: return .idle
+        case .working: return .working
+        case .waiting, .warning: return .waiting
+        case .attention: return .attention
+        case .done: return .happy
+        case .failed: return .failed
+        }
+    }
+
     func color(accent: Color) -> Color {
         switch tone {
         case .idle: return Theme.tertiary
@@ -204,10 +241,12 @@ struct CollapsedIsland: View {
     @ViewBuilder
     private func mascot(_ glance: IslandGlance) -> some View {
         if let source = glance.source {
-            MascotView(source: source, size: 17, animated: glance.tone == .working)
+            MascotView(source: source, size: 17, animated: glance.tone != .idle && glance.tone != .waiting,
+                       mood: glance.mood, seed: glance.key?.description)
                 .travels(glance.key.map { "creature/" + $0.description } ?? "creature/none", in: namespace)
         } else {
-            MascotView(sprite: Mascots.island, size: 17).opacity(0.75)
+            // Nothing is going on: it stays still, so a quiet island costs nothing.
+            MascotView(sprite: Mascots.island, size: 17, mood: .idle).opacity(0.8)
                 .travels("creature/island", in: namespace)
         }
     }
@@ -254,6 +293,8 @@ struct ExpandedIsland: View {
     private var glance: QuotaGlance? {
         guard model.settings.quotaGlance else { return nil }
         var order: [String] = []
+        // In the usage view, the agent being looked at comes first.
+        if model.route == .usage, model.usageAgent != "all" { order.append(model.usageAgent) }
         for source in model.sessions.map(\.source) where !order.contains(source) { order.append(source) }
         return QuotaGlance.make(usage: model.usage, recentAgents: order, now: isStaticPreview ? PreviewClock.now : Date())
     }
@@ -413,6 +454,7 @@ struct SessionsPane: View {
                     SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project,
                                    compact: !full.contains(session.key),
                                    hovered: isStaticPreview ? nil : $hovered, hoverSpace: isStaticPreview ? nil : hoverSpace)
+                        .cascade(rows.firstIndex { $0.key == session.key } ?? 0)
                         .transition(.row)
                 }
             }
@@ -429,10 +471,10 @@ struct SessionsPane: View {
         let names = running.map { AgentRegistry.displayName(for: $0) }
         return VStack(spacing: 9) {
             if running.isEmpty {
-                MascotView(sprite: Mascots.island, size: 44, animated: true)
+                MascotView(sprite: Mascots.island, size: 48, animated: true, mood: .idle)
             } else {
                 HStack(spacing: 10) {
-                    ForEach(running.prefix(6), id: \.self) { MascotView(source: $0, size: 34, animated: true) }
+                    ForEach(running.prefix(6), id: \.self) { MascotView(source: $0, size: 38, animated: true, mood: .idle) }
                 }
             }
             Text(running.isEmpty ? L("No agents running yet.") : L("All quiet."))

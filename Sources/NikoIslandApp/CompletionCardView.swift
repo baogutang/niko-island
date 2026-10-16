@@ -59,7 +59,7 @@ struct CompletionCard: View {
         VStack(alignment: .leading, spacing: 0) {
             // The band the menu bar occupies: on a notched display its middle is behind the camera.
             HStack(spacing: 7) {
-                MascotView(source: completion.source, size: 17)
+                MascotView(source: completion.source, size: 17, animated: true, mood: completion.failed ? .failed : .happy)
                 Text(completion.failed ? L("Stopped with an error") : L("Finished"))
                     .font(look.body(11.5, .semibold)).foregroundStyle(tone)
                 Image(systemName: completion.failed ? "exclamationmark" : "checkmark")
@@ -186,7 +186,7 @@ struct RecapCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack(spacing: 7) {
-                MascotView(sprite: Mascots.island, size: 17)
+                MascotView(sprite: Mascots.island, size: 17, mood: .happy)
                 Text(L("While you were away")).font(look.body(11.5, .semibold)).foregroundStyle(look.accent)
                 Text(L("%lld finished", recap.items.count)).font(look.body(11.5)).foregroundStyle(Theme.secondary)
                 Spacer(minLength: 0)
@@ -226,7 +226,7 @@ private struct RecapLine: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            MascotView(source: item.key.source, size: 18)
+            MascotView(source: item.key.source, size: 18, mood: item.failed ? .failed : .happy, seed: item.key.description)
             Text(item.project).font(look.body(12, .medium)).foregroundStyle(Theme.secondary).lineLimit(1).fixedSize()
             Text("·").font(look.body(12)).foregroundStyle(Theme.tertiary)
             Text(item.title).font(look.title(13.5, .medium)).foregroundStyle(Theme.primary).lineLimit(1).truncationMode(.tail)

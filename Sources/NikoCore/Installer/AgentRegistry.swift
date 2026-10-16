@@ -68,7 +68,8 @@ public struct AgentDescriptor: Sendable, Equatable {
 
     public var id: String
     public var displayName: String
-    /// HOME-relative directory whose existence means "this agent is installed".
+    /// HOME-relative directory the agent keeps its config in. Its existence means
+    /// "installed" unless `markers` says what else to look for.
     public var directory: String
     public var binary: String?
     public var mechanism: Mechanism
@@ -90,6 +91,11 @@ public struct AgentDescriptor: Sendable, Equatable {
     public var followUp: String?
     /// Files an earlier version of ours wrote for this agent and no longer uses.
     public var legacyFiles: [String] = []
+    /// HOME-relative paths of which at least one exists once the agent has really
+    /// run here, for an agent whose directory other tools create too (`~/.claude`
+    /// holds skills and settings that Cursor and skill installers read and write).
+    /// Its command on the PATH counts as well. Empty: the directory is enough.
+    public var markers: [String] = []
     /// Configs the agent shares with the user where an earlier version of ours
     /// put hook entries (Claude's shape) the agent never read. Only our entries
     /// are taken out of them; the files themselves stay.
@@ -296,7 +302,8 @@ public enum AgentRegistry {
         AgentDescriptor(id: "claude", displayName: "Claude Code", directory: ".claude", binary: "claude",
                         mechanism: .sharedSettings(file: ".claude/settings.json", events: claudeEvents, statusLine: true),
                         stability: .stable, symbol: "sparkle",
-                        apps: ["com.anthropic.claudefordesktop"], processes: ["claude"], approvals: true),
+                        apps: ["com.anthropic.claudefordesktop"], processes: ["claude"], approvals: true,
+                        markers: [".claude.json", ".claude/projects", ".local/share/claude/versions", ".claude/local/claude"]),
         with(shared("codex", "Codex", dir: ".codex", file: ".codex/hooks.json", events: codexEvents, stability: .beta,
                     symbol: "chevron.left.forwardslash.chevron.right", apps: ["com.openai.codex"])) {
             $0.bridgeArguments = ["--reply", "json-strict"]

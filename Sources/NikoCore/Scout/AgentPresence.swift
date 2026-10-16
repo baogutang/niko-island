@@ -19,9 +19,21 @@ public enum AgentPresence {
             let name = withUnsafeBytes(of: processes[index].kp_proc.p_comm) { raw -> String in
                 String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
             }
-            if !name.isEmpty { names.insert(name) }
+            guard !name.isEmpty else { continue }
+            names.insert(name)
+            // Claude Code's native installer names its binary after its version
+            // (`~/.local/share/claude/versions/2.1.3`): only its path says what it is.
+            if name.first?.isNumber == true, let path = ProcessInspector.path(of: processes[index].kp_proc.p_pid),
+               let alias = alias(forPath: path) {
+                names.insert(alias)
+            }
         }
         return names
+    }
+
+    /// The name a process goes by when its executable is not named after the agent.
+    static func alias(forPath path: String) -> String? {
+        path.contains("/claude/versions/") ? "claude" : nil
     }
 
     /// Ids of the agents that are running, in registry order.

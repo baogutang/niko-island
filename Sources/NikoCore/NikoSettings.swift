@@ -300,6 +300,13 @@ public struct NikoSettings: Sendable, Equatable {
     }
 
     /// The plan limits of the agent last used, along the top of the open island.
+    /// Colour seeps out from under the closed island: amber while someone waits on you,
+    /// the accent while agents work, and a light runs along its edge.
+    public var islandGlow: Bool {
+        get { bool("islandGlow", default: true) }
+        set { raw["islandGlow"] = .bool(newValue) }
+    }
+
     public var quotaGlance: Bool {
         get { bool("quotaGlance", default: true) }
         set { raw["quotaGlance"] = .bool(newValue) }
@@ -448,6 +455,7 @@ public struct NikoSettings: Sendable, Equatable {
         case "minimax": return minimaxLimitsLookup
         case "gemini": return geminiLimitsLookup
         case "copilot": return copilotLimitsLookup
+        case "cursor": return cursorLimitsLookup
         default: return false
         }
     }
@@ -471,6 +479,12 @@ public struct NikoSettings: Sendable, Equatable {
             return ["cn", "global"].contains(value) ? value : "cn"
         }
         set { raw["minimaxRegion"] = .string(newValue) }
+    }
+
+    /// Ask Cursor about the plan's included usage this cycle, with the sign-in Cursor's app keeps.
+    public var cursorLimitsLookup: Bool {
+        get { bool("cursorLimitsLookup", default: false) }
+        set { raw["cursorLimitsLookup"] = .bool(newValue) }
     }
 
     /// Ask GitHub about Copilot's monthly allowances, with the sign-in the GitHub CLI keeps.

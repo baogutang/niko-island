@@ -13,15 +13,18 @@ public struct MaintenanceState: Sendable, Equatable {
         public var approvals = false
         /// Something the user still has to do in the agent itself.
         public var followUp: String?
+        /// False for an agent whose hooks of ours are in place but which is not on this Mac.
+        public var installed = true
 
         public init(id: String, name: String, stability: AgentDescriptor.Stability, wired: Bool,
-                    approvals: Bool = false, followUp: String? = nil) {
+                    approvals: Bool = false, followUp: String? = nil, installed: Bool = true) {
             self.id = id
             self.name = name
             self.stability = stability
             self.wired = wired
             self.approvals = approvals
             self.followUp = followUp
+            self.installed = installed
         }
     }
 
@@ -54,13 +57,18 @@ extension AppModel {
     nonisolated static func scanRows(home: URL) -> [MaintenanceState.AgentRow] {
         let installer = Installer(options: InstallOptions(home: home))
         guard let report = try? installer.scan(.uninstall) else { return [] }
+        let apps = Set(AgentRegistry.installable.flatMap(\.apps).filter { NSWorkspace.shared.urlForApplication(withBundleIdentifier: $0) != nil })
         return AgentRegistry.installable.compactMap { agent in
             guard let scanned = report.agents[agent.id], scanned.directory == .present else { return nil }
             let wired = agent.activeFiles.contains { file in
                 scanned.files[file]?.data.map { HookMerge.isOurs(command: String(decoding: $0, as: UTF8.self)) } ?? false
             }
+            // A ~/.claude made by Cursor or a skill installer is not Claude Code. Rows of ours
+            // that are connected stay listed, so they can be taken out again.
+            let installed = report.isInstalled(agent, apps: apps)
+            guard wired || installed else { return nil }
             return MaintenanceState.AgentRow(id: agent.id, name: agent.displayName, stability: agent.stability, wired: wired,
-                                             approvals: agent.approvals, followUp: agent.followUp)
+                                             approvals: agent.approvals, followUp: agent.followUp, installed: installed)
         }
     }
 
@@ -213,8 +221,24 @@ extension AppModel {
         }
         usageEngine = engine
         engine.start()
+        activityLedger = ActivityLedger(path: ActivityLedger.defaultPath(paths: paths))
+        refreshActivity(force: true)
         refreshPricingIfDue()
         reconcileProviderLimits()
+    }
+
+    /// Reads the activity record again: every minute, or at once when the usage view opens.
+    func refreshActivity(force: Bool = false, now: Date = Date()) {
+        guard let ledger = activityLedger, force || now.timeIntervalSince(activityReadAt) >= 60 else { return }
+        activityReadAt = now
+        ledger.snapshot { [weak self] snapshot in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self, self.activity != snapshot else { return }
+                    self.activity = snapshot
+                }
+            }
+        }
     }
 
     // MARK: Limits the providers keep (opt-in)
@@ -225,7 +249,8 @@ extension AppModel {
                                            codex: settings.codexLimitsLookup, kimi: settings.kimiLimitsLookup,
                                            minimax: settings.minimaxLimitsLookup,
                                            minimaxRegion: MiniMaxQuotaAPI.Region(rawValue: settings.minimaxRegion) ?? .cn,
-                                           gemini: settings.geminiLimitsLookup, copilot: settings.copilotLimitsLookup)
+                                           gemini: settings.geminiLimitsLookup, copilot: settings.copilotLimitsLookup,
+                                           cursor: settings.cursorLimitsLookup)
     }
 
     /// Starts, stops or re-aims the lookups after a setting changed. Nothing is

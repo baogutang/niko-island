@@ -54,6 +54,8 @@ public struct UsageTotals: Sendable, Equatable {
     public var messages = 0
 
     public var tokens: Int { input + output + cacheRead + cacheWrite }
+    /// Without the cache reads (see `UsageSnapshot.Window.billable`).
+    public var billable: Int { input + output + cacheWrite }
 }
 
 /// SQLite (WAL) storage for usage, schema per PROTOCOLS §6.1.

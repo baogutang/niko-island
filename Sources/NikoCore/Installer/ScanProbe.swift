@@ -50,6 +50,9 @@ public enum ScanProbe {
         }
         lines += [
             "}",
+            "ni_mark() {",
+            "    if [ -e \"$HOME/$1\" ] || [ -L \"$HOME/$1\" ]; then printf 'mark=%s\\n' \"$1\"; fi",
+            "}",
             "printf '<<<NI:meta>>>\\n'",
             "printf 'probe=1\\nhome=%s\\nuid=%s\\n' \"$HOME\" \"$(id -u)\"",
         ]
@@ -58,6 +61,7 @@ public enum ScanProbe {
             lines.append("ni_dir \(ShellQuote.single(agent.directory))")
             if let binary = agent.binary { lines.append("ni_bin \(ShellQuote.single(binary))") }
             for file in agent.files { lines.append("ni_file \(ShellQuote.single(file))") }
+            for marker in agent.markers { lines.append("ni_mark \(ShellQuote.single(marker))") }
         }
         lines.append("printf '<<<NI:end>>>\\n'")
         return lines.joined(separator: "\n") + "\n"
@@ -86,6 +90,8 @@ public struct ScanReport: Sendable, Equatable {
         public var binary: String?
         public var version: String?
         public var files: [String: FileState] = [:]
+        /// The agent's `markers` that exist.
+        public var markers: Set<String> = []
     }
 
     public var home: String
@@ -94,6 +100,15 @@ public struct ScanReport: Sendable, Equatable {
 
     public func file(_ relative: String, agent id: String) -> FileState {
         agents[id]?.files[relative] ?? .unreadable
+    }
+
+    /// The agent is on this Mac: its directory is there and, for an agent with
+    /// markers, so is one of them, its command, or one of its apps (`apps` are
+    /// the bundle ids found installed; the probe itself cannot look for apps).
+    public func isInstalled(_ agent: AgentDescriptor, apps: Set<String> = []) -> Bool {
+        guard let scanned = agents[agent.id], scanned.directory == .present else { return false }
+        guard !agent.markers.isEmpty else { return true }
+        return scanned.binary != nil || !scanned.markers.isEmpty || agent.apps.contains(where: apps.contains)
     }
 }
 
@@ -149,6 +164,8 @@ extension ScanProbe {
                 agent.binary = value
             case "version":
                 agent.version = value
+            case "mark":
+                agent.markers.insert(value)
             case "file":
                 let fields = value.split(separator: "|", maxSplits: 3, omittingEmptySubsequences: false).map(String.init)
                 guard fields.count == 4 else { throw ScanError.malformedOutput("bad file record for \(id)") }

@@ -21,6 +21,16 @@
         }
       }
     },
+    "%@ is not on this Mac, but its hooks are connected. Other agents run them too (Cursor does, unless told not to); their sessions are shown as theirs. Remove them if you do not use %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "这台 Mac 上没有 %@，但它的钩子是接好的。别的代理也会执行这些钩子（Cursor 默认就会），它们的会话会记在它们自己名下。如果你不用 %@，可以移除。"
+          }
+        }
+      }
+    },
     "%@ is out": {
       "localizations": {
         "zh-Hans": {
@@ -77,6 +87,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ tokens"
+          }
+        }
+      }
+    },
+    "%@ tokens in and out, %@ more read from the cache": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "输入和输出 %@ token，另有 %@ 从缓存读取"
           }
         }
       }
@@ -231,12 +251,32 @@
         }
       }
     },
+    "%@: %lld sessions, %@ prompts, %@ tool calls": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：%lld 个会话，%@ 条提示词，%@ 次工具调用"
+          }
+        }
+      }
+    },
     "%@: hooks put back": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "%@：被移走的钩子已放回"
+          }
+        }
+      }
+    },
+    "%@: nothing": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@：没有活动"
           }
         }
       }
@@ -257,6 +297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 天前"
+          }
+        }
+      }
+    },
+    "%lld days in a row": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "连续 %lld 天"
           }
         }
       }
@@ -351,6 +401,16 @@
         }
       }
     },
+    "%lld sessions · %@ prompts · %@ tool calls in 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "7 天里 %lld 个会话 · %@ 条提示词 · %@ 次工具调用"
+          }
+        }
+      }
+    },
     "%lld waiting": {
       "localizations": {
         "zh-Hans": {
@@ -417,6 +477,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 小时 %lld 分钟前"
+          }
+        }
+      }
+    },
+    "+ %@ read from cache": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另有 %@ 从缓存读取"
           }
         }
       }
@@ -721,6 +791,26 @@
         }
       }
     },
+    "Activity per day, last 26 weeks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最近 26 周每天的活动"
+          }
+        }
+      }
+    },
+    "Activity, 26 weeks": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "活动，26 周"
+          }
+        }
+      }
+    },
     "Add": {
       "localizations": {
         "zh-Hans": {
@@ -787,6 +877,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "代理会继续工作；等待中的请求会回到各自的终端。"
+          }
+        }
+      }
+    },
+    "Agents, 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "代理，7 天"
           }
         }
       }
@@ -951,6 +1051,16 @@
         }
       }
     },
+    "Amber beneath the closed island while someone waits on you, your accent while agents work, and a light along its edge.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有人在等你时，收起的岛屿下透出琥珀色光晕；代理干活时是你的强调色，并有一道光沿着底边划过。"
+          }
+        }
+      }
+    },
     "Amp's plugin API is experimental and runs in its command-line app only: reload plugins in Amp (or start it again) to load ours.": {
       "localizations": {
         "zh-Hans": {
@@ -1111,6 +1221,16 @@
         }
       }
     },
+    "Ask Cursor for my plan's usage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "向 Cursor 查询我的套餐用量"
+          }
+        }
+      }
+    },
     "Ask GitHub for my Copilot allowances": {
       "localizations": {
         "zh-Hans": {
@@ -1207,6 +1327,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "人在 Mac 前时，灵动岛就是通知你的方式。"
+          }
+        }
+      }
+    },
+    "Auto, this cycle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Auto，本计费周期"
           }
         }
       }
@@ -1771,12 +1901,42 @@
         }
       }
     },
+    "Creatures": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "小生物"
+          }
+        }
+      }
+    },
     "Cues for each moment": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "为每个时刻配一声提示"
+          }
+        }
+      }
+    },
+    "Cursor's app has not signed in on this Mac, so there is nothing to ask with.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cursor 应用还没有在这台 Mac 上登录，没有可以用来查询的凭据。"
+          }
+        }
+      }
+    },
+    "Cursor's sign-in on this Mac has run out. It renews itself the next time Cursor opens.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cursor 在这台 Mac 上的登录已过期。下次打开 Cursor 时它会自己续期。"
           }
         }
       }
@@ -2231,6 +2391,16 @@
         }
       }
     },
+    "Glow around the island": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "岛屿光晕"
+          }
+        }
+      }
+    },
     "Go to what needs me with %@": {
       "localizations": {
         "zh-Hans": {
@@ -2381,12 +2551,32 @@
         }
       }
     },
+    "How much of the included usage this billing cycle is spent, for Auto and for the named models, and on-demand spending if it is on. Reads the sign-in Cursor's app keeps on this Mac (its own settings database, read only) and sends it to cursor.com, nowhere else. Asked every ten minutes while Cursor is in use.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本计费周期内含额度用了多少（Auto 与指定模型分开），以及打开了的话按需付费的花费。读取 Cursor 应用保存在这台 Mac 上的登录凭据（它自己的设置数据库，只读），只发送到 cursor.com。Cursor 在使用时每十分钟查询一次。"
+          }
+        }
+      }
+    },
     "How soon it closes after the pointer leaves": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "指针离开后多久收起"
+          }
+        }
+      }
+    },
+    "Included usage, this cycle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "内含额度，本计费周期"
           }
         }
       }
@@ -2697,6 +2887,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "我的文件"
+          }
+        }
+      }
+    },
+    "Named models, this cycle": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "指定模型，本计费周期"
           }
         }
       }
@@ -3101,12 +3301,12 @@
         }
       }
     },
-    "Off: a plain dot in each agent's colour.": {
+    "Off: a plain dot in each agent's colour. The Pixel style draws them in pixels.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "关闭后：每个代理显示为一个带颜色的圆点。"
+            "value": "关闭：每个代理显示为一个它颜色的圆点。像素主题会用像素画出它们。"
           }
         }
       }
@@ -3137,6 +3337,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "较早的空闲会话显示为一行"
+          }
+        }
+      }
+    },
+    "On-demand spending": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "按需付费"
           }
         }
       }
@@ -3377,16 +3587,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "像素"
-          }
-        }
-      }
-    },
-    "Pixel creatures": {
-      "localizations": {
-        "zh-Hans": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "像素小生物"
           }
         }
       }
@@ -4581,6 +4781,16 @@
         }
       }
     },
+    "Tools, 7 days": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "工具，7 天"
+          }
+        }
+      }
+    },
     "Tue": {
       "localizations": {
         "zh-Hans": {
@@ -5321,6 +5531,16 @@
         }
       }
     },
+    "less": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "少"
+          }
+        }
+      }
+    },
     "macOS": {
       "localizations": {
         "zh-Hans": {
@@ -5367,6 +5587,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "你在 macOS 的询问里选择了不共享 %@ 的登录凭据。"
+          }
+        }
+      }
+    },
+    "more": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "多"
           }
         }
       }
