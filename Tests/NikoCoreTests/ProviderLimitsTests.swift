@@ -769,14 +769,18 @@ final class ProviderLimitsTests: XCTestCase {
             formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
             return formatter.string(from: date)
         }
-        let at = Date()
+        // Noon today, on a fixed calendar: a turn ten minutes earlier is today whenever the tests run.
+        // (Anchored to the clock, it was yesterday's for the ten minutes after midnight.)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC") ?? .current
+        let at = try XCTUnwrap(calendar.date(bySettingHour: 12, minute: 0, second: 0, of: Date()))
         let lines = [
             #"{"id":"1","timestamp":"\#(iso(at.addingTimeInterval(-600)))","payload":{"type":"usage_summary","promptTurnSummaries":[{"unit":"credit","unitPlural":"credits","usage":6.25}],"status":"success"}}"#,
             #"{"id":"2","timestamp":"\#(iso(at.addingTimeInterval(-3 * 86_400)))","payload":{"type":"usage_summary","promptTurnSummaries":[{"unit":"credit","usage":1.5},{"unit":"credit","usage":0.5}]}}"#,
             #"{"id":"3","timestamp":"\#(iso(at))","payload":{"type":"assistant","content":"usage_summary is a word here"}}"#,
         ]
         scratch.write("home/.kiro/sessions/w/sess_a/messages.jsonl", lines.joined(separator: "\n") + "\n")
-        let credits = try XCTUnwrap(KiroCredits(home: scratch.file("home")).totals(now: at))
+        let credits = try XCTUnwrap(KiroCredits(home: scratch.file("home")).totals(now: at, calendar: calendar))
         XCTAssertEqual(credits.fiveHours, 6.25)
         XCTAssertEqual(credits.week, 8.25)
         XCTAssertEqual(credits.month, 8.25)
