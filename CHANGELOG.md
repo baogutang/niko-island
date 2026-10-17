@@ -12,6 +12,8 @@
 ### Verification
 - 455 local automated tests, 5 environment-dependent skips, no failures. New tests: the island laid out in a window of its real size with a request and the most rows (it used to end at 882-1,282 points, now within the window); Usage's first frame; a pet loop as one strip of drawn, moving frames; the menu-bar watch rule; a transcript not parsed again until it changes or a turning point passes.
 - Release builds of 0.15.1 and of this code, side by side against throwaway homes with notifications on: 20 agents cycling through moods with the island open went from 195 MB to 147 MB (Core Animation 63 MB in 2,811 regions to 24 MB in 291; 2,749 images held to 229); CPU at rest the same (5.3 %); a full-screen window in front 5.7 % to 2.1 %. On the real island the pets move through their strips with clean edges, and the banner arrives.
+- The signed nightly of this code (apple-silicon, 0.15.2-nightly.8666cb2), run with notifications on: a turn finished and its notification was posted; the app kept running, no crash report, 4.0 % CPU and 65 MB afterwards, both windows 780 × 760. The screen was locked during this run, so the banner itself was not seen. CI on `main` green.
+- A test of Kiro's credits expected a turn from ten minutes ago under "today" and failed in the ten minutes after midnight (the first nightly ran at 00:06 UTC); it now runs at noon on a fixed calendar.
 
 ## [0.15.1] - 2026-10-16
 
