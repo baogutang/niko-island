@@ -14,6 +14,7 @@
 ### Verification
 - 475 local automated tests, 5 environment-dependent skips, no failures. New: a question answered with its answers added, a failed call, the next tool after two seconds and not before, a subagent's tools against the main thread's request and the other way round, going idle; the model letting both go, closing the island it opened and saying where they were answered; a record believed after the hooks went quiet, and not while the user is asked something; a plan as waiting on the user.
 - A release build with a throwaway home, through the real bridge: a question asked as Claude Code asks it (blocking), then reported run with its answers added: the waiting hook ended at once with status 0 and no decision, the island said "已在 Claude Code 里回答"; a plan request, then the next tool three seconds later: the same.
+- The signed nightly of this code (apple-silicon, 0.16.1-nightly.aa91090): the same question and plan let go at once; run with notifications on, a turn finished and its notification was posted, still running, no crash report, 3.3 % CPU and 66 MB, both windows 780 × 760. No banner was displayed: none has been all day on this Mac, for 0.15.2 and 0.16.0 alike (a Focus mode, or the app's banners switched off in System Settings). CI on `main` green.
 
 ## [0.16.0] - 2026-10-17
 
