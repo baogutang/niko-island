@@ -25,6 +25,7 @@
 - 471 local automated tests, 5 environment-dependent skips, no failures. New: the leftover cleaner on fixtures of each config shape (only the island's entries go, ours stay, backups byte-identical and never overwritten), unchaining the status line, the stable order, chip fitting, old readings, the health card's findings and fixes, command descriptions, workspaces, last heard across restarts, following observed values.
 - The cleaner was run on copies of the owner's 17 real agent config files in a scratch folder: 98 Vibe Island hooks out of 11 files and 10 Ping Island hooks out of Codex's; in every file only those entries changed, every hook of ours and every other command and setting stayed, and each backup matched its original byte for byte. Running it twice in the same second overwrote the first backup; fixed and tested before release.
 - CPU figures above are from release builds against throwaway homes, with three sessions sent two tool events a second through the real bridge; the island, Usage and the health card were looked at on a real display (captured by window).
+- The signed nightly of this code (apple-silicon, 0.16.0-nightly.5054ea8), run with notifications on: a turn finished and its notification was posted; still running, no crash report, 2.8 % CPU and 65 MB afterwards, both windows 780 × 760. No banner showed, and none showed for the published 0.15.2 run the same way minutes later: the Mac was not showing banners at the time (a Focus mode, most likely). CI on `main` green.
 
 ## [0.15.2] - 2026-10-17
 
