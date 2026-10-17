@@ -1707,6 +1707,35 @@ extension AppModelTests {
         XCTAssertEqual(model.sessions.first?.phase, .working)
     }
 
+    func testAQuestionOrAPlanAnsweredInTheAgentsWindowLeavesTheIsland() throws {
+        let start = Date()
+        func deliver(_ json: String, blocking: Bool = false, at seconds: TimeInterval) throws {
+            let event = try AgentEvent(json: JSONValue.parse(Data(json.utf8)), defaultSource: "claude")
+            model.handle(IngressDelivery(event: event, evidence: AdmissionEvidence(channel: .unixSocket, peerUID: getuid()),
+                                         replier: blocking ? IngressReplier.detached(id: UInt64(seconds * 10) + 1) : nil),
+                         now: start.addingTimeInterval(seconds))
+        }
+        let questions = #"{"questions":[{"question":"Which style?","header":"Style","multiSelect":false,"options":[{"label":"A"},{"label":"B"}]}]}"#
+        try deliver(#"{"hook_event_name":"PermissionRequest","session_id":"q","cwd":"/tmp/demo","tool_name":"AskUserQuestion","tool_input":\#(questions)}"#, blocking: true, at: 0)
+        XCTAssertEqual(model.pending.count, 1)
+        XCTAssertEqual(model.sessions.first?.phase, .needsAttention)
+        // Answered in Claude's own window: the question ran with its answers added.
+        try deliver(#"{"hook_event_name":"PostToolUse","session_id":"q","cwd":"/tmp/demo","tool_name":"AskUserQuestion","tool_use_id":"t1","tool_input":{"questions":[{"question":"Which style?","header":"Style","multiSelect":false,"options":[{"label":"A"},{"label":"B"}]}],"answers":{"Which style?":"B"}}}"#, at: 20)
+        XCTAssertTrue(model.pending.isEmpty, "the island no longer waits for an answer that was given")
+        XCTAssertEqual(model.sessions.first?.phase, .working)
+        XCTAssertFalse(model.isExpanded, "opened for the question, it closes again")
+        XCTAssertEqual(model.toast?.title, L("Answered in %@", "Claude Code"), "and says where it was answered")
+
+        // A plan approved in the app, then the next tool: the request goes, the row goes back to work.
+        try deliver(#"{"hook_event_name":"PermissionRequest","session_id":"q","cwd":"/tmp/demo","tool_name":"ExitPlanMode","tool_input":{"plan":"1. Do it"}}"#, blocking: true, at: 30)
+        try deliver(#"{"hook_event_name":"PreToolUse","session_id":"q","cwd":"/tmp/demo","agent_id":"helper","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}"#, at: 40)
+        XCTAssertEqual(model.pending.count, 1, "a subagent's tool says nothing about the main thread's request")
+        try deliver(#"{"hook_event_name":"PreToolUse","session_id":"q","cwd":"/tmp/demo","tool_name":"Bash","tool_use_id":"t2","tool_input":{"command":"make"}}"#, at: 60)
+        XCTAssertTrue(model.pending.isEmpty)
+        XCTAssertEqual(model.sessions.first?.phase, .working)
+        XCTAssertEqual(model.sessions.first?.activity.verb, "running")
+    }
+
     func testATurnThatEndedTakesItsRequestsAlong() async throws {
         async let asked = bridge(event("PermissionRequest", tool: "Bash"))
         let shown = await eventually { self.model.pending.count == 1 }

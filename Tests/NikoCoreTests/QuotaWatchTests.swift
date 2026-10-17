@@ -152,6 +152,35 @@ final class QuotaWatchTests: XCTestCase {
         XCTAssertTrue(after.settles(big))
     }
 
+    /// The shapes Claude Code 2.1 sends (read from its own code): a PermissionRequest has no
+    /// `tool_use_id`; a question it ran carries `answers`; a subagent's events carry `agent_id`.
+    func testAQuestionOrPlanAnsweredInTheAgentsOwnWindowLeavesTheIsland() throws {
+        func event(_ text: String) throws -> AgentEvent { try AgentEvent(json: JSONValue.parse(Data(text.utf8)), defaultSource: "claude") }
+        let questions = #"{"questions":[{"question":"Which style?","header":"Style","multiSelect":false,"options":[{"label":"A"},{"label":"B"}]}]}"#
+        let asked = try event(#"{"hook_event_name":"PermissionRequest","session_id":"s","tool_name":"AskUserQuestion","tool_input":\#(questions)}"#)
+        // Answered in Claude's window: it runs with the answers added to what was asked.
+        let answered = #"{"questions":[{"question":"Which style?","header":"Style","multiSelect":false,"options":[{"label":"A"},{"label":"B"}]}],"answers":{"Which style?":"B"},"annotations":{}}"#
+        XCTAssertTrue(try event(#"{"hook_event_name":"PostToolUse","session_id":"s","tool_name":"AskUserQuestion","tool_use_id":"toolu_1","tool_input":\#(answered)}"#).settles(asked))
+        XCTAssertTrue(try event(#"{"hook_event_name":"PostToolUseFailure","session_id":"s","tool_name":"AskUserQuestion","tool_use_id":"toolu_1","tool_input":\#(questions),"error":"rejected"}"#).settles(asked))
+        XCTAssertFalse(try event(#"{"hook_event_name":"PostToolUse","session_id":"s","tool_name":"AskUserQuestion","tool_input":{"questions":[]}}"#).settles(asked),
+                       "another question is not this one")
+
+        // A plan approved in the app: the next tool starts.
+        let plan = try event(#"{"hook_event_name":"PermissionRequest","session_id":"s","tool_name":"ExitPlanMode","tool_input":{"plan":"1. Do it"}}"#)
+        let next = try event(#"{"hook_event_name":"PreToolUse","session_id":"s","tool_name":"Bash","tool_use_id":"toolu_2","tool_input":{"command":"make"}}"#)
+        XCTAssertTrue(next.settles(plan, waited: 30))
+        XCTAssertFalse(next.settles(plan, waited: 0.3), "calls started side by side are not an answer")
+        // A subagent working on is no answer to the main thread, nor the other way round.
+        let helper = try event(#"{"hook_event_name":"PreToolUse","session_id":"s","agent_id":"a1","tool_name":"Read","tool_input":{"file_path":"/tmp/x"}}"#)
+        XCTAssertFalse(helper.settles(plan, waited: 30))
+        let helperAsks = try event(#"{"hook_event_name":"PermissionRequest","session_id":"s","agent_id":"a1","tool_name":"Bash","tool_input":{"command":"rm x"}}"#)
+        XCTAssertFalse(next.settles(helperAsks, waited: 30))
+        XCTAssertTrue(helper.settles(helperAsks, waited: 30))
+        // Idle again means nothing is waiting; a notice that it needs permission means it still is.
+        XCTAssertTrue(try event(#"{"hook_event_name":"Notification","session_id":"s","notification_type":"idle_prompt","message":"Claude is waiting for your input"}"#).settles(plan))
+        XCTAssertFalse(try event(#"{"hook_event_name":"Notification","session_id":"s","notification_type":"permission_prompt","message":"Claude needs your permission"}"#).settles(plan))
+    }
+
     // MARK: Usage over time
 
     func testTokensAreCountedInStretchesOfTime() throws {

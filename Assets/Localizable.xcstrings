@@ -1261,6 +1261,16 @@
         }
       }
     },
+    "Answered in %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "已在 %@ 里回答"
+          }
+        }
+      }
+    },
     "Answered. %lld windows known.": {
       "localizations": {
         "zh-Hans": {
@@ -2657,6 +2667,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "跳转到会话"
+          }
+        }
+      }
+    },
+    "Has a plan for you to review": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有一份计划等你审阅"
           }
         }
       }
@@ -5867,6 +5887,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近几乎没用"
+          }
+        }
+      }
+    },
+    "has a plan for you": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "等你审阅计划"
           }
         }
       }

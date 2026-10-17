@@ -65,7 +65,8 @@ public final class AppModel {
 
     /// A short notice shown in the collapsed island.
     public struct Toast: Equatable, Sendable {
-        public enum Kind: Sendable { case completed, failed, limitReset, limitWarning, notice }
+        /// `answered`: a request was answered in the agent's own window (good news, not a warning).
+        public enum Kind: Sendable { case completed, failed, limitReset, limitWarning, notice, answered }
         public var key: SessionKey
         public var title: String
         public var kind: Kind
@@ -620,9 +621,16 @@ public final class AppModel {
             DispatchQueue.global(qos: .utility).async { LastHeard.save(heard, paths: paths) }
         }
         // Answered in the agent's own dialog: the agent goes on, but leaves our hook waiting.
-        for request in pending where event.settles(request.event) {
+        var answeredElsewhere: Session?
+        for request in pending where event.settles(request.event, waited: now.timeIntervalSince(request.receivedAt)) {
             request.replier.send(ReplyBuilder.line(for: .passToTerminal, event: request.event))
             requestWithdrawn(request.id, resolving: false)
+            answeredElsewhere = store[event.key]
+        }
+        // The card leaves because it was answered in the agent's own window: say so, so it does not look lost.
+        if let session = answeredElsewhere, !isExpanded, event.name != HookEvent.sessionEnd, event.name != HookEvent.userPromptSubmit {
+            let place = session.hostName ?? AgentRegistry.displayName(for: session.source)
+            notify(Toast(key: session.key, title: L("Answered in %@", place), kind: .answered), for: 4)
         }
 
         let silenced = isSilenced(event.key)
@@ -651,8 +659,10 @@ public final class AppModel {
                 } else {
                     route = .sessions
                     if let session = store[event.key] {
-                        announce(request.isQuestion ? .question : .permission, session: session,
-                                 body: request.isQuestion ? (request.questions.first?.text ?? "") : (event.toolName ?? ""))
+                        let plan = event.toolName == Activity.planTool
+                        announce(request.isQuestion || plan ? .question : .permission, session: session,
+                                 body: request.isQuestion ? (request.questions.first?.text ?? "")
+                                     : plan ? L("Has a plan for you to review") : (event.toolName ?? ""))
                         push(request.isQuestion ? .question : .permission, session: session,
                              detail: request.isQuestion ? request.questions.first?.text
                                  : [event.toolName, request.summary.detail].compactMap { $0 }.joined(separator: ": "), now: now)

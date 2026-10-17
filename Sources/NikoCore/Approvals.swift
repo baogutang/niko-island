@@ -260,23 +260,46 @@ public struct RequestSummary: Sendable, Equatable {
 }
 
 extension AgentEvent {
-    /// Whether `other` reports the very call this request asked about: the same tool with the
-    /// same input, as far as a status event carries it (the bridge shortens long strings there).
+    /// The subagent an event comes from (Claude Code's `agent_id`); nil on the main thread.
+    public var agentID: String? {
+        raw["agent_id"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
+    /// Whether `other` reports the very call this request asked about: the same tool, run with
+    /// everything the request asked about (the bridge shortens long strings in status events).
+    /// What ran may carry more than was asked: an answered question runs with its `answers`
+    /// added (Claude Code: `updatedInput: {...input, answers, annotations}`), and comparing the
+    /// whole input left a question answered in the agent's own window waiting on the island.
     public func isSameCall(as other: AgentEvent) -> Bool {
         guard let tool = toolName, tool == other.toolName else { return false }
         func shortened(_ input: JSONObject?) -> JSONValue {
             BridgeRunner.truncateStrings(in: .object(input ?? JSONObject()), limit: BridgeRunner.slimStringLimit)
         }
-        return shortened(toolInput) == shortened(other.toolInput)
+        let asked = shortened(toolInput), ran = shortened(other.toolInput)
+        guard let askedFields = asked.objectValue, let ranFields = ran.objectValue else { return asked == ran }
+        return askedFields.members.allSatisfy { ranFields[$0.key] == $0.value }
     }
 
+    /// How long a request must have waited before another tool starting says it was answered:
+    /// calls run side by side start within milliseconds of each other; a person takes longer.
+    public static let answeredAfter: TimeInterval = 2
+
     /// An event that shows a waiting request of the same session was settled somewhere else:
-    /// the call it asked about has run (or failed), or the turn is over.
-    public func settles(_ request: AgentEvent) -> Bool {
+    /// the call it asked about has run or failed, the same agent (or subagent) has gone on to
+    /// another tool, it is idle again, or the turn is over. `waited`: how long the request has
+    /// been on the island.
+    public func settles(_ request: AgentEvent, waited: TimeInterval = .infinity) -> Bool {
         guard key == request.key, !isBlocking else { return false }
         switch name {
         case HookEvent.stop, HookEvent.stopFailure, HookEvent.userPromptSubmit, HookEvent.sessionEnd: return true
-        case HookEvent.postToolUse: return request.isSameCall(as: self)
+        case HookEvent.postToolUse, HookEvent.postToolUseFailure: return request.isSameCall(as: self)
+        case HookEvent.preToolUse:
+            // A blocked call holds up the thread that made it: the same thread starting another
+            // tool means it was answered (in the agent's own window). A subagent's tools say
+            // nothing about the main thread's request, nor the main thread's about a subagent's.
+            return agentID == request.agentID && waited >= Self.answeredAfter
+        case HookEvent.notification:
+            return raw["notification_type"]?.stringValue == "idle_prompt"
         default: return false
         }
     }

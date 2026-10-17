@@ -86,7 +86,8 @@ struct RowFacts: Equatable {
         moves = CreatureMood.moves(session, now: now)
         branch = session.cwd.flatMap { model.branches[$0] }
         project = AutoNamer.projectName(cwd: session.cwd)
-        cost = model.usage.use(of: session.key)?.label
+        // A model with no list price is counted in tokens: said so, not a bare "11.1M".
+        cost = model.usage.use(of: session.key).map { $0.cost >= 0.005 ? $0.label : L("%@ tokens", $0.label) }
         canReply = model.canReply(to: session.key)
         reply = model.replies[session.key]
         if model.grantedSessions.contains(session.key) {

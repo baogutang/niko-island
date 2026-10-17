@@ -7,6 +7,8 @@ public enum HookEvent {
     public static let userPromptSubmit = "UserPromptSubmit"
     public static let preToolUse = "PreToolUse"
     public static let postToolUse = "PostToolUse"
+    /// A tool call that failed (or was interrupted); same payload as PostToolUse plus the error.
+    public static let postToolUseFailure = "PostToolUseFailure"
     public static let notification = "Notification"
     public static let stop = "Stop"
     public static let subagentStop = "SubagentStop"
@@ -375,6 +377,11 @@ public struct Activity: Sendable, Equatable {
 
     /// Activity for a tool call. `detail` is a short, single-line hint; long
     /// inputs are truncated so nothing sensitive sprawls across the panel.
+    /// Claude Code's plan mode asks for its plan to be approved with this tool.
+    public static let planTool = "ExitPlanMode"
+    /// What an agent says while it waits on the user, not on its own work.
+    public static let waitsOnUser: Set<String> = ["has a question", "has a plan for you"]
+
     public static func forTool(_ tool: String?, input: JSONObject?) -> Activity {
         let verb = verb(forTool: tool)
         var detail: String?

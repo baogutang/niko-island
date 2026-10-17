@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.16.1] - 2026-10-17
+
+### Fixed
+- **A question or a plan answered in the agent's own window leaves the island.** A request on the island is let go when the agent shows it was answered elsewhere, and that test was too narrow. Claude Code's permission request carries no call id (read from Claude Code 2.1's own code), so the island matched it to the call that ran by comparing inputs, and an answered question runs with its answers added (`updatedInput: {...input, answers, annotations}`): it never matched, and the question stayed on the island until the turn ended or the ten-minute hand-back. Now the call that ran only has to contain what was asked; a failed call (`PostToolUseFailure`) counts; the same thread starting another tool counts once the request has waited two seconds (a plan approved in the Claude app is followed by the next tool; calls started side by side are not); a subagent's tools are told apart from the main thread's by Claude Code's `agent_id`; going idle counts. The waiting hook is let go without a decision, so the agent goes on with what was chosen in its window.
+- **A session whose hooks went quiet follows its own record.** Some work runs without the agent's hooks (ZCode's scheduled tasks): a session that had only said it started read "starting" for an hour while it spent 11 million tokens. When a session's hooks have been silent for 30 seconds while its record moved on, the record says what it is doing; never while it waits on the user, which a record cannot see.
+
+### Changed
+- When a request leaves the island because it was answered elsewhere, the closed island says so for a moment ("Answered in Claude"), instead of the card silently vanishing.
+- A plan waiting for approval reads "has a plan for you" (and its banner "has a plan for you to review"), from hooks and from transcripts alike; a transcript used to show it as running.
+- A session's use of a model with no list price reads "11.1M tokens" instead of a bare "11.1M".
+
+### Verification
+- 475 local automated tests, 5 environment-dependent skips, no failures. New: a question answered with its answers added, a failed call, the next tool after two seconds and not before, a subagent's tools against the main thread's request and the other way round, going idle; the model letting both go, closing the island it opened and saying where they were answered; a record believed after the hooks went quiet, and not while the user is asked something; a plan as waiting on the user.
+- A release build with a throwaway home, through the real bridge: a question asked as Claude Code asks it (blocking), then reported run with its answers added: the waiting hook ended at once with status 0 and no decision, the island said "已在 Claude Code 里回答"; a plan request, then the next tool three seconds later: the same.
+
 ## [0.16.0] - 2026-10-17
 
 ### Added

@@ -258,6 +258,9 @@ public enum ClaudeTranscript {
                         progress = TaskProgress.from(tool: name, input: item["input"]) ?? progress
                         if name == "AskUserQuestion" {
                             tool = Activity(verb: "has a question")
+                        } else if name == Activity.planTool {
+                            // Waiting for the plan to be approved, not running anything.
+                            tool = Activity(verb: "has a plan for you")
                         } else {
                             tool = Activity.forTool(name, input: item["input"]?.objectValue)
                         }
@@ -271,7 +274,7 @@ public enum ClaudeTranscript {
                     turn = .finished
                 default:
                     if let tool {
-                        turn = tool.verb == "has a question" ? .attention(tool) : .tool(tool)
+                        turn = Activity.waitsOnUser.contains(tool.verb) ? .attention(tool) : .tool(tool)
                     } else if turn == .unknown || turn == .finished {
                         turn = .thinking
                     }

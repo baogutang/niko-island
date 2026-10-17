@@ -17,6 +17,8 @@ public struct Session: Identifiable, Sendable, Equatable {
     public var title: String
     public var startedAt: Date
     public var lastEventAt: Date
+    /// When its hooks last said something (nil for a session known only from its record).
+    public var lastHookAt: Date?
     /// When the current phase began — the card's elapsed timer counts from here.
     public var phaseSince: Date
     public var activity: Activity
@@ -70,6 +72,8 @@ public struct SessionStore: Sendable {
     }
 
     public static let idleExpiry: TimeInterval = 12 * 3600
+    /// How long a session's hooks may stay silent while its record moves on before the record is believed.
+    public static let hooksQuietAfter: TimeInterval = 30
 
     public private(set) var sessions: [SessionKey: Session] = [:]
 
@@ -113,6 +117,7 @@ public struct SessionStore: Sendable {
 
         session.origin = .hooks                      // live events take over from the transcript
         session.lastEventAt = now
+        session.lastHookAt = now
         if let cwd = event.cwd, cwd != session.cwd {
             session.cwd = cwd
             session.title = AutoNamer.title(cwd: cwd, prompt: session.firstPrompt, source: event.source)
@@ -142,13 +147,13 @@ public struct SessionStore: Sendable {
             session.activity = Activity.forTool(event.toolName, input: event.toolInput)
             session.toolCalls += 1
             if let progress = TaskProgress.from(tool: event.toolName, input: event.toolInput.map { .object($0) }) { session.progress = progress }
-        case HookEvent.postToolUse:
+        case HookEvent.postToolUse, HookEvent.postToolUseFailure:
             session.phase = .working
             session.activity = .thinking
         case HookEvent.permissionRequest:
             session.phase = .needsAttention
-            session.activity = Questions.isQuestion(event)
-                ? Activity(verb: "has a question")
+            session.activity = Questions.isQuestion(event) ? Activity(verb: "has a question")
+                : event.toolName == Activity.planTool ? Activity(verb: "has a plan for you")
                 : Activity(verb: "needs permission", detail: event.toolName)
         case HookEvent.notification:
             let kind = event.raw["notification_type"]?.stringValue ?? ""
@@ -292,11 +297,18 @@ public struct SessionStore: Sendable {
             }
             if session.origin == .hooks {
                 session.lastPrompt = session.lastPrompt ?? snapshot.lastPrompt
-                if session != before {
-                    sessions[key] = session
-                    changes.append(.updated(key))
+                // Hooks gone quiet while the agent's own record moved on: some work runs without its
+                // hooks (ZCode's scheduled tasks; a session started before they were connected), and
+                // a row said "starting" for an hour while the agent worked. Its record says where it
+                // is now. Not while it waits on the user: a record cannot see a permission dialog.
+                let silent = snapshot.updatedAt.timeIntervalSince(session.lastHookAt ?? session.lastEventAt) > Self.hooksQuietAfter
+                guard silent, session.phase != .needsAttention else {
+                    if session != before {
+                        sessions[key] = session
+                        changes.append(.updated(key))
+                    }
+                    continue
                 }
-                continue
             }
 
             session.cwd = snapshot.cwd ?? session.cwd
