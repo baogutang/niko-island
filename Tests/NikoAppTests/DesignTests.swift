@@ -48,6 +48,85 @@ final class DesignTests: XCTestCase {
         XCTAssertLessThan(IslandMetrics.contentLimit + 100, IslandMetrics.canvas.height, "a page fits with the header and margins")
     }
 
+    /// Lays the island out in a window of the canvas's size and reports the island's frame on each pass.
+    private func islandFrames(_ model: AppModel, then change: (() -> Void)? = nil) -> (settled: CGRect, afterChange: [CGRect]) {
+        _ = NSApplication.shared
+        var frames: [CGRect] = []
+        let host = IslandWindowController.host(IslandView(model: model, metrics: .plain) { frames.append($0) })
+        let window = NSWindow(contentRect: NSRect(origin: .zero, size: IslandMetrics.canvas), styleMask: [.borderless], backing: .buffered, defer: false)
+        window.isReleasedWhenClosed = false
+        window.contentView = host
+        defer { window.close() }
+        func settle() {
+            for _ in 0..<12 {
+                host.layoutSubtreeIfNeeded()
+                RunLoop.main.run(until: Date().addingTimeInterval(0.02))
+            }
+        }
+        settle()
+        let settled = frames.last ?? .zero
+        guard let change else { return (settled, []) }
+        frames = []
+        change()
+        settle()
+        return (settled, frames)
+    }
+
+    private func addSessions(_ model: AppModel, count: Int) {
+        for index in 0..<count {
+            let object: JSONObject = ["source": .string("claude"), "hook_event_name": .string("UserPromptSubmit"),
+                                      "session_id": .string("more-\(index)"), "cwd": .string("/Users/dev/code/project-\(index)"),
+                                      "prompt": .string("Task number \(index)")]
+            guard let event = try? AgentEvent(json: .object(object)) else { continue }
+            model.handle(IngressDelivery(event: event, evidence: AdmissionEvidence(channel: .unixSocket, peerUID: getuid()), replier: nil))
+        }
+    }
+
+    func testTheOpenIslandStaysInsideItsWindow() {
+        // A long list with the most rows, and a request on top of one: both used to run past the
+        // window's bottom (0.14 and 0.15.0 grew the window upwards, 0.15.1 cut the island off).
+        for scene in [PreviewRenderer.Scene.sessions, .permission, .question] {
+            let model = PreviewRenderer.demoModel(scene)
+            model.settings.visibleRows = NikoSettings.visibleRowChoices.max() ?? 12
+            addSessions(model, count: 14)
+            model.expand(.click)
+            let island = islandFrames(model).settled
+            XCTAssertGreaterThan(island.height, 300, "\(scene): the island was laid out")
+            XCTAssertLessThanOrEqual(island.maxY, IslandMetrics.canvas.height - 40, "\(scene): the island ends inside its window, with room for its shadow")
+        }
+    }
+
+    func testUsageOpensAtItsOwnHeight() {
+        let model = PreviewRenderer.demoModel(.sessions)
+        let frames = islandFrames(model) { model.route = .usage }.afterChange
+        XCTAssertFalse(frames.isEmpty)
+        // Measured after the fact, its first frame was the whole window's height.
+        XCTAssertTrue(frames.allSatisfy { $0.maxY <= IslandMetrics.canvas.height - 40 }, "\(frames.map { Int($0.maxY) })")
+    }
+
+    func testAMoodLoopIsOneStripOfFramesSideBySide() throws {
+        func pixels(_ image: CGImage) -> [UInt8] {
+            var bytes = [UInt8](repeating: 0, count: image.width * image.height * 4)
+            let context = CGContext(data: &bytes, width: image.width, height: image.height, bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                                    space: CGColorSpaceCreateDeviceRGB(), bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+            context?.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+            return bytes
+        }
+        for (agent, mood) in [("claude", CreatureMood.working), ("kiro", .attention), ("codex", .happy)] {
+            let strip = try XCTUnwrap(CreatureFrames.strip(Mascots.sprite(for: agent), mood: mood, points: 17, scale: 2))
+            XCTAssertGreaterThan(strip.count, 2, "\(agent) \(mood)")
+            XCTAssertEqual(strip.image.height, 34, "one row")
+            XCTAssertEqual(strip.image.width, strip.count * 34, "frames side by side")
+            XCTAssertEqual(strip.rect(strip.count - 1).maxX, 1, accuracy: 0.0001)
+            let frames = (0..<strip.count).compactMap { strip.image.cropping(to: CGRect(x: $0 * 34, y: 0, width: 34, height: 34)) }.map(pixels)
+            XCTAssertEqual(frames.count, strip.count)
+            for (index, frame) in frames.enumerated() {
+                XCTAssertTrue(stride(from: 3, to: frame.count, by: 4).contains { frame[$0] > 0 }, "\(agent) \(mood): frame \(index) is drawn")
+            }
+            XCTAssertGreaterThan(Set(frames).count, 1, "\(agent) \(mood): the creature moves")
+        }
+    }
+
     func testEveryAgentHasACreatureAndATint() {
         for agent in AgentRegistry.installable {
             XCTAssertNotEqual(Mascots.sprite(for: agent.id).name, "island", "\(agent.id) falls back to the generic sprite")

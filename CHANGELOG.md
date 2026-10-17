@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.2] - 2026-10-17
+
+### Fixed
+- **The island no longer keeps the processor busy following the menu bar.** It watched the menu bar at display rate (120 times a second, listing every window on screen each time) for as long as it rode a shown bar that might hide: in a full-screen app on a notched display, where the bar never hides, and on any desktop after one passing slide of the bar had been taken for "automatically hide". A 0.15.0 that had run for two hours used 15-20 % CPU, a fifth of its main thread's time in that one call. A bar at rest is now watched closely only while the pointer is near it, just after it leaves, and after a click.
+- **The open island stays inside its window.** A request above seven or more sessions, or the 12-row setting, made it taller than its window (up to 1,265 of 760 points): 0.15.0 grew the window upwards, which is another way the island vanished, and 0.15.1 cut its bottom off. The request and the list now share the room there is; each scrolls inside beyond that.
+- **Usage no longer flashes the island to full height as it opens.** 0.15.1 measured the page after laying it out, so its first frame was the whole window's height; it is now sized in the same pass.
+- **Pets use far less memory.** Every frame of every mood was an image of its own, and Core Animation keeps a buffer per image: about 2,700 of them and 135 MB after a day. Each mood is now one strip of frames that the layer steps along, one image per loop.
+- **Sessions found on disk are not parsed again while nothing changes.** Every 1.5 seconds the last 256 KB of each recent transcript was parsed again, and Claude Code's task files read again, changed or not. A reading now stands until the file changes or a moment passes that changes what it says (a quiet turn stops counting as running, a refused window reopens).
+
+### Verification
+- 455 local automated tests, 5 environment-dependent skips, no failures. New tests: the island laid out in a window of its real size with a request and the most rows (it used to end at 882-1,282 points, now within the window); Usage's first frame; a pet loop as one strip of drawn, moving frames; the menu-bar watch rule; a transcript not parsed again until it changes or a turning point passes.
+- Release builds of 0.15.1 and of this code, side by side against throwaway homes with notifications on: 20 agents cycling through moods with the island open went from 195 MB to 147 MB (Core Animation 63 MB in 2,811 regions to 24 MB in 291; 2,749 images held to 229); CPU at rest the same (5.3 %); a full-screen window in front 5.7 % to 2.1 %. On the real island the pets move through their strips with clean edges, and the banner arrives.
+
 ## [0.15.1] - 2026-10-16
 
 ### Fixed

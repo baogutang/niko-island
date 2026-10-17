@@ -27,6 +27,14 @@ public final class TranscriptScout: @unchecked Sendable {
         var headRead = false
         var tail = Data()
         var tailIsWholeFile = false
+        /// What the file said the last time it was read, and the moment that reading was for.
+        /// Parsing a tail is the costly part of a pass, so an unchanged file keeps its reading
+        /// until one of its turning points passes.
+        var snapshot: TranscriptSnapshot?
+        var snapshotAt: Date?
+        /// Claude Code's task list for the session. Its files only change through tool calls,
+        /// which the transcript records, so it is read again only when the transcript changes.
+        var tasks: TaskProgress?
     }
 
     private let home: URL
@@ -37,6 +45,8 @@ public final class TranscriptScout: @unchecked Sendable {
     private var entries: [String: Entry] = [:]
     private var tick = 0
     private var lastEmitted: [TranscriptSnapshot]?
+    /// How many readings were made (tests: an unchanged file is not parsed again).
+    private(set) var readingsMade = 0
     private lazy var zcode = ZCodeSessions(home: home)
     private lazy var kiro = KiroSessions(home: home)
 
@@ -102,13 +112,19 @@ public final class TranscriptScout: @unchecked Sendable {
                 continue
             }
             var entry = entries[path] ?? Entry(modified: .distantPast, size: 0)
-            if entry.modified != modified || entry.size != size || !entry.headRead {
+            let changed = entry.modified != modified || entry.size != size || !entry.headRead
+            if changed {
                 read(path, size: size, into: &entry)
                 entry.modified = modified
                 entry.size = size
-                entries[path] = entry
             }
-            if let snapshot = snapshot(path: path, entry: entry, now: now) { out.append(snapshot) }
+            if changed || stale(entry, now: now) {
+                entry.snapshot = snapshot(path: path, entry: &entry, now: now, readTasks: changed)
+                entry.snapshotAt = now
+                readingsMade += 1
+            }
+            entries[path] = entry
+            if let snapshot = entry.snapshot { out.append(snapshot) }
         }
         // ZCode keeps its sessions in a database instead of one file each.
         out.append(contentsOf: zcode.snapshots(since: cutoff, now: now))
@@ -119,7 +135,14 @@ public final class TranscriptScout: @unchecked Sendable {
 
     private func isCodex(_ path: String) -> Bool { path.hasPrefix(codexRoot.path + "/") }
 
-    private func snapshot(path: String, entry: Entry, now: Date) -> TranscriptSnapshot? {
+    /// A reading made before one of the file's turning points no longer says what the file says now.
+    private func stale(_ entry: Entry, now: Date) -> Bool {
+        guard let at = entry.snapshotAt else { return true }
+        if now < at { return true }
+        return TranscriptText.turningPoints(modified: entry.modified, snapshot: entry.snapshot).contains { $0 > at && $0 <= now }
+    }
+
+    private func snapshot(path: String, entry: inout Entry, now: Date, readTasks: Bool) -> TranscriptSnapshot? {
         if isCodex(path) {
             guard let meta = entry.codexMeta else { return nil }
             return CodexTranscript.snapshot(path: path, meta: meta, tail: entry.tail, tailIsWholeFile: entry.tailIsWholeFile,
@@ -128,7 +151,8 @@ public final class TranscriptScout: @unchecked Sendable {
         var snapshot = ClaudeTranscript.snapshot(path: path, tail: entry.tail, tailIsWholeFile: entry.tailIsWholeFile,
                                                  firstPrompt: entry.claudeFirstPrompt, modified: entry.modified, now: now)
         // Newer Claude Code keeps its task list as files next to the transcripts instead of in them.
-        if let id = snapshot?.key.sessionID, let tasks = TaskProgress.claudeTasks(home: home, sessionID: id) { snapshot?.progress = tasks }
+        if readTasks, let id = snapshot?.key.sessionID { entry.tasks = TaskProgress.claudeTasks(home: home, sessionID: id) }
+        if let tasks = entry.tasks { snapshot?.progress = tasks }
         return snapshot
     }
 

@@ -216,6 +216,29 @@ final class TranscriptScoutTests: XCTestCase {
         XCTAssertEqual(scout.scanOnce(), [])
     }
 
+    func testAnUnchangedTranscriptIsNotParsedAgainUntilItCanReadDifferently() throws {
+        let scratch = Scratch()
+        let file = scratch.url.appendingPathComponent(".claude/projects/p/44444444.jsonl")
+        let prompt = #"{"type":"user","cwd":"/tmp/proj","message":{"role":"user","content":"Fix the flaky upload test"}}"#
+        let toolUse = #"{"type":"assistant","message":{"role":"assistant","stop_reason":"tool_use","content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"swift test"}}]}}"#
+        let toolResult = #"{"type":"user","toolUseResult":{"stdout":"ok"},"message":{"role":"user","content":[{"type":"tool_result","tool_use_id":"t1","content":"ok"}]}}"#
+        try write(prompt + "\n" + toolUse + "\n", to: file)
+        let modified = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date)
+        let scout = TranscriptScout(home: scratch.url) { _ in }
+        XCTAssertEqual(scout.scanOnce(now: modified.addingTimeInterval(5)).first?.phase, .working)
+        let made = scout.readingsMade
+        for seconds in [10.0, 30, 80] { _ = scout.scanOnce(now: modified.addingTimeInterval(seconds)) }
+        XCTAssertEqual(scout.readingsMade, made, "nothing changed and no turning point passed: the reading stands")
+        // Quiet for longer than a running tool can be, the same file reads differently.
+        XCTAssertEqual(scout.scanOnce(now: modified.addingTimeInterval(16 * 60)).first?.phase, .waiting)
+        XCTAssertEqual(scout.readingsMade, made + 1)
+        // A file that grows is read again at once.
+        try write(prompt + "\n" + toolUse + "\n" + toolResult + "\n", to: file)
+        let grown = try XCTUnwrap(FileManager.default.attributesOfItem(atPath: file.path)[.modificationDate] as? Date)
+        XCTAssertEqual(scout.scanOnce(now: grown.addingTimeInterval(1)).first?.activity, .thinking)
+        XCTAssertEqual(scout.readingsMade, made + 2)
+    }
+
     func testOnlyTheTailOfALongTranscriptIsRead() throws {
         let scratch = Scratch()
         let file = scratch.url.appendingPathComponent(".claude/projects/p/33333333.jsonl")

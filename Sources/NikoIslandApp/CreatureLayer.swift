@@ -6,11 +6,27 @@ import SwiftUI
 ///
 /// Redrawing a creature in SwiftUI thirty times a second kept the app busy for as
 /// long as an agent worked, which is most of the day. Instead each mood's loop is
-/// drawn once into frames (one render pass for all of them) and handed to a layer;
-/// the window server flips through them at no cost to the app.
+/// drawn once, as one strip of frames side by side, and handed to a layer that
+/// shows one frame of it at a time; the window server steps along the strip at no
+/// cost to the app. One image per loop, not one per frame: Core Animation keeps a
+/// buffer of its own for every image it shows, and frames as images of their own
+/// came to 2,700 buffers and 135 MB.
 @MainActor
 enum CreatureFrames {
-    private static var cache: [String: [CGImage]] = [:]
+    /// A mood's loop: `count` frames side by side in one image.
+    struct Strip {
+        var image: CGImage
+        var count: Int
+
+        /// Where frame `index` is in the strip, in the unit square a layer's `contentsRect` uses.
+        func rect(_ index: Int) -> CGRect {
+            CGRect(x: CGFloat(index) / CGFloat(count), y: 0, width: 1 / CGFloat(count), height: 1)
+        }
+    }
+
+    /// The widest image a layer is sure to take.
+    static let widest: CGFloat = 16_384
+    private static var cache: [String: Strip] = [:]
     private static var order: [String] = []
 
     /// Frames a second: the calm moods move slowly and need fewer.
@@ -22,36 +38,33 @@ enum CreatureFrames {
         }
     }
 
-    static func frames(_ sprite: MascotSprite, mood: CreatureMood, points: CGFloat, scale: CGFloat) -> [CGImage] {
+    static func strip(_ sprite: MascotSprite, mood: CreatureMood, points: CGFloat, scale: CGFloat) -> Strip? {
         let key = "\(sprite.name)|\(mood.rawValue)|\(Int((points * scale).rounded()))"
         if let hit = cache[key] { return hit }
         let loop = CreaturePose.loop(mood)
-        let count = max(2, Int((loop * rate(mood)).rounded()))
-        let columns = 12, rows = (count + columns - 1) / columns
+        let side = max(1, points * scale)
+        let count = min(max(2, Int((loop * rate(mood)).rounded())), max(2, Int(widest / side)))
         let seed = MascotView.seed(sprite.name)
         let detail = points >= 24
         let sheet = Canvas { context, _ in
             for index in 0..<count {
                 var cell = context
-                cell.translateBy(x: CGFloat(index % columns) * points, y: CGFloat(index / columns) * points)
+                cell.translateBy(x: CGFloat(index) * points, y: 0)
                 cell.clip(to: Path(CGRect(x: 0, y: 0, width: points, height: points)))
                 let pose = CreaturePose.make(mood: mood, t: loop * Double(index) / Double(count), seed: seed, still: false)
                 CreatureArt.draw(sprite, pose: pose, in: cell, size: CGSize(width: points, height: points), scale: scale, detail: detail)
             }
         }
-        .frame(width: CGFloat(columns) * points, height: CGFloat(rows) * points)
+        .frame(width: CGFloat(count) * points, height: points)
         let renderer = ImageRenderer(content: sheet)
         renderer.scale = scale
-        guard let image = renderer.cgImage else { return [] }
-        let side = points * scale
-        let frames = (0..<count).compactMap { index in
-            image.cropping(to: CGRect(x: CGFloat(index % columns) * side, y: CGFloat(index / columns) * side, width: side, height: side))
-        }
-        cache[key] = frames
+        guard let image = renderer.cgImage else { return nil }
+        let strip = Strip(image: image, count: count)
+        cache[key] = strip
         order.append(key)
-        // A few dozen loops at most: each is a few hundred kilobytes.
+        // A few dozen loops at most: each is one image of a few hundred kilobytes.
         if order.count > 48 { cache[order.removeFirst()] = nil }
-        return frames
+        return strip
     }
 }
 
@@ -79,6 +92,10 @@ final class LiveCreatureView: NSView {
         super.init(frame: .zero)
         wantsLayer = true
         player.contentsGravity = .resizeAspect
+        // Pixel art, and frames side by side in one image: sampled without blending, so the
+        // edge of the next frame can never show at the edge of this one.
+        player.magnificationFilter = .nearest
+        player.minificationFilter = .nearest
         layer?.addSublayer(player)
     }
 
@@ -117,17 +134,18 @@ final class LiveCreatureView: NSView {
         let next = "\(sprite.name)|\(mood.rawValue)|\(size)|\(scale)|\(seed)"
         guard next != key else { return }
         key = next
-        let frames = CreatureFrames.frames(sprite, mood: mood, points: size, scale: scale)
+        let strip = CreatureFrames.strip(sprite, mood: mood, points: size, scale: scale)
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         player.removeAnimation(forKey: "loop")
-        player.contents = frames.first
+        player.contents = strip?.image
+        player.contentsRect = strip?.rect(0) ?? CGRect(x: 0, y: 0, width: 1, height: 1)
         player.contentsScale = scale
         CATransaction.commit()
-        guard frames.count > 1 else { return }
+        guard let strip, strip.count > 1 else { return }
         let loop = CreaturePose.loop(mood)
-        let animation = CAKeyframeAnimation(keyPath: "contents")
-        animation.values = frames
+        let animation = CAKeyframeAnimation(keyPath: "contentsRect")
+        animation.values = (0..<strip.count).map { NSValue(rect: strip.rect($0)) }
         animation.calculationMode = .discrete
         animation.duration = loop
         animation.repeatCount = .infinity

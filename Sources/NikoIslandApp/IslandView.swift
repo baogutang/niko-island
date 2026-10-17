@@ -383,22 +383,25 @@ struct SessionsPane: View {
     @State private var hovered: SessionKey?
     @Namespace private var hoverSpace
 
+    private var rowHeight: CGFloat { model.settings.rowDensity == .compact ? 52 : 68 }
+
     /// Height of the list before it scrolls: the number of rows the user asked for.
-    private var maxListHeight: CGFloat {
-        CGFloat(model.settings.visibleRows) * (model.settings.rowDensity == .compact ? 52 : 68)
-    }
+    private var maxListHeight: CGFloat { CGFloat(model.settings.visibleRows) * rowHeight }
 
     var body: some View {
         content.animation(isStaticPreview ? nil : Motion.smooth(look.motion), value: model.focusedRequestID)
     }
 
     private var content: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        // The request and the list share what the window has room for (see `PaneStack`).
+        PaneStack(budget: IslandMetrics.contentLimit, listFloor: 2 * rowHeight) {
             if case .other(let message)? = model.startFailure {
                 notice(L("Niko Island could not start listening"), detail: message)
             }
             if let request = model.focusedRequest {
-                RequestDetailView(model: model, request: request).id(request.id)
+                scrolling { RequestDetailView(model: model, request: request) }
+                    .layoutValue(key: PaneStack.RoleKey.self, value: .request)
+                    .id(request.id)
                     .transition(.rise)
             }
             let rows = model.sessions.filter { $0.key != model.focusedRequest?.sessionKey }
@@ -406,10 +409,22 @@ struct SessionsPane: View {
                 if model.focusedRequest != nil {
                     Rectangle().fill(Theme.hairline).frame(height: 1).padding(.vertical, 12)
                 }
-                list(rows)
+                list(rows).layoutValue(key: PaneStack.RoleKey.self, value: .list)
             } else if model.focusedRequest == nil {
                 emptyState
             }
+        }
+    }
+
+    /// Content that scrolls once `PaneStack` gives it less than it needs. Static previews
+    /// cannot draw a scroll view, and theirs always fits.
+    @ViewBuilder
+    private func scrolling<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        if isStaticPreview {
+            content()
+        } else {
+            ScrollView(.vertical, showsIndicators: false) { content() }
+                .scrollBounceBehavior(.basedOnSize)
         }
     }
 
@@ -426,7 +441,8 @@ struct SessionsPane: View {
                             Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
                         })
                 }
-                .frame(height: min(max(listHeight, 44), maxListHeight))
+                // Its own height up to the rows asked for; `PaneStack` may give it less.
+                .frame(minHeight: 0, idealHeight: min(max(listHeight, 44), maxListHeight), maxHeight: min(max(listHeight, 44), maxListHeight))
                 .onPreferenceChange(ListHeightKey.self) { height in
                     // The list grows and shrinks to its rows on the same spring as everything else.
                     withAnimation(listHeight == 0 ? nil : Motion.smooth(look.motion)) { listHeight = height }
@@ -538,20 +554,60 @@ struct SessionsPane: View {
 struct CappedScroll<Content: View>: View {
     var maxHeight: CGFloat
     @ViewBuilder var content: Content
-    @State private var height: CGFloat = 0
     @Environment(\.isStaticPreview) private var isStaticPreview
 
     var body: some View {
         if isStaticPreview {
             content
         } else {
-            ScrollView(.vertical, showsIndicators: false) {
-                content.background(GeometryReader { proxy in
-                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
-                })
-            }
-            .frame(height: height == 0 ? nil : min(height, maxHeight))
-            .onPreferenceChange(ListHeightKey.self) { height = $0 }
+            // A scroll view's own height is its content's; capped, and fixed at that, it is
+            // sized in the same layout pass as everything else. (Measured afterwards, the first
+            // frame was the whole window's height: the island flashed tall as Usage opened.)
+            ScrollView(.vertical, showsIndicators: false) { content }
+                .scrollBounceBehavior(.basedOnSize)
+                .frame(maxHeight: maxHeight)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/// Stacks the open island's pane top to bottom within one height, so the island never
+/// outgrows its window (whose size is fixed: see `IslandWindowController.host`). Everything
+/// takes its own height; then the request takes what it needs while leaving the list
+/// `listFloor` (when it has that much), and the list the rest. Each scrolls inside beyond that.
+struct PaneStack: Layout {
+    enum Role { case fixed, request, list }
+    struct RoleKey: LayoutValueKey { static let defaultValue = Role.fixed }
+
+    var budget: CGFloat
+    var listFloor: CGFloat
+
+    func heights(_ subviews: Subviews, width: CGFloat?) -> [CGFloat] {
+        let wanted = subviews.map { $0.sizeThatFits(ProposedViewSize(width: width, height: nil)).height }
+        let roles = subviews.map { $0[RoleKey.self] }
+        var heights = wanted
+        var left = budget
+        for (role, height) in zip(roles, wanted) where role == .fixed { left -= height }
+        let list = roles.firstIndex(of: .list)
+        let listWants = list.map { wanted[$0] } ?? 0
+        if let request = roles.firstIndex(of: .request) {
+            heights[request] = min(wanted[request], max(0, left - min(listWants, listFloor)))
+            left -= heights[request]
+        }
+        if let list { heights[list] = min(listWants, max(0, left)) }
+        return heights
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        return CGSize(width: width, height: heights(subviews, width: width).reduce(0, +))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for (subview, height) in zip(subviews, heights(subviews, width: bounds.width)) {
+            subview.place(at: CGPoint(x: bounds.minX, y: y), anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: height))
+            y += height
         }
     }
 }

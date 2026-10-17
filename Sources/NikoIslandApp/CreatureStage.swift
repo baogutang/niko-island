@@ -111,8 +111,7 @@ final class CreatureStageNSView: NSView {
         let scale = window?.backingScaleFactor ?? 2
         for swimmer in swimmers {
             let mood: CreatureMood = swimmer.period == nil ? .idle : .working
-            let frames = CreatureFrames.frames(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale)
-            guard let first = frames.first else { continue }
+            guard let strip = CreatureFrames.strip(swimmer.sprite, mood: mood, points: swimmer.size, scale: scale) else { continue }
             // Travel: an outer layer crosses the screen at an even pace.
             let lane = CALayer()
             lane.bounds = CGRect(x: 0, y: 0, width: swimmer.size, height: swimmer.size)
@@ -144,7 +143,8 @@ final class CreatureStageNSView: NSView {
             // Bobbing on the swell, and the two frames of its paddling.
             let body = CALayer()
             body.frame = lane.bounds
-            body.contents = first
+            body.contents = strip.image
+            body.contentsRect = strip.rect(0)
             body.contentsGravity = .resizeAspect
             body.magnificationFilter = .nearest
             body.opacity = 0.92
@@ -158,9 +158,9 @@ final class CreatureStageNSView: NSView {
             bob.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
             bob.timeOffset = Double.random(in: 0...bob.duration)
             body.add(bob, forKey: "bob")
-            if frames.count > 1 {
-                let paddle = CAKeyframeAnimation(keyPath: "contents")
-                paddle.values = frames
+            if strip.count > 1 {
+                let paddle = CAKeyframeAnimation(keyPath: "contentsRect")
+                paddle.values = (0..<strip.count).map { NSValue(rect: strip.rect($0)) }
                 paddle.calculationMode = .discrete
                 paddle.duration = CreaturePose.loop(mood)
                 paddle.repeatCount = .infinity

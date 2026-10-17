@@ -53,6 +53,8 @@ final class IslandWindowController: NSObject {
     private var fastTimer: Timer?
     private var fastUntil = Date.distantPast
     private var overlayLeaving = false
+    /// When to follow the menu bar at display rate.
+    private var watch = BarWatch()
     private var overlaySettlesAt = Date.distantPast
     private var lastTrace = ""
     private var subscriptions: Set<AnyCancellable> = []
@@ -255,11 +257,10 @@ final class IslandWindowController: NSObject {
         // one that is simply gone may be an app on its way into full screen.
         if onDesktop, let offset, offset < 0 { desktopBarHides = true }
         let moving = next != placement || (offset.map { $0 < 0 } ?? false)
-        // While the island is riding a revealed menu bar, the bar can leave at any moment:
-        // keep watching at display rate so it leaves with it, not a beat later.
+        // Riding a shown menu bar that may hide by itself: watched closely around the pointer, not all the time.
         let riding = !pinned && offset != nil && (next.surface == .overlay || (onDesktop && desktopBarHides))
         apply(next)
-        if moving || riding { quicken(for: 0.4) }
+        if let duration = watch.passed(moving: moving, ridingBar: riding) { quicken(for: duration) }
         if traceLayout {
             let line = "island placement surface=\(next.surface) lift=\(Int(next.lift)) bar=\(offset.map { String(Int($0)) } ?? "none") desktop=\(onDesktop)"
             if line != lastTrace {
@@ -346,6 +347,7 @@ final class IslandWindowController: NSObject {
             guard let self else { return }
             MainActor.assumeIsolated {
                 if self.model.isExpanded, !self.pointerInside { self.model.collapse() }
+                if let duration = self.watch.clicked() { self.quicken(for: duration) }
             }
         }) { monitors.append(monitor) }
     }
@@ -364,8 +366,13 @@ final class IslandWindowController: NSObject {
 
     private func pointerMoved() {
         let location = NSEvent.mouseLocation
-        // The menu bar is revealed from the top edge: be ready to move with it from its first frame.
-        if location.y >= screenTop - 3, location.x >= displayBounds.minX, location.x <= displayBounds.maxX { quicken(for: 0.6) }
+        let onDisplay = location.x >= displayBounds.minX && location.x <= displayBounds.maxX
+        // The menu bar is revealed from the top edge, and one that hides by itself goes a moment
+        // after the pointer leaves it: be ready to move with it from its first frame.
+        if let duration = watch.pointerMoved(atTopEdge: onDisplay && location.y >= screenTop - 3,
+                                             nearBar: onDisplay && location.y >= screenTop - metrics.bandHeight - 60) {
+            quicken(for: duration)
+        }
 
         let rect = islandScreenRect
         let inside = rect != .zero && rect.insetBy(dx: -2, dy: -2).contains(location)

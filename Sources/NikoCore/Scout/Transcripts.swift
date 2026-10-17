@@ -75,6 +75,16 @@ enum TranscriptText {
 
     /// A turn that has written nothing for this long is not treated as running any more.
     static let staleAfter: TimeInterval = 15 * 60
+    /// A file whose state cannot be told counts as running for this long after its last write.
+    static let unknownQuietAfter: TimeInterval = 90
+
+    /// The moments after which the same file, unchanged, reads differently: a quiet turn stops
+    /// counting as running, a window it was refused opens again. Until one passes, a reading stands.
+    static func turningPoints(modified: Date, snapshot: TranscriptSnapshot?) -> [Date] {
+        var points = [modified.addingTimeInterval(unknownQuietAfter), modified.addingTimeInterval(staleAfter)]
+        if let resets = snapshot?.limitReached?.resetsAt { points.append(resets) }
+        return points
+    }
 
     static func lines(_ data: Data, dropFirst: Bool) -> [Data] {
         var out = data.split(separator: 0x0A, omittingEmptySubsequences: true).map { Data($0) }
@@ -137,7 +147,7 @@ private func resolve(_ turn: Turn, modified: Date, now: Date) -> (Session.Phase,
     case .attention(let activity): return quiet > TranscriptText.staleAfter ? (.waiting, .waiting) : (.needsAttention, activity)
     case .tool(let activity): return quiet > TranscriptText.staleAfter ? (.waiting, .waiting) : (.working, activity)
     case .thinking: return quiet > TranscriptText.staleAfter ? (.waiting, .waiting) : (.working, .thinking)
-    case .unknown: return quiet < 90 ? (.working, .thinking) : (.waiting, .waiting)
+    case .unknown: return quiet < TranscriptText.unknownQuietAfter ? (.working, .thinking) : (.waiting, .waiting)
     }
 }
 

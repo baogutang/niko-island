@@ -91,4 +91,25 @@ final class MenuBarFollowTests: XCTestCase {
         XCTAssertFalse(NikoSettings(raw: settings.raw).attentionBreaksFullScreen)
         XCTAssertEqual(NikoSettings(raw: ["fullScreenPolicy": .string("nonsense")]).fullScreenPolicy, .followMenuBar)
     }
+
+    func testABarAtRestIsNotWatchedAtDisplayRate() {
+        var watch = BarWatch()
+        // Riding a shown bar that never leaves (a notched display's full-screen app): pass after
+        // pass, nothing moves, so nothing keeps the display-rate timer going. 0.15.1 and earlier did.
+        for _ in 0..<100 { XCTAssertNil(watch.passed(moving: false, ridingBar: true)) }
+        XCTAssertEqual(watch.passed(moving: true, ridingBar: true), BarWatch.moving, "a sliding bar is followed frame by frame")
+
+        // The pointer far below: nothing to watch. Near the bar, and just after leaving it: watched closely.
+        XCTAssertNil(watch.pointerMoved(atTopEdge: false, nearBar: false))
+        XCTAssertEqual(watch.pointerMoved(atTopEdge: false, nearBar: true), BarWatch.leaving)
+        XCTAssertEqual(watch.pointerMoved(atTopEdge: false, nearBar: false), BarWatch.leaving, "the move that leaves the bar")
+        XCTAssertNil(watch.pointerMoved(atTopEdge: false, nearBar: false))
+        XCTAssertEqual(watch.clicked(), BarWatch.leaving, "a click may close the bar's menu")
+
+        // Not riding a bar: only the top edge, where a hidden bar comes down from, matters.
+        _ = watch.passed(moving: false, ridingBar: false)
+        XCTAssertNil(watch.pointerMoved(atTopEdge: false, nearBar: true))
+        XCTAssertEqual(watch.pointerMoved(atTopEdge: true, nearBar: true), BarWatch.reveal)
+        XCTAssertNil(watch.clicked())
+    }
 }
