@@ -6,7 +6,7 @@ import SwiftUI
 /// known, a week of bars and the models behind the numbers.
 /// Used inside the island and in Settings.
 struct UsageView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     @Environment(\.look) private var look
     @Environment(\.isStaticPreview) private var isStaticPreview
     /// The bar chart shows days, or the twelve months.
@@ -198,10 +198,13 @@ struct UsageView: View {
     }
 
     /// `mascot`: the agent's creature is drawn (in the list of every agent's limits).
-    private func limitRow(_ window: RateLimitWindow, agent: String, mascot: Bool) -> some View {
+    /// `capturedAt`: when the reading was made; an old one is drawn faintly, with its age instead of a pace.
+    private func limitRow(_ window: RateLimitWindow, agent: String, mascot: Bool, capturedAt: Date?) -> some View {
         let level = QuotaLevel(used: window.usedPercent)
-        let tint = LimitWords.color(level, accent: look.accent)
-        let outlook = isStaticPreview ? nil : model.outlook(agent: agent, window: window)
+        let stale = LimitFreshness.isStale(capturedAt, now: isStaticPreview ? PreviewClock.now : Date())
+        let tint = stale ? Theme.tertiary : LimitWords.color(level, accent: look.accent)
+        // A pace worked out from readings that stopped coming says nothing about now.
+        let outlook = isStaticPreview || stale ? nil : model.outlook(agent: agent, window: window)
         return VStack(alignment: .leading, spacing: 3) {
             HStack(spacing: 10) {
                 if mascot { MascotView(source: agent, size: 15) }
@@ -224,11 +227,14 @@ struct UsageView: View {
                 Text(String(format: "%.0f%%", window.usedPercent)).font(look.mono(12, .medium))
                     .contentTransition(.numericText(value: window.usedPercent))
                     .animation(Motion.smooth(look.motion), value: window.usedPercent)
-                    .foregroundStyle(level == .ok ? Theme.primary : tint).frame(width: 40, alignment: .trailing)
+                    .foregroundStyle(stale ? Theme.tertiary : level == .ok ? Theme.primary : tint).frame(width: 40, alignment: .trailing)
                 Text(resetText(window.resetsAt)).font(look.body(11)).foregroundStyle(Theme.tertiary).lineLimit(1)
                     .frame(width: 112, alignment: .trailing)
             }
-            if let outlook, let text = LimitWords.outlook(outlook, window: window) {
+            if stale, let capturedAt {
+                Text(L("Last read %@", sinceText(capturedAt))).font(look.body(10.5)).foregroundStyle(Theme.tertiary)
+                    .padding(.leading, (mascot ? 25 : 0) + 122)
+            } else if let outlook, let text = LimitWords.outlook(outlook, window: window) {
                 Text(text).font(look.body(10.5))
                     .foregroundStyle(outlook.runsOutBeforeReset && outlook.runsOutAt != nil ? Theme.amber : Theme.tertiary)
                     .padding(.leading, (mascot ? 25 : 0) + 122)
@@ -236,12 +242,37 @@ struct UsageView: View {
         }
     }
 
+    /// Claude Code's own figures stop coming when it is used only in the Claude app (its status
+    /// line runs in a terminal). Having it look for itself keeps them current.
+    @ViewBuilder
+    private func staleClaudeHint(_ agent: UsageSnapshot.AgentUsage) -> some View {
+        let now = isStaticPreview ? PreviewClock.now : Date()
+        if agent.id == ProviderLimitsClient.claude, !agent.limits.isEmpty, LimitFreshness.isStale(agent.limitsCapturedAt, now: now),
+           !model.settings.claudeAsksItself, !model.settings.claudeLimitsLookup {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(L("Claude Code's status line only runs in a terminal, so in the Claude app these figures stop coming. Having Claude Code look for itself keeps them current."))
+                    .font(look.body(11.5)).foregroundStyle(Theme.secondary).fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 4)
+                smallButton(L("Keep current"), primary: true) { model.settings.claudeAsksItself = true }
+            }
+        }
+    }
+
+    /// Lookups the user switched on that are not answering (no key yet, a sign-in that ran out…).
+    private var lookupProblems: [(agent: String, text: String, state: ProviderLimitsClient.State)] {
+        model.providerLookups.compactMap { agent, result in
+            guard model.settings.asksProvider(agent), let text = ProviderLookupText.problem(result.state, agent: agent) else { return nil }
+            return (agent, text, result.state)
+        }
+        .sorted { AgentRegistry.displayName(for: $0.agent) < AgentRegistry.displayName(for: $1.agent) }
+    }
+
     /// Who the numbers come from, in a few words.
     private func sourceText(_ agent: UsageSnapshot.AgentUsage) -> String {
         let name = AgentRegistry.displayName(for: agent.id)
         switch agent.limitsSource {
         case .provider?: return agent.limitsCapturedAt.map { L("asked %@", sinceText($0)) } ?? ""
-        case .statusLine?: return L("from %@'s status line", name)
+        case .statusLine?: return agent.limitsCapturedAt.map { L("from %@'s status line, %@", name, sinceText($0)) } ?? L("from %@'s status line", name)
         case .agentCache?: return agent.limitsCapturedAt.map { L("as %@ last saw them, %@", name, sinceText($0)) } ?? ""
         case .limitReached?: return L("%@ was turned away", name)
         case .agentFiles?, nil: return L("as %@ reports them", name)
@@ -296,7 +327,8 @@ struct UsageView: View {
                             .help(L("A reset is spent in %@ itself. This only brings it to the front.", name))
                     }
                 }
-                ForEach(agent.limits) { limitRow($0, agent: agent.id, mascot: false) }
+                ForEach(agent.limits) { limitRow($0, agent: agent.id, mascot: false, capturedAt: agent.limitsCapturedAt) }
+                staleClaudeHint(agent)
                 if let asking {
                     if !asking.enabled {
                         // Nothing local knows the plan's windows: say where they are and how to see them.
@@ -326,15 +358,30 @@ struct UsageView: View {
         }
     }
 
-    /// Every agent's limits in one list.
+    /// Every agent's limits in one list, and the lookups that are switched on but not answering.
     @ViewBuilder
     private var allLimits: some View {
         let withLimits = usage.agents.filter { $0.id != "all" && !$0.limits.isEmpty }
-        if !withLimits.isEmpty {
+        let problems = isStaticPreview ? [] : lookupProblems
+        if !withLimits.isEmpty || !problems.isEmpty {
             VStack(alignment: .leading, spacing: 7) {
                 Text(L("Limits").uppercased()).font(look.mono(10.5, .semibold)).foregroundStyle(Theme.tertiary)
                 ForEach(withLimits) { agent in
-                    ForEach(agent.limits) { limitRow($0, agent: agent.id, mascot: true) }
+                    ForEach(LimitRows.shown(agent.limits)) { limitRow($0, agent: agent.id, mascot: true, capturedAt: agent.limitsCapturedAt) }
+                    if let quiet = LimitRows.quiet(agent.limits) {
+                        Text(L("%lld more at 0%%", quiet)).font(look.body(10.5)).foregroundStyle(Theme.tertiary)
+                            .padding(.leading, 25 + 122)
+                    }
+                    staleClaudeHint(agent)
+                }
+                ForEach(problems, id: \.agent) { problem in
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        MascotView(source: problem.agent, size: 15)
+                        Text("\(AgentRegistry.displayName(for: problem.agent))  \(problem.text)")
+                            .font(look.body(11.5)).foregroundStyle(Theme.amber).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: 4)
+                        smallButton(L("Settings…"), action: openUsageSettings)
+                    }
                 }
             }
         }

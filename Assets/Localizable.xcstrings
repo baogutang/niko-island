@@ -21,6 +21,26 @@
         }
       }
     },
+    "%@ is also connected to %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 也接入了 %@"
+          }
+        }
+      }
+    },
+    "%@ is no longer on this Mac, but its %lld hooks still run on every event of these agents, with nothing to answer them.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 已经不在这台 Mac 上了，但它留下的 %lld 条钩子仍会在这些代理的每次事件时运行，却没有谁来接收。"
+          }
+        }
+      }
+    },
     "%@ is not on this Mac, but its hooks are connected. Other agents run them too (Cursor does, unless told not to); their sessions are shown as theirs. Remove them if you do not use %@.": {
       "localizations": {
         "zh-Hans": {
@@ -47,6 +67,26 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@ 把套餐的额度记在它自己的服务器上。"
+          }
+        }
+      }
+    },
+    "%@ left hooks in %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 在 %@ 里留下了钩子"
+          }
+        }
+      }
+    },
+    "%@ left hooks in %lld agents": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 在 %lld 个代理里留下了钩子"
           }
         }
       }
@@ -231,6 +271,16 @@
         }
       }
     },
+    "%@. Their hooks stay in place until they are disconnected.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@。断开之前，它们的钩子会一直留着。"
+          }
+        }
+      }
+    },
     "%@: %@ %lld%% used": {
       "localizations": {
         "zh-Hans": {
@@ -247,6 +297,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%@：%@约 %@ 后用完"
+          }
+        }
+      }
+    },
+    "%@: %lld hooks taken out of %lld files. A backup of each file is next to it.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@：已从 %3$lld 个文件中移除 %2$lld 条钩子，每个文件旁都留了备份。"
           }
         }
       }
@@ -287,6 +347,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "这台 Mac 上有 %lld 个代理尚未接入"
+          }
+        }
+      }
+    },
+    "%lld connected agents are not on this Mac": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld 个已接入的代理不在这台 Mac 上"
           }
         }
       }
@@ -347,6 +417,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "%lld 分钟前"
+          }
+        }
+      }
+    },
+    "%lld more at 0%%": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "另有 %lld 项为 0%%"
           }
         }
       }
@@ -821,6 +901,16 @@
         }
       }
     },
+    "Add a key…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "填写 Key…"
+          }
+        }
+      }
+    },
     "Adds the tool and command being asked for, or the first line of a reply. Off: none of that leaves this Mac.": {
       "localizations": {
         "zh-Hans": {
@@ -1141,6 +1231,16 @@
         }
       }
     },
+    "An old reading of %@'s limits: open Usage": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ 的限额是较早的读数：打开用量"
+          }
+        }
+      }
+    },
     "Answer here and the agent carries on with the session.": {
       "localizations": {
         "zh-Hans": {
@@ -1297,6 +1397,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "正在询问 GitHub…"
+          }
+        }
+      }
+    },
+    "Asking about %@'s plan does not work": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "查询 %@ 的套餐没有成功"
           }
         }
       }
@@ -1511,6 +1621,16 @@
         }
       }
     },
+    "Cancel": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "取消"
+          }
+        }
+      }
+    },
     "Card": {
       "localizations": {
         "zh-Hans": {
@@ -1651,12 +1771,72 @@
         }
       }
     },
+    "Claude Code's limits are an old reading": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 的限额是较早的读数"
+          }
+        }
+      }
+    },
     "Claude Code's sign-in on this Mac has run out. It renews itself the next time Claude Code runs in a terminal.": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
             "value": "Claude Code 在这台 Mac 上的登录已过期。下次在终端里运行 Claude Code 时它会自己续期。"
+          }
+        }
+      }
+    },
+    "Claude Code's status line only runs in a terminal, so in the Claude app these figures stop coming. Having Claude Code look for itself keeps them current.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 的状态栏只在终端里运行，在 Claude App 里使用时这些数字就不再更新。让 Claude Code 自己查，就能一直保持最新。"
+          }
+        }
+      }
+    },
+    "Claude Code's status line still goes through it too.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Claude Code 的状态栏也还要经过它。"
+          }
+        }
+      }
+    },
+    "Clean up": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清理"
+          }
+        }
+      }
+    },
+    "Clean up %@'s hooks?": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清理 %@ 的钩子？"
+          }
+        }
+      }
+    },
+    "Clean up…": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "清理…"
           }
         }
       }
@@ -1871,12 +2051,12 @@
         }
       }
     },
-    "Connections and creatures": {
+    "Connections and status": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "接入与小生物"
+            "value": "接入与状态"
           }
         }
       }
@@ -2037,6 +2217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "诊断信息"
+          }
+        }
+      }
+    },
+    "Disconnect them": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "全部断开"
           }
         }
       }
@@ -2481,6 +2671,16 @@
         }
       }
     },
+    "Health": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "健康检查"
+          }
+        }
+      }
+    },
     "Hello": {
       "localizations": {
         "zh-Hans": {
@@ -2711,6 +2911,16 @@
         }
       }
     },
+    "Its hooks are taken out of the agents' settings, and its status line out of Claude Code's. A backup of every file changed is kept next to it. %@'s own folders are not touched.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "会从各代理的配置里移除它的钩子，并从 Claude Code 的状态栏中去掉它。每个改动的文件旁都会留一份备份。%@ 自己的文件夹不会被动。"
+          }
+        }
+      }
+    },
     "Its hooks were taken out and could not be put back: %@. Press Connect once the file can be written again.": {
       "localizations": {
         "zh-Hans": {
@@ -2737,6 +2947,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "安静的会话保留"
+          }
+        }
+      }
+    },
+    "Keep current": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保持最新"
           }
         }
       }
@@ -2827,6 +3047,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "最近 24 小时"
+          }
+        }
+      }
+    },
+    "Last read %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "上次读取：%@"
           }
         }
       }
@@ -3151,6 +3381,16 @@
         }
       }
     },
+    "No other island left hooks behind, every connected agent is on this Mac, and the plan lookups that are switched on answer.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "没有其他灵动岛留下的钩子，已接入的代理都在这台 Mac 上，打开的套餐查询也都有回应。"
+          }
+        }
+      }
+    },
     "No price known for: %@": {
       "localizations": {
         "zh-Hans": {
@@ -3317,6 +3557,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "还没有接入任何代理。在你确认之前，接入不会改动任何东西。"
+          }
+        }
+      }
+    },
+    "Nothing to fix": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一切正常"
           }
         }
       }
@@ -4391,6 +4641,16 @@
         }
       }
     },
+    "Some files could not be written: %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有些文件没能写入：%@"
+          }
+        }
+      }
+    },
     "Some tools rewrite an agent's config and drop entries they do not know. A connected agent whose hooks went missing is connected again, at most every ten minutes, and the island says so. Removing an agent here or with niko-island uninstall stops this for it.": {
       "localizations": {
         "zh-Hans": {
@@ -4467,6 +4727,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "停止"
+          }
+        }
+      }
+    },
+    "Stop asking": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不再查询"
           }
         }
       }
@@ -4731,6 +5001,16 @@
         }
       }
     },
+    "They are in %@.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "它们在 %@ 里。"
+          }
+        }
+      }
+    },
     "This is the latest version.": {
       "localizations": {
         "zh-Hans": {
@@ -4937,6 +5217,16 @@
           "stringUnit": {
             "state": "translated",
             "value": "已在系统设置中关闭，不会弹出横幅。"
+          }
+        }
+      }
+    },
+    "Two islands answer the same requests and announce the same turns. Remove one of them from these agents if that is not what you want.": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "两个灵动岛会同时接收同样的请求、播报同样的回合。如果这不是你想要的，请在这些代理里移除其中一个。"
           }
         }
       }
@@ -5551,6 +5841,16 @@
         }
       }
     },
+    "from %@'s status line, %@": {
+      "localizations": {
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "来自 %@ 的状态栏，%@"
+          }
+        }
+      }
+    },
     "go to it": {
       "localizations": {
         "zh-Hans": {
@@ -5731,12 +6031,12 @@
         }
       }
     },
-    "no event since Niko Island started": {
+    "no event received yet": {
       "localizations": {
         "zh-Hans": {
           "stringUnit": {
             "state": "translated",
-            "value": "Niko Island 启动以来还没收到事件"
+            "value": "还没收到过事件"
           }
         }
       }

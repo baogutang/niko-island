@@ -381,7 +381,12 @@ public struct Activity: Sendable, Equatable {
         if let input {
             switch verb {
             case "running":
-                detail = (input["command"] ?? input["cmd"])?.stringValue
+                // Claude Code describes each command in a few words; otherwise the command, without what only sets the scene.
+                if let described = input["description"]?.stringValue, describes(described) {
+                    detail = described
+                } else {
+                    detail = (input["command"] ?? input["cmd"])?.stringValue.map(commandGist)
+                }
             case "reading", "editing":
                 detail = (input["file_path"] ?? input["path"] ?? input["notebook_path"])?.stringValue
                     .map { ($0 as NSString).lastPathComponent }
@@ -400,6 +405,38 @@ public struct Activity: Sendable, Equatable {
             detail = tool
         }
         return Activity(verb: verb, detail: detail.map { Activity.oneLine($0, limit: 96) })
+    }
+
+    /// A description worth showing instead of the command: a few words, not one ("run").
+    static func describes(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.split(whereSeparator: \.isWhitespace).count >= 2 { return true }
+        // Chinese and Japanese descriptions have no spaces between words.
+        return trimmed.unicodeScalars.filter { $0.value >= 0x2E80 }.count >= 4
+    }
+
+    /// What a shell command does, without what only sets the scene: variables set in front,
+    /// `cd` and `export` before `&&` or `;`, and `env`, `sudo`, `time`, `nohup`, `exec` in front.
+    /// `SP=/private/tmp/x; cd $SP && sips -c 80 a.png` is `sips -c 80 a.png`.
+    public static func commandGist(_ command: String) -> String {
+        let line = command.split(whereSeparator: \.isNewline).first.map(String.init) ?? command
+        let wrappers: Set<String> = ["env", "sudo", "time", "nohup", "exec", "command", "builtin"]
+        func isAssignment(_ word: Substring) -> Bool {
+            guard let equals = word.firstIndex(of: "="), equals > word.startIndex else { return false }
+            return word[..<equals].allSatisfy { $0.isLetter || $0.isNumber || $0 == "_" }
+        }
+        for segment in line.components(separatedBy: "&&").flatMap({ $0.components(separatedBy: ";") }) {
+            var words = segment.split(separator: " ", omittingEmptySubsequences: true)[...]
+            while let first = words.first, isAssignment(first) || wrappers.contains(String(first)) {
+                words = words.dropFirst()
+                // A wrapper's own options (`sudo -E`, `env -i`) go with it.
+                while let option = words.first, option.hasPrefix("-"), wrappers.contains(String(first)) { words = words.dropFirst() }
+            }
+            guard let head = words.first else { continue }
+            if ["cd", "export", "set", "source", ".", "pushd", "unset", "true"].contains(String(head)) { continue }
+            return words.joined(separator: " ")
+        }
+        return line.trimmingCharacters(in: .whitespaces)
     }
 
     public static func oneLine(_ text: String, limit: Int) -> String {

@@ -47,7 +47,7 @@ struct ProgressLine: View {
 /// what they said, and a way back to them. It opens nothing and decides
 /// nothing; a click goes to the session, the ✕ puts the card away.
 struct CompletionCard: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var completion: AppModel.Completion
     var metrics: IslandMetrics
     @Environment(\.look) private var look
@@ -124,7 +124,7 @@ struct CompletionCard: View {
 /// A line to type a follow-up into. The island takes the keyboard only once
 /// the field is clicked; Return sends what was typed into the session's terminal.
 struct ReplyField: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var key: SessionKey
     var onFocus: (Bool) -> Void = { _ in }
     @Environment(\.look) private var look
@@ -177,7 +177,7 @@ struct ReplyField: View {
 /// What ended while the screen was locked or asleep, said once when somebody
 /// is back: one line per session, each a way to that session.
 struct RecapCard: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var recap: AppModel.Recap
     var metrics: IslandMetrics
     @Environment(\.look) private var look

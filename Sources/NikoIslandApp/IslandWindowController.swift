@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import NikoCore
 import SwiftUI
 
@@ -57,7 +56,7 @@ final class IslandWindowController: NSObject {
     private var watch = BarWatch()
     private var overlaySettlesAt = Date.distantPast
     private var lastTrace = ""
-    private var subscriptions: Set<AnyCancellable> = []
+    private var watches: [AnyObject] = []
 
     init(model: AppModel) {
         self.model = model
@@ -82,17 +81,14 @@ final class IslandWindowController: NSObject {
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(spaceChanged),
                                                           name: NSWorkspace.activeSpaceDidChangeNotification, object: nil)
         // Opening, closing and a request arriving or leaving all change whether the island may slide away.
-        Publishers.Merge(model.$isExpanded.map { _ in () }, model.$pending.map(\.count).removeDuplicates().map { _ in () })
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] in
-                self?.quicken(for: 0.3)
-                self?.follow()
-            }
-            .store(in: &subscriptions)
-        model.$settings.map(\.islandDisplay).removeDuplicates().dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.screensChanged() }
-            .store(in: &subscriptions)
+        watches.append(Watch({ [model] in Pair(first: model.isExpanded, second: model.pending.count) }) { [weak self] _ in
+            self?.quicken(for: 0.3)
+            self?.follow()
+        })
+        var first = true
+        watches.append(Watch({ [model] in model.settings.islandDisplay }) { [weak self] _ in
+            if first { first = false } else { self?.screensChanged() }
+        })
     }
 
     private static func makePanel() -> IslandPanel {
@@ -138,12 +134,27 @@ final class IslandWindowController: NSObject {
             }
         }
         deskPanel.contentView = IslandWindowController.host(desk)
+        if overlayPanel.isVisible { attachOverlay() } else { detachOverlay() }
+    }
+
+    /// The overlay window holds an island only while it is on screen (over a full-screen app).
+    /// Kept in the window while it was hidden, that second island was drawn again on every change
+    /// of the model, as if it could be seen.
+    private func attachOverlay() {
         let overlay = IslandView(model: model, metrics: metrics) { [weak self] rect in
             guard let self else { return }
             self.overlayRect = rect
             self.pointerMoved()
         }
-        overlayPanel.contentView = IslandWindowController.host(overlay)
+        let host = IslandWindowController.host(overlay)
+        overlayPanel.contentView = host
+        host.layoutSubtreeIfNeeded()
+    }
+
+    private func detachOverlay() {
+        guard !(overlayPanel.contentView is NSHostingView<IslandView>) || !overlayPanel.isVisible else { return }
+        overlayPanel.contentView = NSView()
+        overlayRect = .zero
     }
 
     /// The island's view in its window. SwiftUI must never size the window: by default a
@@ -285,6 +296,7 @@ final class IslandWindowController: NSObject {
             overlayLeaving = false
             let origin = NSPoint(x: baseOrigin.x, y: baseOrigin.y + next.lift)
             if !overlayPanel.isVisible {
+                if !(overlayPanel.contentView is NSHostingView<IslandView>) { attachOverlay() }
                 // Arriving without a menu bar to ride on (an agent needs you): come down from above.
                 let rides = next.lift > 0
                 let start = rides ? origin : NSPoint(x: origin.x, y: origin.y + metrics.bandHeight + 20)
@@ -303,6 +315,7 @@ final class IslandWindowController: NSObject {
             if next.surface == .desktop || previous.lift > 0 {
                 // Back on a desktop, or it rode the menu bar out: nothing left to animate.
                 overlayPanel.orderOut(nil)
+                detachOverlay()
             } else {
                 overlayLeaving = true
                 let away = NSPoint(x: baseOrigin.x, y: baseOrigin.y + max(overlayRect.height, metrics.bandHeight) + 20)
@@ -310,6 +323,7 @@ final class IslandWindowController: NSObject {
                     guard let self, self.overlayLeaving else { return }
                     self.overlayLeaving = false
                     self.overlayPanel.orderOut(nil)
+                    self.detachOverlay()
                 }
             }
         }

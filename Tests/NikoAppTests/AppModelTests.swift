@@ -1564,7 +1564,8 @@ final class AppModelTests: XCTestCase, @unchecked Sendable {   // main-actor con
         XCTAssertEqual(look.motion, 0.7)
         XCTAssertEqual(look.chips, [.elapsed, .agent, .branch])
         XCTAssertEqual(look.replyLines, 1)
-        XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "kiro")
+        // Kept in the settings, but every agent is shown as its own mark (0.15): a pick of an older version is not used.
+        XCTAssertEqual(Mascots.sprite(for: "claude", choices: look.mascots).name, "clawd")
         XCTAssertEqual(Mascots.sprite(for: "codex", choices: look.mascots).name, "codex")
         XCTAssertEqual(Mascots.sprite(for: "claude", choices: ["claude": "starfish"]).name, "clawd", "a creature of an older version is gone: its own pet")
         model.settings.setMascot(nil, for: "claude")

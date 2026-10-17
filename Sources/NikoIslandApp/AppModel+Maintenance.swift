@@ -188,6 +188,7 @@ extension AppModel {
                 self.maintenance.busy = false
                 self.maintenance.message = summary
                 self.maintenance.agents = rows
+                self.refreshHealth()
                 if result.succeeded, action == .install {
                     // The installer may have switched on the loopback ingress for a JS plugin.
                     self.settings = NikoSettings.load(paths: self.paths)

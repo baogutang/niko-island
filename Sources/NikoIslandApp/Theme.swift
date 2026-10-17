@@ -63,6 +63,8 @@ struct IslandLook: Equatable {
     /// How long the island takes to open and close, relative to the standard.
     var motion: Double = 1
     var style = NikoSettings.IslandStyle.classic
+    /// How wide the open island is: rows work out from it how many chips they have room for.
+    var islandWidth: CGFloat = 640
 
     init() {}
 
@@ -87,10 +89,12 @@ struct IslandLook: Equatable {
         motion = settings.motion.factor
         replyLines = settings.replyLines
         accent = Theme.color(for: settings.accent)
-        mascots = settings.mascotChoices
+        // Every agent is shown as its own mark (0.15): a creature picked for it in an older version is not used.
+        mascots = [:]
         showMascots = settings.showMascots
         compact = settings.rowDensity == .compact
         chips = Set(NikoSettings.RowChip.allCases.filter(settings.showsChip))
+        islandWidth = CGFloat(settings.islandWidth.points)
     }
 }
 

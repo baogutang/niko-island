@@ -29,7 +29,7 @@ final class BackdropStage {
 /// screen), so a large display gets a large welcome that is drawn at that
 /// size. Nothing with text in it is ever magnified.
 struct OnboardingView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics = .plain
     var onFinish: () -> Void
 
@@ -628,7 +628,7 @@ private struct Shimmer: View {
 /// A stand-in for the island, drawn where the real one sits, that acts out
 /// what the real one does. It never touches real sessions.
 struct DemoIsland: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics
     var stage: Stage
 

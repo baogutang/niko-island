@@ -211,6 +211,12 @@ enum PreviewRenderer {
         case .settingsGeneral:
             model.settingsPage = SettingsPage.general.rawValue
             model.permissions.showForPreview(notifications: .granted, automation: [.terminal: .granted, .iterm2: .denied])
+            // The health check with something to say: another island's hooks, left behind.
+            if let vibe = ForeignHooks.known.first(where: { $0.id == "vibe-island" }) {
+                model.health.leftovers = [ForeignHooks.Finding(island: vibe, places: [
+                    .init(agent: "claude", file: ".claude/settings.json", hooks: 14), .init(agent: "codex", file: ".codex/hooks.json", hooks: 6),
+                    .init(agent: "cursor", file: ".cursor/hooks.json", hooks: 12)], statusLine: true, installed: false)]
+            }
         case .permissionGuide:
             break
         case .onboarding:
@@ -239,7 +245,7 @@ enum PreviewRenderer {
 
     /// A stand-in desktop: wallpaper, a hint of a menu bar, and the island on top.
     private struct Stage: View {
-        @ObservedObject var model: AppModel
+        var model: AppModel
         var metrics: IslandMetrics
         var width: CGFloat
         var height: CGFloat?

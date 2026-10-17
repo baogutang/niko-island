@@ -5,13 +5,13 @@ import SwiftUI
 /// from the top centre. Collapsed it is a small black tab the height of the
 /// menu bar; expanded it becomes the session surface.
 struct IslandView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics
     var onFrameChange: (CGRect) -> Void = { _ in }
     @Environment(\.isStaticPreview) private var isStaticPreview
 
     private var visible: Bool {
-        model.isExpanded || model.settings.showIslandWhenIdle || !model.sessions.isEmpty || !model.pending.isEmpty
+        model.isExpanded || model.settings.showIslandWhenIdle || model.listedCount > 0 || !model.pending.isEmpty
     }
 
     var body: some View {
@@ -28,7 +28,7 @@ struct IslandView: View {
 
 /// The island itself: the black shape and whatever it currently holds.
 struct IslandBody: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics
     @Environment(\.look) private var look
     @Environment(\.isStaticPreview) private var isStaticPreview
@@ -45,8 +45,9 @@ struct IslandBody: View {
         // so the island is out of the way the moment it is not wanted.
         let spring = model.isExpanded || showsCard ? Motion.open(look.motion) : Motion.close(look.motion)
         let lifted = model.isExpanded || showsCard
-        let tone = IslandGlance(model: model).tone
         let closed = !model.isExpanded && !showsCard && model.settings.islandGlow
+        // Only the closed island glows: the open one does not depend on every event in the list.
+        let tone = closed ? IslandGlance(model: model).tone : .idle
         return VStack(spacing: 0) {
             if model.isExpanded {
                 ExpandedIsland(model: model, metrics: metrics)
@@ -206,7 +207,7 @@ struct IslandGlance: Equatable {
 }
 
 struct CollapsedIsland: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics
     @Environment(\.look) private var look
     @Environment(\.islandNamespace) private var namespace
@@ -292,7 +293,7 @@ struct CollapsedIsland: View {
 
 struct ExpandedIsland: View {
     @Environment(\.look) private var look
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var metrics: IslandMetrics
     @Environment(\.isStaticPreview) private var isStaticPreview
 
@@ -302,14 +303,14 @@ struct ExpandedIsland: View {
         var order: [String] = []
         // In the usage view, the agent being looked at comes first.
         if model.route == .usage, model.usageAgent != "all" { order.append(model.usageAgent) }
-        for source in model.sessions.map(\.source) where !order.contains(source) { order.append(source) }
+        for source in model.listedAgents where !order.contains(source) { order.append(source) }
         return QuotaGlance.make(usage: model.usage, recentAgents: order, now: isStaticPreview ? PreviewClock.now : Date())
     }
 
     private var summary: String {
         if !model.pending.isEmpty { return L("%lld waiting for your decision", model.pending.count) }
-        if model.sessions.isEmpty { return L("No sessions") }
-        return L("%lld sessions", model.sessions.count)
+        if model.listedCount == 0 { return L("No sessions") }
+        return L("%lld sessions", model.listedCount)
     }
 
     var body: some View {
@@ -354,7 +355,7 @@ struct ExpandedIsland: View {
                 .help(L("A newer version can be installed from Settings → About."))
             }
             Spacer(minLength: 0)
-            if model.sessions.count > 3 {
+            if model.listedCount > 3 {
                 IconButton(symbol: "magnifyingglass", label: L("Find a session")) {
                     model.collapse()
                     model.onOpenSwitcher?()
@@ -367,7 +368,16 @@ struct ExpandedIsland: View {
                        label: model.settings.soundsEnabled ? L("Mute sounds") : L("Turn sounds on")) {
                 model.settings.soundsEnabled.toggle()
             }
-            IconButton(symbol: "gearshape.fill", label: L("Settings")) { model.onOpenSettings?() }
+            IconButton(symbol: "gearshape.fill", label: L("Settings")) {
+                // Something in Settings → General → Health wants fixing: it opens there.
+                if model.healthItems.contains(where: \.urgent) { model.settingsPage = "general" }
+                model.onOpenSettings?()
+            }
+            .overlay(alignment: .topTrailing) {
+                if !isStaticPreview, model.healthItems.contains(where: \.urgent) {
+                    Circle().fill(Theme.amber).frame(width: 6, height: 6).offset(x: -4, y: 4).allowsHitTesting(false)
+                }
+            }
         }
         .padding(.horizontal, 20)
         .frame(height: max(metrics.bandHeight, 34))
@@ -377,7 +387,7 @@ struct ExpandedIsland: View {
 /// The session list, with the request that needs an answer opened up on top.
 struct SessionsPane: View {
     @Environment(\.look) private var look
-    @ObservedObject var model: AppModel
+    var model: AppModel
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var listHeight: CGFloat = 0
     @State private var hovered: SessionKey?
@@ -474,9 +484,12 @@ struct SessionsPane: View {
                     .accessibilityAddTraits(.isHeader)
                 }
                 ForEach(group.sessions) { session in
-                    SessionRowView(model: model, session: session, now: now, showsProject: model.settings.sessionGrouping != .project,
+                    SessionRowView(model: model, session: session,
+                                   facts: RowFacts(session: session, model: model, now: now, hovered: hovered == session.key),
+                                   showsProject: model.settings.sessionGrouping != .project,
                                    compact: !full.contains(session.key),
                                    hovered: isStaticPreview ? nil : $hovered, hoverSpace: isStaticPreview ? nil : hoverSpace)
+                        .equatable()
                         .cascade(rows.firstIndex { $0.key == session.key } ?? 0)
                         .transition(.row)
                 }
@@ -555,6 +568,7 @@ struct CappedScroll<Content: View>: View {
     var maxHeight: CGFloat
     @ViewBuilder var content: Content
     @Environment(\.isStaticPreview) private var isStaticPreview
+    @State private var overflows = false
 
     var body: some View {
         if isStaticPreview {
@@ -563,11 +577,29 @@ struct CappedScroll<Content: View>: View {
             // A scroll view's own height is its content's; capped, and fixed at that, it is
             // sized in the same layout pass as everything else. (Measured afterwards, the first
             // frame was the whole window's height: the island flashed tall as Usage opened.)
-            ScrollView(.vertical, showsIndicators: false) { content }
-                .scrollBounceBehavior(.basedOnSize)
-                .frame(maxHeight: maxHeight)
-                .fixedSize(horizontal: false, vertical: true)
+            ScrollView(.vertical, showsIndicators: false) {
+                content.background(GeometryReader { proxy in
+                    Color.clear.preference(key: ListHeightKey.self, value: proxy.size.height)
+                })
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: maxHeight)
+            .fixedSize(horizontal: false, vertical: true)
+            // More below than fits: the foot fades, so the page reads as one that scrolls.
+            .mask(ScrollFade(active: overflows))
+            .onPreferenceChange(ListHeightKey.self) { overflows = $0 > maxHeight + 1 }
         }
+    }
+}
+
+/// A mask that fades the last few points of a scroll view whose content goes on below.
+struct ScrollFade: View {
+    var active: Bool
+
+    var body: some View {
+        LinearGradient(stops: [.init(color: .black, location: 0), .init(color: .black, location: active ? 0.93 : 1),
+                               .init(color: active ? .clear : .black, location: 1)],
+                       startPoint: .top, endPoint: .bottom)
     }
 }
 
@@ -674,10 +706,14 @@ struct QuotaGlanceView: View {
                     if index > 0 { Rectangle().fill(Theme.hairline).frame(width: 1, height: 11) }
                     HStack(spacing: 4) {
                         Text(entry.label).foregroundStyle(Theme.tertiary)
-                        Text("\(entry.percent)%").fontWeight(.semibold).foregroundStyle(color(entry.level))
+                        Text("\(entry.percent)%").fontWeight(.semibold).foregroundStyle(glance.stale ? Theme.tertiary : color(entry.level))
                         if let left = entry.resetsIn { Text(left).foregroundStyle(Theme.tertiary) }
                     }
                     .font(look.mono(11))
+                }
+                if glance.stale {
+                    // An old reading: shown, but not as how things stand now.
+                    Image(systemName: "clock.arrow.circlepath").font(.system(size: 9.5, weight: .semibold)).foregroundStyle(Theme.tertiary)
                 }
             }
             .padding(.horizontal, 8).padding(.vertical, 3)
@@ -686,7 +722,8 @@ struct QuotaGlanceView: View {
         }
         .buttonStyle(.plain)
         .onHover { inside in withAnimation(Motion.snappy(look.motion)) { hovering = inside } }
-        .help(L("Plan limits of %@: open Usage", AgentRegistry.displayName(for: glance.agent)))
+        .help(glance.stale ? L("An old reading of %@'s limits: open Usage", AgentRegistry.displayName(for: glance.agent))
+              : L("Plan limits of %@: open Usage", AgentRegistry.displayName(for: glance.agent)))
         .accessibilityLabel(glance.entries.map { L("%@ window %lld percent used", $0.label, $0.percent) }.joined(separator: ", "))
     }
 

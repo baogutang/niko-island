@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import NikoCore
 import SwiftUI
 
@@ -12,7 +11,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
     private var notifier: SystemNotifier?
     private var sounds: SoundPlayer?
     private let onboarding = OnboardingWindowController()
-    private var subscriptions: Set<AnyCancellable> = []
+    private var watches: [AnyObject] = []
     public let model: AppModel
     private var observers: [NSObjectProtocol] = []
 
@@ -87,24 +86,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         Hotkey.shared.actions[.deny] = { [weak self] in self?.model.decideByKey(.deny) }
         Hotkey.shared.actions[.jump] = { [weak self] in self?.model.jumpToWhatNeedsMe() }
         Hotkey.shared.actions[.switcher] = { [weak self] in self?.switcher?.toggle() }
-        model.$settings
-            .receive(on: DispatchQueue.main)
-            .sink { settings in
-                Localization.use(language: settings.language)
-                Hotkey.shared.setEnabled(settings.hotkeyEnabled)
-                Hotkey.shared.set(.jump, enabled: settings.jumpHotkey)
-                Hotkey.shared.set(.switcher, enabled: settings.switcherHotkey)
-            }
-            .store(in: &subscriptions)
+        watches.append(Watch({ [model] in model.settings }) { settings in
+            Localization.use(language: settings.language)
+            Hotkey.shared.setEnabled(settings.hotkeyEnabled)
+            Hotkey.shared.set(.jump, enabled: settings.jumpHotkey)
+            Hotkey.shared.set(.switcher, enabled: settings.switcherHotkey)
+        })
         // ⌃⌥A and ⌃⌥D belong to us only while a request is waiting; otherwise other apps keep them.
-        model.$pending.map { !$0.isEmpty }
-            .combineLatest(model.$settings.map(\.decisionHotkeys))
-            .receive(on: DispatchQueue.main)
-            .sink { waiting, enabled in
-                Hotkey.shared.set(.allow, enabled: waiting && enabled)
-                Hotkey.shared.set(.deny, enabled: waiting && enabled)
-            }
-            .store(in: &subscriptions)
+        watches.append(Watch({ [model] in Pair(first: !model.pending.isEmpty, second: model.settings.decisionHotkeys) }) { state in
+            Hotkey.shared.set(.allow, enabled: state.first && state.second)
+            Hotkey.shared.set(.deny, enabled: state.first && state.second)
+        })
         model.isFrontmost = { TerminalJumper.isFrontmost($0) }
         model.replySender = { session, text in await TerminalJumper.reply(text, to: session) }
         // After an update is in place: start it once this process has gone, then go.
@@ -118,14 +110,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate {
         model.checkForUpdates()
         model.refreshWiringAfterUpdate(isBundled: Bundle.main.bundleURL.pathExtension == "app")
         watchScreen()
-        model.$wantsOnboarding
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] wanted in
-                guard let self, wanted else { return }
-                self.model.wantsOnboarding = false
-                self.onboarding.show(model: self.model)
+        watches.append(Watch({ [model] in model.wantsOnboarding }) { [weak self] wanted in
+            guard let self, wanted else { return }
+            // Asked for from inside a change of the model: shown once that change is done.
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard self.model.wantsOnboarding else { return }
+                    self.model.wantsOnboarding = false
+                    self.onboarding.show(model: self.model)
+                }
             }
-            .store(in: &subscriptions)
+        })
 
         // For screenshots and manual checks: `-NikoOpenSettings <page>` opens Settings straight away.
         if let page = UserDefaults.standard.string(forKey: "NikoOpenSettings").flatMap(SettingsPage.init(rawValue:)) {

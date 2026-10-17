@@ -155,7 +155,7 @@ final class SwitcherState: ObservableObject {
 }
 
 struct SwitcherView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     @ObservedObject var state: SwitcherState
     var choose: (SessionKey) -> Void
     @Environment(\.look) private var look

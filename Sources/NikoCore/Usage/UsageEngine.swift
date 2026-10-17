@@ -353,6 +353,28 @@ public final class UsageEngine: @unchecked Sendable {
                 self.zcodePending = false
                 self.syncZCode()
             }
+            self.publishThrottled()
+        }
+    }
+
+    /// While an agent works, its transcript changes every second or two. What is new is counted
+    /// each time, but the figures (a handful of queries over the whole history, and whatever
+    /// shows them redrawn) are worked out again at most this often.
+    static let publishInterval: TimeInterval = 4
+    private var lastPublish = Date.distantPast
+    private var publishScheduled = false
+
+    private func publishThrottled() {
+        let wait = lastPublish.addingTimeInterval(Self.publishInterval).timeIntervalSinceNow
+        guard wait > 0 else {
+            publish()
+            return
+        }
+        guard !publishScheduled else { return }
+        publishScheduled = true
+        queue.asyncAfter(deadline: .now() + wait) { [weak self] in
+            guard let self else { return }
+            self.publishScheduled = false
             self.publish()
         }
     }
@@ -394,6 +416,7 @@ public final class UsageEngine: @unchecked Sendable {
     // MARK: Snapshots
 
     private func publish() {
+        lastPublish = Date()
         onSnapshot(makeSnapshot())
     }
 

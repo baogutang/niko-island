@@ -18,7 +18,7 @@ enum QuestionAnswers {
 /// It stays until the user decides or the agent withdraws it.
 struct RequestDetailView: View {
     @Environment(\.look) private var look
-    @ObservedObject var model: AppModel
+    var model: AppModel
     let request: AppModel.PendingRequest
 
     private var session: Session? { model.sessions.first { $0.key == request.sessionKey } }
@@ -71,7 +71,7 @@ struct RequestDetailView: View {
 
 struct PermissionForm: View {
     @Environment(\.look) private var look
-    @ObservedObject var model: AppModel
+    var model: AppModel
     let request: AppModel.PendingRequest
 
     private var headline: String {
@@ -178,7 +178,7 @@ struct PermissionForm: View {
 /// a time. The result goes back as `updatedInput.answers`.
 struct QuestionForm: View {
     @Environment(\.look) private var look
-    @ObservedObject var model: AppModel
+    var model: AppModel
     let request: AppModel.PendingRequest
 
     @State private var step = 0

@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import Observation
 import NikoCore
 
 /// What the model asks of the notification layer. The real implementation
@@ -18,7 +19,8 @@ public protocol SoundPlaying: AnyObject {
 
 /// Main-actor state behind the island: sessions, pending approvals, settings.
 @MainActor
-public final class AppModel: ObservableObject {
+@Observable
+public final class AppModel {
     public struct Badge: Equatable, Sendable {
         public var active = 0
         public var pending = 0
@@ -93,42 +95,49 @@ public final class AppModel: ObservableObject {
     public let hub: IngressHub
     let log: NikoLog
 
-    @Published public private(set) var sessions: [Session] = []
-    @Published public private(set) var pending: [PendingRequest] = []
-    @Published public private(set) var badge = Badge()
-    @Published public private(set) var grantedSessions: Set<SessionKey> = []
-    @Published public private(set) var startFailure: StartFailure?
-    @Published public private(set) var httpPort: UInt16 = 0
-    @Published public private(set) var isExpanded = false
+    public private(set) var sessions: [Session] = []
+    public private(set) var pending: [PendingRequest] = []
+    public private(set) var badge = Badge()
+    public private(set) var grantedSessions: Set<SessionKey> = []
+    public private(set) var startFailure: StartFailure?
+    public private(set) var httpPort: UInt16 = 0
+    public private(set) var isExpanded = false
     /// How far two fingers are pulling the island right now, in points: down (positive) on the
     /// closed island, up (negative) on the open one's top band. Drawn with rubber-band resistance.
-    @Published public var pull: CGFloat = 0
-    @Published public private(set) var expandReason: ExpandReason = .click
-    @Published public var route: Route = .sessions {
+    public var pull: CGFloat = 0
+    public private(set) var expandReason: ExpandReason = .click
+    public var route: Route = .sessions {
         didSet { if route == .usage { refreshActivity(force: true) } }
     }
-    @Published public private(set) var toast: Toast?
+    public private(set) var toast: Toast?
     /// The card for a turn that has just finished; nil most of the time.
-    @Published public private(set) var completion: Completion?
+    public private(set) var completion: Completion?
     /// The screen is locked or asleep: nobody is there to hear or see anything.
-    @Published public internal(set) var isAway = false {
+    public internal(set) var isAway = false {
         didSet { if oldValue, !isAway { welcomeBack() } }
     }
     /// What finished while nobody was there, shown once when somebody is back.
-    @Published public private(set) var recap: Recap?
+    public private(set) var recap: Recap?
     /// How the last line to the phone went; nil until one was sent.
-    @Published public internal(set) var pushStatus: PushClient.Outcome?
-    @Published public internal(set) var hasPushKey = false
-    @Published public internal(set) var hasPushSignIn = false
+    public internal(set) var pushStatus: PushClient.Outcome?
+    public internal(set) var hasPushKey = false
+    public internal(set) var hasPushSignIn = false
     /// Branch per working directory, for the rows that are listed.
-    @Published public internal(set) var branches: [String: String] = [:]
+    public internal(set) var branches: [String: String] = [:]
     /// Says whether the island can be seen right now (it is away over a full-screen app). Set by the window.
-    var islandIsVisible: () -> Bool = { true }
-    private var completionTask: Task<Void, Never>?
-    private var completionHeld = false
+    /// The agents of the listed sessions in list order, each once, and how many sessions there are.
+    /// Set only when they change: the open island's header reads these rather than the list,
+    /// so an event in a session does not lay out the whole open island again (Usage most of all).
+    public private(set) var listedAgents: [String] = []
+    /// What the health card in Settings found (other islands' leftovers, …).
+    public internal(set) var health = HealthState()
+    public private(set) var listedCount = 0
+    @ObservationIgnored var islandIsVisible: () -> Bool = { true }
+    @ObservationIgnored private var completionTask: Task<Void, Never>?
+    @ObservationIgnored private var completionHeld = false
     /// The pending request whose details are open (the oldest one unless the user picked another).
-    @Published public var focusedRequestID: UInt64?
-    @Published public var settings: NikoSettings {
+    public var focusedRequestID: UInt64?
+    public var settings: NikoSettings {
         didSet {
             guard settings != oldValue else { return }
             settings.save(paths: paths)
@@ -147,80 +156,80 @@ public final class AppModel: ObservableObject {
             }
         }
     }
-    @Published public internal(set) var usage = UsageSnapshot() {
+    public internal(set) var usage = UsageSnapshot() {
         didSet { noteRateLimits(previous: oldValue) }
     }
     /// Sessions, prompts and tool calls per agent and day, from the hook events.
-    @Published public internal(set) var activity = ActivitySnapshot()
-    var activityLedger: ActivityLedger?
-    var activityReadAt = Date.distantPast
-    @Published public internal(set) var maintenance = MaintenanceState()
+    public internal(set) var activity = ActivitySnapshot()
+    @ObservationIgnored var activityLedger: ActivityLedger?
+    @ObservationIgnored var activityReadAt = Date.distantPast
+    public internal(set) var maintenance = MaintenanceState()
 
     /// The island wants to be shown (a request arrived).
-    public var onAttentionNeeded: (() -> Void)?
-    public weak var notifier: AttentionNotifying?
-    public weak var soundPlayer: SoundPlaying?
+    @ObservationIgnored public var onAttentionNeeded: (() -> Void)?
+    @ObservationIgnored public weak var notifier: AttentionNotifying?
+    @ObservationIgnored public weak var soundPlayer: SoundPlaying?
     /// Opens the settings window (set by the app delegate).
-    public var onOpenSettings: (() -> Void)?
+    @ObservationIgnored public var onOpenSettings: (() -> Void)?
     /// Opens the quick switcher (set by the app delegate).
-    public var onOpenSwitcher: (() -> Void)?
+    @ObservationIgnored public var onOpenSwitcher: (() -> Void)?
     /// Plays a cue regardless of the switches (the preview buttons in Settings).
-    public var onPreviewSound: ((SoundEvent) -> Void)?
+    @ObservationIgnored public var onPreviewSound: ((SoundEvent) -> Void)?
     /// The settings page that is showing (raw value of `SettingsPage`).
-    @Published public var settingsPage = "general"
+    public var settingsPage = "general"
     /// Whose usage the usage view shows: "all" or an agent id.
-    @Published public var usageAgent = "all"
+    public var usageAgent = "all"
     /// What each provider answered the last time it was asked (opt-in lookups).
-    @Published public internal(set) var providerLookups: [String: ProviderLimitsClient.Result] = [:]
+    public internal(set) var providerLookups: [String: ProviderLimitsClient.Result] = [:]
     /// Whether a GLM Coding Plan key is in the Keychain (the key itself is never held here).
-    @Published public internal(set) var hasGLMKey = false
-    @Published public internal(set) var hasKimiKey = false
-    @Published public internal(set) var hasMiniMaxKey = false
+    public internal(set) var hasGLMKey = false
+    public internal(set) var hasKimiKey = false
+    public internal(set) var hasMiniMaxKey = false
     /// A newer release, once GitHub has said so (only when the user switched the check on).
-    @Published public internal(set) var availableUpdate: ReleaseInfo?
+    public internal(set) var availableUpdate: ReleaseInfo?
     public enum UpdateState: Equatable, Sendable { case idle, checking, upToDate, installing, failed(String) }
-    @Published public internal(set) var updateState: UpdateState = .idle
+    public internal(set) var updateState: UpdateState = .idle
     /// Tests replace this.
-    var makeUpdater: () -> Updater = { Updater() }
+    @ObservationIgnored var makeUpdater: () -> Updater = { Updater() }
     /// How the latest-version answer is turned into the running app being replaced (the app delegate sets it).
-    var relaunch: (URL) -> Void = { _ in }
+    @ObservationIgnored var relaunch: (URL) -> Void = { _ in }
 
     /// How Claude Code's own look at the plan's usage last went; nil until it was asked to.
-    @Published public internal(set) var claudeLookup: ClaudeCodeUsage.Outcome?
-    @Published public internal(set) var claudeIsLooking = false
-    var claudeLookedAt: Date?
+    public internal(set) var claudeLookup: ClaudeCodeUsage.Outcome?
+    public internal(set) var claudeIsLooking = false
+    @ObservationIgnored var claudeLookedAt: Date?
     /// Tests replace this; the app runs the user's own `claude`.
-    var claudeAsker: @Sendable (URL, NikoPaths) -> ClaudeCodeUsage.Outcome = { home, paths in ClaudeCodeUsage.ask(home: home, paths: paths) }
-    var limitsClient: ProviderLimitsClient?
+    @ObservationIgnored var claudeAsker: @Sendable (URL, NikoPaths) -> ClaudeCodeUsage.Outcome = { home, paths in ClaudeCodeUsage.ask(home: home, paths: paths) }
+    @ObservationIgnored var limitsClient: ProviderLimitsClient?
     /// Tests and previews replace this so that no Keychain is opened and no request leaves.
-    var makeLimitsClient: (@escaping @Sendable ([String: ProviderLimitsClient.Result]) -> Void) -> ProviderLimitsClient? = { _ in nil }
+    @ObservationIgnored var makeLimitsClient: (@escaping @Sendable ([String: ProviderLimitsClient.Result]) -> Void) -> ProviderLimitsClient? = { _ in nil }
     /// Agents whose app or command-line tool is running right now.
-    @Published public internal(set) var runningAgents: [String] = []
+    public internal(set) var runningAgents: [String] = []
     /// When each agent's hooks last reached the app (this run only): Settings shows it, so a hook
     /// that never fires is noticed. Updated at most every 20 seconds per agent.
-    @Published public internal(set) var lastHeard: [String: Date] = [:]
+    public internal(set) var lastHeard: [String: Date] = [:]
     /// Shown instead of the island's usual content the first time the app runs.
-    @Published public var wantsOnboarding = false
+    public var wantsOnboarding = false
     /// Brings the session's terminal to the front; replaced in tests.
-    public var jumpHandler: (Session) -> Void = { TerminalJumper.jump(to: $0) }
+    @ObservationIgnored public var jumpHandler: (Session) -> Void = { TerminalJumper.jump(to: $0) }
     /// What macOS currently allows the app (notifications, control of terminals).
-    let permissions = PermissionCenter()
+    @ObservationIgnored let permissions = PermissionCenter()
 
     private var store = SessionStore()
     private var grants = SessionGrants()
-    private let inbox = DeliveryInbox()
-    private var unixServer: UnixIngressServer?
-    private var httpServer: HTTPIngressServer?
-    private var pruneTimer: Timer?
-    private var goneTimer: Timer?
-    private var presenceTimer: Timer?
-    private var toastTask: Task<Void, Never>?
-    private var lastPlayed: [SoundEvent: Date] = [:]
-    var usageEngine: UsageEngine?
-    private var scout: TranscriptScout?
-    private var scoutPrimed = false
+    @ObservationIgnored private let inbox = DeliveryInbox()
+    @ObservationIgnored private var unixServer: UnixIngressServer?
+    @ObservationIgnored private var httpServer: HTTPIngressServer?
+    @ObservationIgnored private var pruneTimer: Timer?
+    @ObservationIgnored private var goneTimer: Timer?
+    @ObservationIgnored private var presenceTimer: Timer?
+    @ObservationIgnored private var toastTask: Task<Void, Never>?
+    @ObservationIgnored private var lastPlayed: [SoundEvent: Date] = [:]
+    @ObservationIgnored var usageEngine: UsageEngine?
+    @ObservationIgnored private var scout: TranscriptScout?
+    @ObservationIgnored private var scoutPrimed = false
     /// The app was started with session discovery (tests start without).
-    private var scoutWanted = false
+    @ObservationIgnored private var scoutWanted = false
     /// Sessions the user dismissed, and when; a transcript must not bring them
     /// back until it has something new to say.
     private var dismissedAt: [SessionKey: Date] = [:]
@@ -246,6 +255,7 @@ public final class AppModel: ObservableObject {
         }
         log.configure(fileURL: paths.logFile)
         AppModel.raiseFileDescriptorLimit()
+        lastHeard = LastHeard.load(paths: paths)
 
         hub.setHandler { [weak self] delivery in
             // Ingress queue → main actor, in order. Deliveries are queued and
@@ -299,6 +309,7 @@ public final class AppModel: ObservableObject {
         if usage { startUsageEngine() }
         if scout ?? usage { startScout() }
         refreshMaintenance()
+        if usage { refreshHealth() }
         return true
     }
 
@@ -315,7 +326,7 @@ public final class AppModel: ObservableObject {
         presenceTimer = timer
     }
 
-    private var branchFolders: Set<String> = []
+    @ObservationIgnored private var branchFolders: Set<String> = []
 
     /// Which branch each listed session's directory is on. Read off the main thread: it is a handful of small files.
     func refreshBranches() {
@@ -388,6 +399,8 @@ public final class AppModel: ObservableObject {
     }
 
     func refreshPresence() {
+        // Other islands' leftovers: looked for again every ten minutes (a few small files).
+        if let checked = health.checkedAt, Date().timeIntervalSince(checked) >= 600 { refreshHealth() }
         refreshBranches()
         remindAboutWaiting()
         remindAboutUnread()
@@ -415,7 +428,7 @@ public final class AppModel: ObservableObject {
 
     /// How often one request is brought up again before the app lets it be.
     nonisolated static let reminderLimit = 3
-    private var reminders: [UInt64: (count: Int, last: Date)] = [:]
+    @ObservationIgnored private var reminders: [UInt64: (count: Int, last: Date)] = [:]
 
     /// An agent that is blocked on you is the one thing worth saying twice.
     /// After the wait the user chose, the cue plays again (and the island opens
@@ -601,7 +614,11 @@ public final class AppModel: ObservableObject {
     private func process(_ delivery: IngressDelivery, now: Date) {
         let event = delivery.event
         let change = store.apply(event, evidence: delivery.evidence, now: now)
-        if lastHeard[event.source].map({ now.timeIntervalSince($0) >= 20 }) ?? true { lastHeard[event.source] = now }
+        if lastHeard[event.source].map({ now.timeIntervalSince($0) >= 20 }) ?? true {
+            lastHeard[event.source] = now
+            let heard = lastHeard, paths = self.paths
+            DispatchQueue.global(qos: .utility).async { LastHeard.save(heard, paths: paths) }
+        }
         // Answered in the agent's own dialog: the agent goes on, but leaves our hook waiting.
         for request in pending where event.settles(request.event) {
             request.replier.send(ReplyBuilder.line(for: .passToTerminal, event: request.event))
@@ -676,7 +693,7 @@ public final class AppModel: ObservableObject {
     }
 
     /// Test seam; the app in front otherwise.
-    var frontmostApp: () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
+    @ObservationIgnored var frontmostApp: () -> String? = { NSWorkspace.shared.frontmostApplication?.bundleIdentifier }
 
     /// "Quiet now" for a while (nil minutes: until switched off by hand, at most a day), or off with 0.
     public func setQuietNow(minutes: Int?, now: Date = Date()) {
@@ -801,9 +818,9 @@ public final class AppModel: ObservableObject {
         soundPlayer?.play(event)
     }
 
-    private var startedAt: [Date] = []
+    @ObservationIgnored private var startedAt: [Date] = []
     /// Sessions whose nearly full context has been pointed out.
-    private var contextWarned: Set<SessionKey> = []
+    @ObservationIgnored private var contextWarned: Set<SessionKey> = []
 
     /// Every reading of a plan window goes into the watch; a window crossing 90 %, or running
     /// out before its reset at the pace of late, is said once per cycle.
@@ -861,16 +878,16 @@ public final class AppModel: ObservableObject {
     }
 
     /// Windows that were used up, with the agent and the time they open again.
-    private var fullWindows: [String: (agent: String, resets: Date)] = [:]
+    @ObservationIgnored private var fullWindows: [String: (agent: String, resets: Date)] = [:]
     /// Putting removed hooks back: when it last looked, whether it is looking, and when each agent was put back.
-    var restoreCheckedAt = Date.distantPast
-    var restoreRunning = false
-    var restoredAt: [String: Date] = [:]
+    @ObservationIgnored var restoreCheckedAt = Date.distantPast
+    @ObservationIgnored var restoreRunning = false
+    @ObservationIgnored var restoredAt: [String: Date] = [:]
     /// Readings of each plan window, for its pace (kept between launches: percentages and times only).
-    private lazy var quotaWatch = QuotaWatch.load(from: paths.cache.appendingPathComponent("quota-history.json"))
-    private var quotaSavedAt = Date.distantPast
+    @ObservationIgnored private lazy var quotaWatch = QuotaWatch.load(from: paths.cache.appendingPathComponent("quota-history.json"))
+    @ObservationIgnored private var quotaSavedAt = Date.distantPast
     /// Limits that opened again while nobody was at the screen.
-    private var resetsWhileAway: [String] = []
+    @ObservationIgnored private var resetsWhileAway: [String] = []
 
     /// A limit that stopped an agent has reset: that is the moment its user was waiting for,
     /// so it is said once, on the island, with the "finished" cue, and to the phone if that is on.
@@ -928,7 +945,7 @@ public final class AppModel: ObservableObject {
     }
 
     /// Held open for a screenshot (`-NikoOpenIsland`): nothing closes it.
-    public var heldOpen = false
+    @ObservationIgnored public var heldOpen = false
 
     public func collapse() {
         guard isExpanded, !heldOpen else { return }
@@ -982,7 +999,7 @@ public final class AppModel: ObservableObject {
     /// A hook says "finished" the moment the turn ends; unless the agent's last
     /// words came with it, they reach us a moment later, when its transcript is
     /// read. A card waits for them; nothing else does.
-    var completionSettleDelay: TimeInterval = 1.9
+    @ObservationIgnored var completionSettleDelay: TimeInterval = 1.9
 
     private func presentWhenSettled(_ key: SessionKey, failed: Bool, replyIsIn: Bool) {
         guard let session = store[key] else { return }
@@ -1002,13 +1019,13 @@ public final class AppModel: ObservableObject {
     }
 
     /// Tests replace this; the app asks which application is in front.
-    var isFrontmost: (Session) -> Bool = { _ in false }
+    @ObservationIgnored var isFrontmost: (Session) -> Bool = { _ in false }
 
     // MARK: Back at the screen
 
     private var missed: [Recap.Item] = []
-    private var recapTask: Task<Void, Never>?
-    private var recapHeld = false
+    @ObservationIgnored private var recapTask: Task<Void, Never>?
+    @ObservationIgnored private var recapHeld = false
 
     /// Somebody is back. What ended in the meantime is said once, in one card,
     /// instead of having been said to an empty room card by card.
@@ -1059,9 +1076,9 @@ public final class AppModel: ObservableObject {
     public enum ReplyState: Equatable, Sendable { case sending, sent, failed }
 
     /// How the last follow-up to a session went.
-    @Published public private(set) var replies: [SessionKey: ReplyState] = [:]
+    public private(set) var replies: [SessionKey: ReplyState] = [:]
     /// Tests replace this; the app types into the session's terminal.
-    var replySender: (Session, String) async -> Bool = { _, _ in false }
+    @ObservationIgnored var replySender: (Session, String) async -> Bool = { _, _ in false }
 
     /// A follow-up can be typed for a session that has stopped and whose terminal can be addressed exactly.
     public func canReply(to key: SessionKey) -> Bool {
@@ -1088,8 +1105,8 @@ public final class AppModel: ObservableObject {
     enum PushKind { case permission, question, finished, failed }
 
     /// Tests replace this with a client that sends nowhere.
-    var makePushClient: () -> PushClient = { PushClient() }
-    private var pushClient: PushClient?
+    @ObservationIgnored var makePushClient: () -> PushClient = { PushClient() }
+    @ObservationIgnored private var pushClient: PushClient?
 
     /// What a line says. Without "say what it is about" it names the agent, the project and the kind of moment, nothing else.
     func pushMessage(_ kind: PushKind, session: Session, detail: String? = nil) -> PushMessage {
@@ -1229,14 +1246,22 @@ public final class AppModel: ObservableObject {
 
     private func publish() {
         let hidden = !settings.silencedFolders.isEmpty || !settings.silencedPrompts.isEmpty
-        sessions = hidden ? store.ordered.filter { !settings.silences(cwd: $0.cwd, firstPrompt: $0.firstPrompt) } : store.ordered
+        let listed = hidden ? store.ordered.filter { !settings.silences(cwd: $0.cwd, firstPrompt: $0.firstPrompt) } : store.ordered
+        if listed != sessions { sessions = listed }
+        var agents: [String] = []
+        for session in listed where !agents.contains(session.source) { agents.append(session.source) }
+        if agents != listedAgents { listedAgents = agents }
+        if listed.count != listedCount { listedCount = listed.count }
         // A context about to be compacted is worth one cue, the first time it gets there.
         for session in sessions where session.context?.isNearlyFull == true && contextWarned.insert(session.key).inserted {
             play(.limit)
         }
         contextWarned = contextWarned.filter { key in sessions.contains { $0.key == key && $0.context?.isNearlyFull == true } }
-        grantedSessions = Set(sessions.map(\.key).filter { grants.hasGrants(for: $0) })
-        badge = Badge(active: sessions.filter { $0.phase == .working }.count, pending: pending.count)
+        // Only what changed is set: each setting redraws whatever reads it.
+        let granted = Set(sessions.map(\.key).filter { grants.hasGrants(for: $0) })
+        if granted != grantedSessions { grantedSessions = granted }
+        let counts = Badge(active: sessions.filter { $0.phase == .working }.count, pending: pending.count)
+        if counts != badge { badge = counts }
         // A folder not seen before: its branch is looked up now rather than at the next tick.
         let folders = Set(sessions.compactMap(\.cwd))
         if folders != branchFolders {
@@ -1328,7 +1353,7 @@ public final class AppModel: ObservableObject {
     }
 
     /// Test seam; the system opens the link otherwise.
-    var openLink: (URL) -> Bool = { NSWorkspace.shared.open($0) }
+    @ObservationIgnored var openLink: (URL) -> Bool = { NSWorkspace.shared.open($0) }
 
     /// Removes a card for a session that will never report again (e.g. a killed agent).
     public func dismiss(_ key: SessionKey) {

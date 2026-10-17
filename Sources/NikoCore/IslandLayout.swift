@@ -16,6 +16,8 @@ public struct QuotaGlance: Equatable, Sendable {
 
     public var agent: String
     public var entries: [Entry]
+    /// The reading is old (see `LimitFreshness`): shown, but not as how things stand now.
+    public var stale = false
 
     /// `recentAgents` in the order the list shows them; the first that has limits wins.
     public static func make(usage: UsageSnapshot, recentAgents: [String], now: Date) -> QuotaGlance? {
@@ -27,7 +29,8 @@ public struct QuotaGlance: Equatable, Sendable {
             guard let short = windows.first else { continue }
             var picked = [short]
             if let long = windows.last, long.id != short.id { picked.append(long) }
-            return QuotaGlance(agent: id, entries: picked.map { entry($0, now: now) })
+            return QuotaGlance(agent: id, entries: picked.map { entry($0, now: now) },
+                               stale: LimitFreshness.isStale(agent.limitsCapturedAt, now: now))
         }
         return nil
     }
@@ -71,5 +74,35 @@ public enum RowTiers {
             }
         }
         return keys
+    }
+}
+
+
+/// How old a reading of a plan's windows may be before it is shown as an old reading rather than
+/// as how things stand. Claude Code's status line, for one, only runs in a terminal: someone who
+/// uses it in the Claude app saw last night's figure as today's.
+public enum LimitFreshness {
+    public static let staleAfter: TimeInterval = 3600
+
+    public static func isStale(_ capturedAt: Date?, now: Date) -> Bool {
+        guard let capturedAt else { return false }
+        return now.timeIntervalSince(capturedAt) > staleAfter
+    }
+}
+
+/// Which of an agent's windows the list of every agent's limits shows. Several windows that
+/// are all but unused said the same thing several times (Cursor's plan: three rows at 0 %):
+/// the ones in use are shown, or the first if none is, and the rest are counted.
+public enum LimitRows {
+    public static func shown(_ windows: [RateLimitWindow]) -> [RateLimitWindow] {
+        guard windows.count > 1 else { return windows }
+        let used = windows.filter { $0.usedPercent >= 0.5 }
+        return used.isEmpty ? [windows[0]] : used
+    }
+
+    /// How many windows were left out, or nil when none was.
+    public static func quiet(_ windows: [RateLimitWindow]) -> Int? {
+        let hidden = windows.count - shown(windows).count
+        return hidden > 0 ? hidden : nil
     }
 }

@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.16.0] - 2026-10-17
+
+### Added
+- **A health check** at the top of Settings → General, each finding with its fix:
+  - **Hooks other islands left behind.** An island that was uninstalled can leave its hooks in the agents' settings; they still run on every event (Vibe Island's bridge, finding no app, searches Spotlight each time, about 60 ms; an old Ping Island bridge looks for a socket that is gone). They are found by the commands they run, and taken out in one click after a confirmation: only their entries (matcher groups and events that held nothing else go with them), their link in Claude Code's status line, and what uninstalling Niko Island would have put back as the status line. A backup of every file changed is kept next to it; the other island's own folders are not touched; an island whose app is still installed is mentioned, not cleaned up. `niko-island internal leftovers [--clean <island>]` does the same from a shell.
+  - Connected agents that are not on this Mac (disconnect them), plan lookups that are switched on but not answering (no key yet: add one; a sign-in that ran out: stop asking), and plan limits that are an old reading (have Claude Code look for itself).
+  - The gear on the open island gets a dot while something wants fixing.
+
+### Changed
+- **The open island stays still while agents work.** The list was sorted by each session's latest event, so whichever had just run a tool went to the top, and with several agents at work it reshuffled, animated, on almost every event (74 layout passes a second). Sessions are now ordered by when they got into their state: one moves when it finishes or needs you, not when it runs another tool.
+- **A seventh of the processor.** Views follow only what they show (Observation instead of one object every view watched: any change redrew the whole island), a row is drawn from its own session alone, the hidden full-screen copy of the island is only made when it shows, and usage figures are worked out at most every four seconds. With agents busy (two events a second): 37 % → 5.5 % open on the list, 15.8 % → 1.3 % open on Usage, 6.9 % → 2.4 % closed.
+- **A command is named by what it does.** Claude Code's own description of it ("Capture the island closed and open"), else the command without what only sets the scene (`SP=…; cd … &&`, `export`, `sudo`).
+- **Rows give the headline room.** Chips the row has no room for are left out, least telling first (where it runs, the model, the context, the cost); an agent's own app is "Desktop" instead of its name a second time ("Claude Code · Claude", "ZCode · ZCode"); a folder an agent keeps for itself is not shown as a project ("default").
+- **Old limit readings look old.** A plan reading older than an hour is drawn faintly with its age ("Last read 3 days ago"), without a pace worked out from it, and the island's header marks it; in the Claude app, Claude Code's status line never runs, and its last figure had been shown as today's.
+- Lookups that are switched on but not answering are listed under Usage → All; windows that are all at 0 % (Cursor's three) are counted on one line; a page that goes on below fades at its foot.
+- Settings → Agents says when each agent was last heard from, across restarts, and asks to trust Codex's hooks only while none has arrived. The per-agent creature picker is gone: every agent is shown as its own mark.
+
+### Fixed
+- Lists and dates came out in English when the language was pinned to 简体中文 in Settings ("A, B, and C").
+- `niko-island status` listed files of an older install location as missing (Gemini CLI's plugin folder).
+
+### Verification
+- 471 local automated tests, 5 environment-dependent skips, no failures. New: the leftover cleaner on fixtures of each config shape (only the island's entries go, ours stay, backups byte-identical and never overwritten), unchaining the status line, the stable order, chip fitting, old readings, the health card's findings and fixes, command descriptions, workspaces, last heard across restarts, following observed values.
+- The cleaner was run on copies of the owner's 17 real agent config files in a scratch folder: 98 Vibe Island hooks out of 11 files and 10 Ping Island hooks out of Codex's; in every file only those entries changed, every hook of ours and every other command and setting stayed, and each backup matched its original byte for byte. Running it twice in the same second overwrote the first backup; fixed and tested before release.
+- CPU figures above are from release builds against throwaway homes, with three sessions sent two tool events a second through the real bridge; the island, Usage and the health card were looked at on a real display (captured by window).
+
 ## [0.15.2] - 2026-10-17
 
 ### Fixed

@@ -25,7 +25,7 @@ enum SettingsPage: String, CaseIterable, Identifiable {
         case .general: return L("Permissions, notifications, startup")
         case .island: return L("How it looks and behaves")
         case .sessions: return L("What is listed, and for how long")
-        case .agents: return L("Connections and creatures")
+        case .agents: return L("Connections and status")
         case .sounds: return L("Cues for each moment")
         case .usage: return L("Tokens, cost and limits")
         case .about: return L("Version and privacy")
@@ -91,7 +91,7 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 }
 
 struct SettingsRootView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     @Environment(\.isStaticPreview) private var isStaticPreview
     @Namespace private var selection
     @State private var hovered: SettingsPage?
@@ -175,7 +175,7 @@ struct SettingsRootView: View {
 // MARK: - Pages
 
 struct SettingsPageView: View {
-    @ObservedObject var model: AppModel
+    var model: AppModel
     var page: SettingsPage
     @Environment(\.isStaticPreview) private var isStaticPreview
     @State private var loginItemError: String?
@@ -188,6 +188,8 @@ struct SettingsPageView: View {
     @State private var pushSignInDraft = ""
     @State private var jumpMatchDraft = ""
     @State private var jumpLinkDraft = ""
+    /// The island whose leftover hooks the user is asked to confirm taking out.
+    @State private var confirmClean: ForeignHooks.Island?
     @Environment(\.look) private var look
 
     var body: some View {
@@ -277,8 +279,47 @@ struct SettingsPageView: View {
 
     // MARK: General
 
+    /// What on this Mac makes the island less useful than it could be, each with what fixes it.
+    private var healthCard: some View {
+        let items = model.healthItems
+        let message = model.health.message
+        return card(L("Health")) {
+            if items.isEmpty {
+                row(L("Nothing to fix"),
+                    L("No other island left hooks behind, every connected agent is on this Mac, and the plan lookups that are switched on answer."),
+                    divider: message != nil) {
+                    Image(systemName: "checkmark.seal.fill").font(.system(size: 17)).foregroundStyle(look.accent)
+                }
+            }
+            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                row(item.title, item.detail, divider: index < items.count - 1 || message != nil) {
+                    if let fix = item.fix, let label = item.fixLabel {
+                        Button(label) {
+                            if case .clean(let island) = fix { confirmClean = island } else { model.apply(fix) }
+                        }
+                        .buttonStyle(PillButtonStyle(kind: .primary))
+                        .disabled(model.health.cleaning != nil || model.maintenance.busy)
+                    }
+                }
+            }
+            if let message {
+                Text(message).font(Theme.body(11.5)).foregroundStyle(Theme.secondary)
+                    .fixedSize(horizontal: false, vertical: true).padding(.vertical, 10)
+            }
+        }
+        .alert(L("Clean up %@'s hooks?", confirmClean?.name ?? ""), isPresented: Binding(
+            get: { confirmClean != nil }, set: { if !$0 { confirmClean = nil } }), presenting: confirmClean) { island in
+            Button(L("Clean up")) { model.cleanLeftovers(island) }
+            Button(L("Cancel"), role: .cancel) {}
+        } message: { island in
+            Text(L("Its hooks are taken out of the agents' settings, and its status line out of Claude Code's. A backup of every file changed is kept next to it. %@'s own folders are not touched.", island.name))
+        }
+        .onAppear { if !isStaticPreview { model.refreshHealth() } }
+    }
+
     private var general: some View {
         VStack(alignment: .leading, spacing: 18) {
+            healthCard
             PermissionsCard(center: model.permissions)
             card(L("Notify me when")) {
                 toggleRow(L("An agent asks for permission"), isOn: Binding(
@@ -884,11 +925,11 @@ struct SettingsPageView: View {
                         Text(L("%@ is not on this Mac, but its hooks are connected. Other agents run them too (Cursor does, unless told not to); their sessions are shown as theirs. Remove them if you do not use %@.", agent.name, agent.name))
                             .font(Theme.body(11.5)).foregroundStyle(Theme.tertiary)
                             .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
-                    } else if agent.wired, let followUp = agent.followUp {
+                    } else if agent.wired, let followUp = agent.followUp, model.lastHeard[agent.id] == nil {
+                        // What to do so that its hooks run at all: only while none has been heard.
                         Text(L(followUp)).font(Theme.body(11.5)).foregroundStyle(Theme.amber)
                             .fixedSize(horizontal: false, vertical: true).padding(.leading, 40)
                     }
-                    creaturePicker(for: agent.id)
                 }
                 .padding(.vertical, 10)
                 if index < model.maintenance.agents.count - 1 { Rectangle().fill(Theme.hairline).frame(height: 1) }
@@ -909,28 +950,6 @@ struct SettingsPageView: View {
                 .padding(12)
                 .background(RoundedRectangle(cornerRadius: 12).fill(Theme.field))
         }
-    }
-
-    /// Any creature can stand for any agent.
-    private func creaturePicker(for agent: String) -> some View {
-        let chosen = Mascots.sprite(for: agent, choices: model.settings.mascotChoices).name
-        return ScrollView(.horizontal, showsIndicators: false) { HStack(spacing: 5) {
-            ForEach(Mascots.all, id: \.name) { sprite in
-                Button {
-                    // Picking the agent's own creature clears the choice.
-                    model.settings.setMascot(sprite.name == Mascots.sprite(for: agent).name ? nil : sprite.name, for: agent)
-                } label: {
-                    MascotView(sprite: sprite, size: 18)
-                        .padding(4)
-                        .background(RoundedRectangle(cornerRadius: 7, style: .continuous)
-                            .fill(sprite.name == chosen ? Color.white.opacity(0.16) : Color.clear))
-                        .opacity(sprite.name == chosen ? 1 : 0.45)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(sprite.name)
-            }
-        } }
-        .padding(.leading, 36)
     }
 
     // MARK: Sounds
@@ -1113,10 +1132,10 @@ struct SettingsPageView: View {
     }
 
     private func heardText(_ agent: String) -> String {
-        guard let date = model.lastHeard[agent] else { return L("no event since Niko Island started") }
+        guard let date = model.lastHeard[agent] else { return L("no event received yet") }
         let seconds = max(0, Date().timeIntervalSince(date).wholeSeconds)
         let since = seconds < 90 ? L("just now") : seconds < 3600 ? L("%lld min ago", seconds / 60)
-            : L("%lldh %lldm ago", seconds / 3600, (seconds % 3600) / 60)
+            : seconds < 86_400 ? L("%lldh %lldm ago", seconds / 3600, (seconds % 3600) / 60) : L("%lld days ago", seconds / 86_400)
         return L("last event %@", since)
     }
 

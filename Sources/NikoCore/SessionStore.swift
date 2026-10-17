@@ -75,7 +75,9 @@ public struct SessionStore: Sendable {
 
     public init() {}
 
-    /// Needs-attention first, then waiting, then working; newest activity first within each.
+    /// Needs-attention first, then waiting, then working; within each, the one that got
+    /// there last first. Not by its latest event: with several agents at work that put
+    /// whichever had just run a tool on top, and the list reshuffled (and animated) all the time.
     public var ordered: [Session] {
         func rank(_ phase: Session.Phase) -> Int {
             switch phase {
@@ -86,7 +88,7 @@ public struct SessionStore: Sendable {
         }
         return sessions.values.sorted {
             if rank($0.phase) != rank($1.phase) { return rank($0.phase) < rank($1.phase) }
-            if $0.lastEventAt != $1.lastEventAt { return $0.lastEventAt > $1.lastEventAt }
+            if $0.phaseSince != $1.phaseSince { return $0.phaseSince > $1.phaseSince }
             return $0.id < $1.id
         }
     }
@@ -349,8 +351,10 @@ public enum AutoNamer {
     ]
 
     /// Name of the enclosing repository (directory holding `.git`), else the directory itself.
+    /// None for the home folder or a folder an agent keeps for itself inside a hidden one
+    /// (ZCode's `~/.zcode/workspace/default` read as a project called "default").
     public static func projectName(cwd: String?) -> String? {
-        guard let cwd, cwd.hasPrefix("/") else { return nil }
+        guard let cwd, cwd.hasPrefix("/"), !isAgentWorkspace(cwd) else { return nil }
         var url = URL(fileURLWithPath: cwd)
         let fallback = url.lastPathComponent
         for _ in 0..<12 {
@@ -362,6 +366,14 @@ public enum AutoNamer {
             url = parent
         }
         return fallback.isEmpty || fallback == "/" ? nil : fallback
+    }
+
+    /// The home folder itself, or anywhere inside a hidden folder in it.
+    static func isAgentWorkspace(_ cwd: String, home: String = NikoPaths.userHome().path) -> Bool {
+        let path = (cwd as NSString).standardizingPath
+        if path == home { return true }
+        guard path.hasPrefix(home + "/") else { return false }
+        return path.dropFirst(home.count + 1).hasPrefix(".")
     }
 
     public static func keywords(from prompt: String, limit: Int = 4) -> [String] {

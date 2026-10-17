@@ -348,6 +348,31 @@ public enum NikoCLI {
             }
             print("\(snapshots.count) session(s) active in the last \(Int(minutes)) min, scanned in \(Int(Date().timeIntervalSince(started) * 1000)) ms")
             return 0
+        case "leftovers":
+            // Hooks other islands left in the agents' configs. `--clean <island id>` takes them out (backups kept).
+            // `--home` and `--niko-root` point at another home and Niko Island folder (a copy, for a dry run).
+            let home = URL(fileURLWithPath: args.value("--home") ?? NSHomeDirectory())
+            let paths = args.value("--niko-root").map { NikoPaths(root: URL(fileURLWithPath: $0)) } ?? NikoPaths.resolve()
+            if let id = args.value("--clean") {
+                guard let island = ForeignHooks.known.first(where: { $0.id == id }) else {
+                    fail("unknown island \(id); known: \(ForeignHooks.known.map(\.id).joined(separator: ", "))")
+                    return 64
+                }
+                let cleaned = ForeignHooks.clean(island, home: home, paths: paths)
+                print("\(island.name): \(cleaned.hooks) hook(s) taken out of \(cleaned.files.count) file(s)"
+                      + (cleaned.statusLine ? ", status line unchained" : "") + "; \(cleaned.backups.count) backup(s)")
+                for file in cleaned.files { print("  ~/\(file)") }
+                for failure in cleaned.failures { print("  could not write \(failure)") }
+                return cleaned.failures.isEmpty ? 0 : 1
+            }
+            let findings = ForeignHooks.scan(home: home, paths: paths, isInstalled: IslandApps.isInstalled)
+            if findings.isEmpty { print("no hooks from other islands") }
+            for finding in findings {
+                print("\(finding.island.name) (\(finding.island.id))\(finding.installed ? ", installed" : ", app not found"): \(finding.hooks) hook(s)"
+                      + (finding.statusLine ? ", in the status line" : ""))
+                for place in finding.places { print("  \(place.agent)\t~/\(place.file)\t\(place.hooks)") }
+            }
+            return 0
         case "limits":
             // One opt-in lookup, to check that a provider answers in a form this version reads.
             // Prints states, percentages and the shape of the answer; never a credential.

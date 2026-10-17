@@ -461,6 +461,22 @@ public struct NikoSettings: Sendable, Equatable {
         }
     }
 
+    /// Switches the lookup for an agent's plan on or off.
+    public mutating func setAsksProvider(_ agent: String, _ on: Bool) {
+        switch agent {
+        case "claude": claudeLimitsLookup = on
+        case "zcode": glmLimitsLookup = on
+        case "codex": codexLimitsLookup = on
+        case "kimi": kimiLimitsLookup = on
+        case "minimax": minimaxLimitsLookup = on
+        case "gemini": geminiLimitsLookup = on
+        case "copilot": copilotLimitsLookup = on
+        case "cursor": cursorLimitsLookup = on
+        case "kiro": kiroLimitsLookup = on
+        default: break
+        }
+    }
+
     /// Ask Kimi about the Kimi Code plan, with a key of that plan the user typed in.
     public var kimiLimitsLookup: Bool {
         get { bool("kimiLimitsLookup", default: false) }

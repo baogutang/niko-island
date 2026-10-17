@@ -72,6 +72,22 @@ final class SessionStoreTests: XCTestCase {
         XCTAssertEqual(store[key]?.activity, before)
     }
 
+    func testTheListStaysStillWhileAgentsWork() {
+        var store = SessionStore()
+        store.apply(event("PreToolUse", session: "working-old"), now: t0)
+        store.apply(event("PreToolUse", session: "working-new"), now: t0 + 50)
+        store.apply(event("Stop", session: "idle"), now: t0 + 10)
+        XCTAssertEqual(store.ordered.map(\.id), ["claude/idle", "claude/working-new", "claude/working-old"])
+        // Another tool in a session that is already at work does not move it (it used to go to the top,
+        // and with several agents at work the list reshuffled, animated, on almost every event).
+        store.apply(event("PreToolUse", session: "working-old"), now: t0 + 70)
+        store.apply(event("PostToolUse", session: "working-old"), now: t0 + 71)
+        XCTAssertEqual(store.ordered.map(\.id), ["claude/idle", "claude/working-new", "claude/working-old"])
+        // Finishing is news: it moves the session to the top of the waiting ones.
+        store.apply(event("Stop", session: "working-old"), now: t0 + 80)
+        XCTAssertEqual(store.ordered.map(\.id), ["claude/working-old", "claude/idle", "claude/working-new"])
+    }
+
     func testOrderingKeysAndPruning() {
         var store = SessionStore()
         store.apply(event("PreToolUse", session: "working-old"), now: t0)

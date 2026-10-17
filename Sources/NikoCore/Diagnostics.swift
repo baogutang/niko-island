@@ -60,7 +60,10 @@ public enum Diagnostics {
                     let ours = HookMerge.isOurs(command: String(decoding: data, as: UTF8.self))
                     wired = wired || ours
                     states.append("\(file): \(data.count) bytes")
-                case .missing: states.append("\(file): missing")
+                case .missing:
+                    // Where an older version put its files: they are meant to be gone.
+                    if !agent.activeFiles.contains(file) { continue }
+                    states.append("\(file): missing")
                 case .unreadable: states.append("\(file): unreadable")
                 case .tooLarge(let size): states.append("\(file): \(size) bytes (over limit)")
                 }

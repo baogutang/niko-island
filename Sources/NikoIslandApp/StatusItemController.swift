@@ -1,5 +1,4 @@
 import AppKit
-import Combine
 import NikoCore
 
 /// The menu-bar icon. Left click toggles the island, right click opens a small menu.
@@ -7,7 +6,7 @@ import NikoCore
 final class StatusItemController: NSObject {
     private let item: NSStatusItem
     private let model: AppModel
-    private var cancellables: Set<AnyCancellable> = []
+    private var badgeWatch: Watch<AppModel.Badge>?
 
     var button: NSStatusBarButton? { item.button }
 
@@ -23,10 +22,7 @@ final class StatusItemController: NSObject {
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])
             button.setAccessibilityLabel(NikoVersion.displayName)
         }
-        model.$badge
-            .receive(on: RunLoop.main)
-            .sink { [weak self] badge in self?.render(badge) }
-            .store(in: &cancellables)
+        badgeWatch = Watch({ [model] in model.badge }) { [weak self] badge in self?.render(badge) }
     }
 
     private func render(_ badge: AppModel.Badge) {
